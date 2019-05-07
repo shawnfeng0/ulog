@@ -2,9 +2,10 @@
 
 #include <string.h>
 #include <stdint.h>
-#include <stdarg.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <time.h>
+#include <pthread.h>
 
 #ifndef LOG_OUTBUF_LEN
 #define LOG_OUTBUF_LEN 128 /* Size of buffer used for log printout */
@@ -15,32 +16,46 @@
 static char log_out_buf[LOG_OUTBUF_LEN];
 static uint16_t log_evt_num = 1;
 static OutputCb output_cb = NULL;
+static pthread_mutex_t log_lock;
 
 #endif
 
-void uLogInit(OutputCb cb)
-{
-#if defined(ULOG_ENABLE)
-    output_cb = cb;
+class LockGuard {
+   public:
+       LockGuard(pthread_mutex_t& _m):mMutex(_m) {
+           pthread_mutex_lock(&mMutex);
+       }
+       ~LockGuard() {
+           pthread_mutex_unlock(&mMutex);
+       }
+   private:
+       pthread_mutex_t& mMutex;
+};
 
-#if defined(ULOG_CLS)
-    char clear_str[3] = {'\033', 'c', '\0'}; // clean screen
-    if (output_cb)
-        output_cb(clear_str);
-#endif
-
-#endif
-}
-
-uint32_t getRefTimeUs() {
+static uint32_t getRefTimeUs() {
     struct timespec tsp;
     clock_gettime(CLOCK_REALTIME, &tsp);
     return (int32_t) ((tsp.tv_sec % 1000) * 1e6 + (int32_t) (tsp.tv_nsec / 1000));
 }
 
+void uLogInit(OutputCb cb) {
+#if defined(ULOG_ENABLE)
+
+  pthread_mutex_init(&log_lock, NULL);
+  output_cb = cb;
+
+#if defined(ULOG_CLS)
+  char clear_str[3] = {'\033', 'c', '\0'};  // clean screen
+  if (output_cb) output_cb(clear_str);
+#endif
+
+#endif
+}
+
 void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...)
 {
 #if defined(ULOG_ENABLE)
+    LockGuard lock = LockGuard(log_lock);
 
 #if LOG_OUTBUF_LEN < 64
 #error "LOG_OUTBUF_LEN does not have enough size."
@@ -67,14 +82,14 @@ void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...)
     switch (level)
     {
         case ULOG_ERROR:
-            infoStr = "\x1b[31;1mERROR: \x1b[30;1m(%s:%d) \x1b[0m";
+            infoStr = (char*)"\x1b[31;1mERROR: \x1b[30;1m(%s:%d) \x1b[0m";
             break;
         case ULOG_WARN:
-            infoStr = "\x1b[33;1mWARN: \x1b[30;1m(%s:%d) \x1b[0m";
+            infoStr = (char*)"\x1b[33;1mWARN: \x1b[30;1m(%s:%d) \x1b[0m";
             break;
         case ULOG_INFO:
         default:
-            infoStr = "\x1b[32;1mINFO: \x1b[30;1m(%s:%d) \x1b[0m";
+            infoStr = (char*)"\x1b[32;1mINFO: \x1b[30;1m(%s:%d) \x1b[0m";
     }
     snprintf(bufPtr, (bufEndPtr - bufPtr), infoStr, file, line);
     bufPtr = log_out_buf + strlen(log_out_buf);
