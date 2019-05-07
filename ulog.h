@@ -1,40 +1,45 @@
 #ifndef ULOG_ULOG_H
 #define ULOG_ULOG_H
-#define ULOG_ENABLE
+
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
+typedef int  (*OutputCb)(const char *ptr);
+
 enum {
-    LEVEL_VERBOSE,
-    LEVEL_DEBUG,
-    LEVEL_INFO,
-    LEVEL_WARNING,
-    LEVEL_ERROR,
-    LEVEL_ASSERT
+    ULOG_VERBOSE,
+    ULOG_DEBUG,
+    ULOG_INFO,
+    ULOG_WARN,
+    ULOG_ERROR,
+    ULOG_ASSERT
 };
+
+// Precompiler define to get only filename;
+#if !defined(__LOG_FILE__)
+#  define __LOG_FILE__ __FILE__
+#endif
+
+#define uLog_verbose(fmt, ...)    _uLogLog(ULOG_VERBOSE, fmt, ##__VA_ARGS__)
+#define uLog_debug(fmt, ...)      _uLogLog(ULOG_DEBUG, fmt, ##__VA_ARGS__)
+#define uLog_info(fmt, ...)       _uLogLog(ULOG_INFO, fmt, ##__VA_ARGS__)
+#define uLog_warn(fmt, ...)       _uLogLog(ULOG_WARN, fmt, ##__VA_ARGS__)
+#define uLog_error(fmt, ...)      _uLogLog(ULOG_ERROR, fmt, ##__VA_ARGS__)
+#define uLog_assert(fmt, ...)     _uLogLog(ULOG_ASSERT, fmt, ##__VA_ARGS__)
 
 #if defined(ULOG_ENABLE)
 
-#define Log_verbose(...)    _Ulog_log(LEVEL_VERBOSE, __VA_ARGS__)
-#define Log_debug(...)      _Ulog_log(LEVEL_DEBUG, __VA_ARGS__)
-#define Log_info(...)       _Ulog_log(LEVEL_INFO, __VA_ARGS__)
-#define Log_warning(...)    _Ulog_log(LEVEL_WARNING, __VA_ARGS__)
-#define Log_error(...)      _Ulog_log(LEVEL_ERROR, __VA_ARGS__)
-#define Log_assert(...)     _Ulog_log(LEVEL_ASSERT, __VA_ARGS__)
-
-#define _Ulog_log(level, ...) Ulog_log(__FILE__, __LINE__, level, __VA_ARGS__)
+#define _uLogLog(level, ...) uLogLog(__LOG_FILE__, __LINE__, level, __VA_ARGS__)
 
 #else
 
-#define Log_info(fmt, ...)
-#define Log_warning(fmt, ...)
-#define Log_error(fmt, ...)
+#define _uLogLog(level, ...)
 
 #endif
 
-void Ulog_log(const char *file, int line, unsigned level, const char *fmt, ...);
+void uLogInit(OutputCb cb);
+void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...);
 
 #ifdef __cplusplus
 }

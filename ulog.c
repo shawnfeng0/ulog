@@ -1,10 +1,8 @@
-#define ULOG_ENABLE
 #include "ulog.h"
 
 #include <string.h>
 #include <stdint.h>
 #include <stdarg.h>
-
 #include <stdio.h>
 
 #ifndef LOG_OUTBUF_LEN
@@ -13,12 +11,36 @@
 
 #if defined(ULOG_ENABLE)
 
-static char Log_outBuf[LOG_OUTBUF_LEN];
-static uint16_t Log_evtNum = 1;
+static char log_out_buf[LOG_OUTBUF_LEN];
+static uint16_t log_evt_num = 1;
+static OutputCb output_cb = NULL;
 
 #endif
 
-void Ulog_log(const char *file, int line, unsigned level, const char *fmt, ...)
+void uLogInit(OutputCb cb)
+{
+#if defined(ULOG_ENABLE)
+    output_cb = cb;
+
+#if defined(ULOG_CLS)
+    char clear_str[3] = {'\033', 'c', '\0'}; // clean screen
+    if (output_cb)
+        output_cb(clear_str);
+#endif
+
+#endif
+}
+
+#include <driverlib/aon_rtc.h>
+float GetSeconds() {
+    uint32_t tstamp_cust = AONRTCCurrentCompareValueGet();
+    uint16_t seconds = tstamp_cust >> 16;
+    uint16_t ifraction = tstamp_cust & 0xFFFF;
+    int fraction = (int)((double)ifraction / 65536 * 1000); // Get 3 decimals
+    return (double)fraction/1000 + seconds;
+}
+
+void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...)
 {
 #if defined(ULOG_ENABLE)
 
@@ -26,61 +48,48 @@ void Ulog_log(const char *file, int line, unsigned level, const char *fmt, ...)
 #error "LOG_OUTBUF_LEN does not have enough size."
 #endif
 
-    char *bufPtr = Log_outBuf;
-    char *bufEndPtr = Log_outBuf + LOG_OUTBUF_LEN - 3; // Less 3 for '\r', '\n', '\0'
-
-#if defined(LOG_CLS)
-    // first log
-    if (Log_evtNum == 1)
-    {
-        char a[2] = {'\033', 'c'}; // clean screen
-        QueueWrite(&a, 2);
-    }
-#endif
+    char *bufPtr = log_out_buf;
+    char *bufEndPtr = log_out_buf + LOG_OUTBUF_LEN - 3; // Less 3 for '\r', '\n', '\0'
 
     /* Print serial number */
-    snprintf(bufPtr, (bufEndPtr - bufPtr), "#%06u ", Log_evtNum++);
-    bufPtr = Log_outBuf + strlen(Log_outBuf);
+    snprintf(bufPtr, (bufEndPtr - bufPtr), "#%06u ", log_evt_num++);
+    bufPtr = log_out_buf + strlen(log_out_buf);
 
-    uint32_t tstamp_cust = 0; //AONRTCCurrentCompareValueGet();
-    uint16_t seconds = tstamp_cust >> 16;
-    uint16_t ifraction = tstamp_cust & 0xFFFF;
-    int fraction = (int)((double)ifraction / 65536 * 1000); // Get 3 decimals
+    float fseconds = GetSeconds();
 
     // Print time
-    snprintf(bufPtr, (bufEndPtr - bufPtr), "[ %d.%03u ] ", seconds,
-             fraction);
-    bufPtr = Log_outBuf + strlen(Log_outBuf);
+    snprintf(bufPtr, (bufEndPtr - bufPtr), "[ %d.%03u ] ", (int) fseconds,
+             (int)(fseconds*1000) % 1000);
+    bufPtr = log_out_buf + strlen(log_out_buf);
 
     // Print level, file and line
     char *infoStr = NULL;
     switch (level)
     {
-        case LEVEL_ERROR:
+        case ULOG_ERROR:
             infoStr = "\x1b[31;1mERROR: \x1b[30;1m(%s:%d) \x1b[0m";
             break;
-        case LEVEL_WARNING:
-            infoStr = "\x1b[33;1mWARNING: \x1b[30;1m(%s:%d) \x1b[0m";
+        case ULOG_WARN:
+            infoStr = "\x1b[33;1mWARN: \x1b[30;1m(%s:%d) \x1b[0m";
             break;
-        case LEVEL_INFO:
+        case ULOG_INFO:
         default:
             infoStr = "\x1b[32;1mINFO: \x1b[30;1m(%s:%d) \x1b[0m";
     }
     snprintf(bufPtr, (bufEndPtr - bufPtr), infoStr, file, line);
-    bufPtr = Log_outBuf + strlen(Log_outBuf);
+    bufPtr = log_out_buf + strlen(log_out_buf);
 
     va_list ap;
     va_start(ap,fmt);
     vsnprintf(bufPtr, (bufEndPtr - bufPtr), fmt, ap);
     va_end(ap);
-    bufPtr = Log_outBuf + strlen(Log_outBuf);
+    bufPtr = log_out_buf + strlen(log_out_buf);
 
     *bufPtr++ = '\r';
     *bufPtr++ = '\n';
     *bufPtr++ = '\0';
 
-    // TODO add mutex
-    puts(Log_outBuf);
-
+    if (output_cb)
+        output_cb(log_out_buf);
 #endif
 }
