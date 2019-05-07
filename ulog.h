@@ -17,20 +17,21 @@ enum {
 };
 
 // Precompiler define to get only filename;
-#if !defined(__LOG_FILE__)
-#  define __LOG_FILE__ __FILE__
+#if !defined(__FILENAME__)
+#include <string.h>
+#define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #endif
 
-#define uLog_verbose(fmt, ...)    _uLogLog(ULOG_VERBOSE, fmt, ##__VA_ARGS__)
-#define uLog_debug(fmt, ...)      _uLogLog(ULOG_DEBUG, fmt, ##__VA_ARGS__)
-#define uLog_info(fmt, ...)       _uLogLog(ULOG_INFO, fmt, ##__VA_ARGS__)
-#define uLog_warn(fmt, ...)       _uLogLog(ULOG_WARN, fmt, ##__VA_ARGS__)
-#define uLog_error(fmt, ...)      _uLogLog(ULOG_ERROR, fmt, ##__VA_ARGS__)
-#define uLog_assert(fmt, ...)     _uLogLog(ULOG_ASSERT, fmt, ##__VA_ARGS__)
+#define Log_verbose(fmt, ...)    _uLogLog(ULOG_VERBOSE, fmt, ##__VA_ARGS__)
+#define Log_debug(fmt, ...)      _uLogLog(ULOG_DEBUG, fmt, ##__VA_ARGS__)
+#define Log_info(fmt, ...)       _uLogLog(ULOG_INFO, fmt, ##__VA_ARGS__)
+#define Log_warn(fmt, ...)       _uLogLog(ULOG_WARN, fmt, ##__VA_ARGS__)
+#define Log_error(fmt, ...)      _uLogLog(ULOG_ERROR, fmt, ##__VA_ARGS__)
+#define Log_assert(fmt, ...)     _uLogLog(ULOG_ASSERT, fmt, ##__VA_ARGS__)
 
 #if defined(ULOG_ENABLE)
 
-#define _uLogLog(level, ...) uLogLog(__LOG_FILE__, __LINE__, level, __VA_ARGS__)
+#define _uLogLog(level, ...) uLogLog(__FILENAME__, __LINE__, level, ##__VA_ARGS__)
 
 #else
 

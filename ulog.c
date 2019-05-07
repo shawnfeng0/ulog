@@ -4,9 +4,10 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <time.h>
 
 #ifndef LOG_OUTBUF_LEN
-#define LOG_OUTBUF_LEN 168 /* Size of buffer used for log printout */
+#define LOG_OUTBUF_LEN 128 /* Size of buffer used for log printout */
 #endif
 
 #if defined(ULOG_ENABLE)
@@ -31,13 +32,10 @@ void uLogInit(OutputCb cb)
 #endif
 }
 
-#include <driverlib/aon_rtc.h>
-float GetSeconds() {
-    uint32_t tstamp_cust = AONRTCCurrentCompareValueGet();
-    uint16_t seconds = tstamp_cust >> 16;
-    uint16_t ifraction = tstamp_cust & 0xFFFF;
-    int fraction = (int)((double)ifraction / 65536 * 1000); // Get 3 decimals
-    return (double)fraction/1000 + seconds;
+uint32_t getRefTimeUs() {
+    struct timespec tsp;
+    clock_gettime(CLOCK_REALTIME, &tsp);
+    return (int32_t) ((tsp.tv_sec % 1000) * 1e6 + (int32_t) (tsp.tv_nsec / 1000));
 }
 
 void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...)
@@ -47,6 +45,8 @@ void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...)
 #if LOG_OUTBUF_LEN < 64
 #error "LOG_OUTBUF_LEN does not have enough size."
 #endif
+    if (!output_cb || !fmt)
+        return;
 
     char *bufPtr = log_out_buf;
     char *bufEndPtr = log_out_buf + LOG_OUTBUF_LEN - 3; // Less 3 for '\r', '\n', '\0'
@@ -55,11 +55,11 @@ void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...)
     snprintf(bufPtr, (bufEndPtr - bufPtr), "#%06u ", log_evt_num++);
     bufPtr = log_out_buf + strlen(log_out_buf);
 
-    float fseconds = GetSeconds();
+    uint32_t ref_time_us = getRefTimeUs();
 
     // Print time
-    snprintf(bufPtr, (bufEndPtr - bufPtr), "[ %d.%03u ] ", (int) fseconds,
-             (int)(fseconds*1000) % 1000);
+    snprintf(bufPtr, (bufEndPtr - bufPtr), "[ %d.%03u ] ", ref_time_us / 1000 / 1000,
+              (ref_time_us / 1000) % 1000);
     bufPtr = log_out_buf + strlen(log_out_buf);
 
     // Print level, file and line
@@ -89,7 +89,6 @@ void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...)
     *bufPtr++ = '\n';
     *bufPtr++ = '\0';
 
-    if (output_cb)
-        output_cb(log_out_buf);
+    output_cb(log_out_buf);
 #endif
 }
