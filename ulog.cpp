@@ -11,14 +11,12 @@
 #define LOG_OUTBUF_LEN 128 /* Size of buffer used for log printout */
 #endif
 
-#if defined(ULOG_ENABLE)
+#if !defined(ULOG_DISABLE)
 
 static char log_out_buf[LOG_OUTBUF_LEN];
 static uint16_t log_evt_num = 1;
 static OutputCb output_cb = NULL;
 static pthread_mutex_t log_lock;
-
-#endif
 
 class LockGuard {
    public:
@@ -38,8 +36,11 @@ static uint32_t getRefTimeUs() {
     return (int32_t) ((tsp.tv_sec % 1000) * 1e6 + (int32_t) (tsp.tv_nsec / 1000));
 }
 
+#endif
+
+
 void uLogInit(OutputCb cb) {
-#if defined(ULOG_ENABLE)
+#if !defined(ULOG_DISABLE)
 
   pthread_mutex_init(&log_lock, NULL);
   output_cb = cb;
@@ -54,7 +55,7 @@ void uLogInit(OutputCb cb) {
 
 void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...)
 {
-#if defined(ULOG_ENABLE)
+#if !defined(ULOG_DISABLE)
     LockGuard lock = LockGuard(log_lock);
 
 #if LOG_OUTBUF_LEN < 64

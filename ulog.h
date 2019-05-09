@@ -29,7 +29,7 @@ enum {
 #define Log_error(fmt, ...)      _uLogLog(ULOG_ERROR, fmt, ##__VA_ARGS__)
 #define Log_assert(fmt, ...)     _uLogLog(ULOG_ASSERT, fmt, ##__VA_ARGS__)
 
-#if defined(ULOG_ENABLE)
+#if !defined(ULOG_DISABLE)
 
 #define _uLogLog(level, ...) uLogLog(__FILENAME__, __LINE__, level, ##__VA_ARGS__)
 
