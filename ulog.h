@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-typedef int  (*OutputCb)(const char *ptr);
+typedef int (*OutputCb)(const char *ptr);
 
 enum {
     ULOG_VERBOSE,
@@ -22,12 +22,21 @@ enum {
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #endif
 
-#define Log_verbose(fmt, ...)    _uLogLog(ULOG_VERBOSE, fmt, ##__VA_ARGS__)
-#define Log_debug(fmt, ...)      _uLogLog(ULOG_DEBUG, fmt, ##__VA_ARGS__)
-#define Log_info(fmt, ...)       _uLogLog(ULOG_INFO, fmt, ##__VA_ARGS__)
-#define Log_warn(fmt, ...)       _uLogLog(ULOG_WARN, fmt, ##__VA_ARGS__)
-#define Log_error(fmt, ...)      _uLogLog(ULOG_ERROR, fmt, ##__VA_ARGS__)
-#define Log_assert(fmt, ...)     _uLogLog(ULOG_ASSERT, fmt, ##__VA_ARGS__)
+#define STR_TO_BLACK(str) "\033[30;1m" #str "\033[0m"
+#define STR_TO_RED(str) "\033[31;1m" #str "\033[0m"
+#define STR_TO_GREEN(str) "\033[32;1m" #str "\033[0m"
+#define STR_TO_YELLOW(str) "\033[33;1m" #str "\033[0m"
+#define STR_TO_BLUE(str) "\033[34;1m" #str "\033[0m"
+#define STR_TO_PURPLE(str) "\033[35;1m" #str "\033[0m"
+#define STR_TO_SKYBLUE(str) "\033[36;1m" #str "\033[0m"
+#define STR_TO_WHITE(str) "\033[37;1m" #str "\033[0m"
+
+#define Log_verbose(fmt, ...) _uLogLog(ULOG_VERBOSE, fmt, ##__VA_ARGS__)
+#define Log_debug(fmt, ...) _uLogLog(ULOG_DEBUG, fmt, ##__VA_ARGS__)
+#define Log_info(fmt, ...) _uLogLog(ULOG_INFO, fmt, ##__VA_ARGS__)
+#define Log_warn(fmt, ...) _uLogLog(ULOG_WARN, fmt, ##__VA_ARGS__)
+#define Log_error(fmt, ...) _uLogLog(ULOG_ERROR, fmt, ##__VA_ARGS__)
+#define Log_assert(fmt, ...) _uLogLog(ULOG_ASSERT, fmt, ##__VA_ARGS__)
 
 #if !defined(ULOG_DISABLE)
 
@@ -46,4 +55,4 @@ void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...);
 }
 #endif
 
-#endif //ULOG_ULOG_H
+#endif  //ULOG_ULOG_H
