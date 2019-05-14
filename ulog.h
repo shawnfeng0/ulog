@@ -5,6 +5,12 @@
 extern "C" {
 #endif
 
+//#define ULOG_NO_COLOR
+
+#if !defined(ULOG_OUTPUT_LEVEL)
+#define ULOG_OUTPUT_LEVEL ULOG_VERBOSE
+#endif
+
 typedef int (*OutputCb)(const char *ptr);
 
 enum {
@@ -16,20 +22,33 @@ enum {
     ULOG_ASSERT
 };
 
+#if !defined(ULOG_NO_COLOR)
+#define _STR_COLOR(color) "\x1b[" #color "m"
+#else
+#define _STR_COLOR(color)
+#endif
+
+#define STR_RESET _STR_COLOR(0)
+#define STR_BLACK _STR_COLOR(30;1)
+#define STR_RED _STR_COLOR(31;1)
+#define STR_GREEN _STR_COLOR(32;1)
+#define STR_YELLOW _STR_COLOR(33;1)
+#define STR_BLUE _STR_COLOR(34;1)
+#define STR_PURPLE _STR_COLOR(35;1)
+#define STR_SKYBLUE _STR_COLOR(36;1)
+#define STR_WHITE _STR_COLOR(37;1)
+
 // Precompiler define to get only filename;
 #if !defined(__FILENAME__)
 #include <string.h>
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #endif
 
-#define STR_TO_BLACK(str) "\033[30;1m" #str "\033[0m"
-#define STR_TO_RED(str) "\033[31;1m" #str "\033[0m"
-#define STR_TO_GREEN(str) "\033[32;1m" #str "\033[0m"
-#define STR_TO_YELLOW(str) "\033[33;1m" #str "\033[0m"
-#define STR_TO_BLUE(str) "\033[34;1m" #str "\033[0m"
-#define STR_TO_PURPLE(str) "\033[35;1m" #str "\033[0m"
-#define STR_TO_SKYBLUE(str) "\033[36;1m" #str "\033[0m"
-#define STR_TO_WHITE(str) "\033[37;1m" #str "\033[0m"
+#if !defined(ULOG_DISABLE)
+#define _uLogLog(level, ...) uLogLog(__FILENAME__, __LINE__, level, ##__VA_ARGS__)
+#else
+#define _uLogLog(level, ...)
+#endif
 
 #define Log_verbose(fmt, ...) _uLogLog(ULOG_VERBOSE, fmt, ##__VA_ARGS__)
 #define Log_debug(fmt, ...) _uLogLog(ULOG_DEBUG, fmt, ##__VA_ARGS__)
@@ -37,16 +56,6 @@ enum {
 #define Log_warn(fmt, ...) _uLogLog(ULOG_WARN, fmt, ##__VA_ARGS__)
 #define Log_error(fmt, ...) _uLogLog(ULOG_ERROR, fmt, ##__VA_ARGS__)
 #define Log_assert(fmt, ...) _uLogLog(ULOG_ASSERT, fmt, ##__VA_ARGS__)
-
-#if !defined(ULOG_DISABLE)
-
-#define _uLogLog(level, ...) uLogLog(__FILENAME__, __LINE__, level, ##__VA_ARGS__)
-
-#else
-
-#define _uLogLog(level, ...)
-
-#endif
 
 void uLogInit(OutputCb cb);
 void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...);

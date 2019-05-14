@@ -60,10 +60,11 @@ void uLogInit(OutputCb cb) {
 
 void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...) {
 #if !defined(ULOG_DISABLE)
-    LockGuard lock = LockGuard(log_lock);
 
-    if (!output_cb || !fmt)
+    if (!output_cb || !fmt || level < ULOG_OUTPUT_LEVEL)
         return;
+
+    LockGuard lock = LockGuard(log_lock);
 
     char *bufPtr = log_out_buf;
     // The last three characters are '\r', '\n', '\0'
@@ -84,23 +85,23 @@ void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...) {
     char *infoStr = nullptr;
     switch (level) {
         case ULOG_DEBUG:
-            infoStr = (char *)"\x1b[34;1mDEBUG: \x1b[30;1m(%s:%d) \x1b[0m";
+            infoStr = (char *)STR_BLUE "DEBUG: " STR_BLACK "(%s:%d) " STR_RESET;
             break;
         case ULOG_INFO:
-            infoStr = (char *)"\x1b[32;1mINFO: \x1b[30;1m(%s:%d) \x1b[0m";
+            infoStr = (char *)STR_GREEN "INFO: " STR_BLACK "(%s:%d) " STR_RESET;
             break;
         case ULOG_WARN:
-            infoStr = (char *)"\x1b[33;1mWARN: \x1b[30;1m(%s:%d) \x1b[0m";
+            infoStr = (char *)STR_YELLOW "WARN: " STR_BLACK "(%s:%d) " STR_RESET;
             break;
         case ULOG_ERROR:
-            infoStr = (char *)"\x1b[31;1mERROR: \x1b[30;1m(%s:%d) \x1b[0m";
+            infoStr = (char *)STR_RED "ERROR: " STR_BLACK "(%s:%d) " STR_RESET;
             break;
         case ULOG_ASSERT:
-            infoStr = (char *)"\x1b[35;1mASSERT: \x1b[30;1m(%s:%d) \x1b[0m";
+            infoStr = (char *)STR_PURPLE "ASSERT: " STR_BLACK "(%s:%d) " STR_RESET;
             break;
         case ULOG_VERBOSE:
         default:
-            infoStr = (char *)"\x1b[37;1mVERBOSE: \x1b[30;1m(%s:%d) \x1b[0m";
+            infoStr = (char *)STR_WHITE "VERBOSE: " STR_BLACK "(%s:%d) " STR_RESET;
     }
     snprintf(bufPtr, (bufEndPtr - bufPtr), infoStr, file, line);
     bufPtr = log_out_buf + strlen(log_out_buf);
