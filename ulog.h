@@ -38,6 +38,7 @@ enum {
 #define STR_SKYBLUE _STR_COLOR(36;1)
 #define STR_WHITE _STR_COLOR(37;1)
 
+
 // Precompiler define to get only filename;
 #if !defined(__FILENAME__)
 #include <string.h>
@@ -56,6 +57,8 @@ enum {
 #define Log_warn(fmt, ...) _uLogLog(ULOG_WARN, fmt, ##__VA_ARGS__)
 #define Log_error(fmt, ...) _uLogLog(ULOG_ERROR, fmt, ##__VA_ARGS__)
 #define Log_assert(fmt, ...) _uLogLog(ULOG_ASSERT, fmt, ##__VA_ARGS__)
+
+#define Log_token(token) Log_debug(#token " = %f", (float) token)
 
 void uLogInit(OutputCb cb);
 void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...);
