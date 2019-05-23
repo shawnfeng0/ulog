@@ -36,12 +36,6 @@ class LockGuard {
     pthread_mutex_t &mMutex;
 };
 
-static uint32_t getRefTimeUs() {
-    struct timespec tsp {};
-    clock_gettime(CLOCK_REALTIME, &tsp);
-    return (int32_t)((tsp.tv_sec % 1000) * 1e6 + (int32_t)(tsp.tv_nsec / 1000));
-}
-
 #endif
 
 void uLogInit(OutputCb cb) {
@@ -74,11 +68,11 @@ void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...) {
     snprintf(bufPtr, (bufEndPtr - bufPtr), "#%06u ", log_evt_num++);
     bufPtr = log_out_buf + strlen(log_out_buf);
 
-    uint32_t ref_time_us = getRefTimeUs();
-
     // Print time
-    snprintf(bufPtr, (bufEndPtr - bufPtr), "[ %d.%03u ] ", ref_time_us / 1000 / 1000,
-             (ref_time_us / 1000) % 1000);
+    struct timespec tsp {};
+    clock_gettime(CLOCK_MONOTONIC, &tsp);
+    snprintf(bufPtr, (bufEndPtr - bufPtr), "[ %ld.%03ld ] ", tsp.tv_sec,
+             tsp.tv_nsec / (1000 * 1000));
     bufPtr = log_out_buf + strlen(log_out_buf);
 
     // Print level, file and line
