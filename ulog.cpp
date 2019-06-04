@@ -99,7 +99,8 @@ void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...) {
 #undef __FUNC_LINE_FORMAT__
     }
     snprintf(buf_ptr, (buf_end_ptr - buf_ptr), info_str, file, line);
-    buf_ptr = log_out_buf + strlen(log_out_buf);
+    output_cb(log_out_buf);
+    buf_ptr = log_out_buf;
 
     va_list ap;
     va_start(ap, fmt);
