@@ -5,8 +5,6 @@
 extern "C" {
 #endif
 
-//#define ULOG_NO_COLOR
-
 #if !defined(ULOG_OUTPUT_LEVEL)
 #define ULOG_OUTPUT_LEVEL ULOG_VERBOSE
 #endif
@@ -25,19 +23,27 @@ enum {
 #if !defined(ULOG_NO_COLOR)
 #define _STR_COLOR(color) "\x1b[" #color "m"
 #else
-#define _STR_COLOR(color)
+#define _STR_COLOR(color) ""
 #endif
 
 #define STR_RESET _STR_COLOR(0)
-#define STR_BLACK _STR_COLOR(30;1)
-#define STR_RED _STR_COLOR(31;1)
-#define STR_GREEN _STR_COLOR(32;1)
-#define STR_YELLOW _STR_COLOR(33;1)
-#define STR_BLUE _STR_COLOR(34;1)
-#define STR_PURPLE _STR_COLOR(35;1)
-#define STR_SKYBLUE _STR_COLOR(36;1)
-#define STR_WHITE _STR_COLOR(37;1)
+#define STR_BLACK _STR_COLOR(0;30)
+#define STR_RED _STR_COLOR(0;31)
+#define STR_GREEN _STR_COLOR(0;32)
+#define STR_YELLOW _STR_COLOR(0;33)
+#define STR_BLUE _STR_COLOR(0;34)
+#define STR_PURPLE _STR_COLOR(0;35)
+#define STR_SKYBLUE _STR_COLOR(0;36)
+#define STR_WHITE _STR_COLOR(0;37)
 
+#define STR_BOLD_BLACK _STR_COLOR(30;1)
+#define STR_BOLD_RED _STR_COLOR(31;1)
+#define STR_BOLD_GREEN _STR_COLOR(32;1)
+#define STR_BOLD_YELLOW _STR_COLOR(33;1)
+#define STR_BOLD_BLUE _STR_COLOR(34;1)
+#define STR_BOLD_PURPLE _STR_COLOR(35;1)
+#define STR_BOLD_SKYBLUE _STR_COLOR(36;1)
+#define STR_BOLD_WHITE _STR_COLOR(37;1)
 
 // Precompiler define to get only filename;
 #if !defined(__FILENAME__)

@@ -1,5 +1,4 @@
 #include "ulog.h"
-
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -60,56 +59,62 @@ void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...) {
 
     LockGuard lock = LockGuard(log_lock);
 
-    char *bufPtr = log_out_buf;
+    char *buf_ptr = log_out_buf;
     // The last three characters are '\r', '\n', '\0'
-    char *bufEndPtr = log_out_buf + LOG_OUTBUF_LEN - 3;
+    char *buf_end_ptr = log_out_buf + LOG_OUTBUF_LEN - 3;
 
     /* Print serial number */
-    snprintf(bufPtr, (bufEndPtr - bufPtr), "#%06u ", log_evt_num++);
-    bufPtr = log_out_buf + strlen(log_out_buf);
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), STR_RESET "#%06u ", log_evt_num++);
+    buf_ptr = log_out_buf + strlen(log_out_buf);
 
     // Print time
     struct timespec tsp {};
     clock_gettime(CLOCK_MONOTONIC, &tsp);
-    snprintf(bufPtr, (bufEndPtr - bufPtr), "[ %ld.%03ld ] ", tsp.tv_sec,
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "[ %ld.%03ld ] ", tsp.tv_sec,
              tsp.tv_nsec / (1000 * 1000));
-    bufPtr = log_out_buf + strlen(log_out_buf);
+    buf_ptr = log_out_buf + strlen(log_out_buf);
 
     // Print level, file and line
-    char *infoStr = nullptr;
+    char *info_str = nullptr;
     switch (level) {
+#define  __FUNC_LINE_FORMAT__ STR_BLACK "/%s:%d "
         case ULOG_DEBUG:
-            infoStr = (char *)STR_BLUE "DEBUG: " STR_BLACK "(%s:%d) " STR_RESET;
+            info_str = (char *)STR_BOLD_BLUE "D" __FUNC_LINE_FORMAT__ STR_BLUE ;
             break;
         case ULOG_INFO:
-            infoStr = (char *)STR_GREEN "INFO: " STR_BLACK "(%s:%d) " STR_RESET;
+            info_str = (char *)STR_BOLD_GREEN "I" __FUNC_LINE_FORMAT__ STR_GREEN;
             break;
         case ULOG_WARN:
-            infoStr = (char *)STR_YELLOW "WARN: " STR_BLACK "(%s:%d) " STR_RESET;
+            info_str = (char *)STR_BOLD_YELLOW "W" __FUNC_LINE_FORMAT__ STR_YELLOW;
             break;
         case ULOG_ERROR:
-            infoStr = (char *)STR_RED "ERROR: " STR_BLACK "(%s:%d) " STR_RESET;
+            info_str = (char *)STR_BOLD_RED "E" __FUNC_LINE_FORMAT__ STR_RED;
             break;
         case ULOG_ASSERT:
-            infoStr = (char *)STR_PURPLE "ASSERT: " STR_BLACK "(%s:%d) " STR_RESET;
+            info_str = (char *)STR_BOLD_PURPLE "A" __FUNC_LINE_FORMAT__ STR_PURPLE;
             break;
         case ULOG_VERBOSE:
         default:
-            infoStr = (char *)STR_WHITE "VERBOSE: " STR_BLACK "(%s:%d) " STR_RESET;
+            info_str = (char *)STR_BOLD_WHITE "V" __FUNC_LINE_FORMAT__ STR_WHITE;
+#undef __FUNC_LINE_FORMAT__
     }
-    snprintf(bufPtr, (bufEndPtr - bufPtr), infoStr, file, line);
-    bufPtr = log_out_buf + strlen(log_out_buf);
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), info_str, file, line);
+    buf_ptr = log_out_buf + strlen(log_out_buf);
 
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(bufPtr, (bufEndPtr - bufPtr), fmt, ap);
+    vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ap);
     va_end(ap);
 
-    bufPtr = log_out_buf + strlen(log_out_buf);
+    buf_ptr = log_out_buf + strlen(log_out_buf);
 
-    *bufPtr++ = '\r';
-    *bufPtr++ = '\n';
-    *bufPtr = '\0';
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s", STR_RESET);
+
+    buf_ptr = log_out_buf + strlen(log_out_buf);
+
+    *buf_ptr++ = '\r';
+    *buf_ptr++ = '\n';
+    *buf_ptr = '\0';
 
     output_cb(log_out_buf);
 #endif
