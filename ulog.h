@@ -64,7 +64,35 @@ enum ULOG_LEVEL {
 #define Log_error(fmt, ...) _uLogLog(ULOG_ERROR, fmt, ##__VA_ARGS__)
 #define Log_assert(fmt, ...) _uLogLog(ULOG_ASSERT, fmt, ##__VA_ARGS__)
 
-#define Log_token(token) Log_debug(#token " = %f", (float) token)
+#define __TYPE_CMP(X, Y) __builtin_types_compatible_p(typeof(X), Y)
+
+#define Log_token(token) do { \
+    char *fmt = "(none) %s = "; \
+    if (__TYPE_CMP(token, float) || __TYPE_CMP(token, double)) { \
+        fmt = "(float) %s => %f";\
+    } else if (__TYPE_CMP(token, int) || __TYPE_CMP(token, unsigned int) \
+        || __TYPE_CMP(token, short) || __TYPE_CMP(token, unsigned short) \
+        || __TYPE_CMP(token, long) || __TYPE_CMP(token, unsigned long) \
+        || __TYPE_CMP(token, long long) || __TYPE_CMP(token, unsigned long long) \
+        ) { \
+        fmt = "(int) %s => %d";\
+    } else if (__TYPE_CMP(token, char) || __TYPE_CMP(token, unsigned char)) { \
+        fmt = "(char) %s => %c";\
+    } else if (__TYPE_CMP(token, char *) || __TYPE_CMP(token, unsigned char*) \
+        || __TYPE_CMP(token, char[]) || __TYPE_CMP(token, unsigned char[]) \
+        ) { \
+        fmt = "(char*) %s => %s";\
+    } else if (__TYPE_CMP(token, void *) \
+        || __TYPE_CMP(token, float*) || __TYPE_CMP(token, double*) \
+        || __TYPE_CMP(token, int*) || __TYPE_CMP(token, unsigned int*) \
+        || __TYPE_CMP(token, short*) || __TYPE_CMP(token, unsigned short*) \
+        || __TYPE_CMP(token, long*) || __TYPE_CMP(token, unsigned long*) \
+        || __TYPE_CMP(token, long long*) || __TYPE_CMP(token, unsigned long long*) \
+        ) { \
+        fmt = "(void*) %s => %x";\
+    } \
+    Log_debug(fmt, #token, token); \
+} while(0);
 
 void uLogInit(OutputCb cb);
 void uLogLog(enum ULOG_LEVEL level, const char *file, const char *func, int line, const char *fmt, ...);
