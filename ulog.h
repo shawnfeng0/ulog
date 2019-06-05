@@ -11,7 +11,7 @@ extern "C" {
 
 typedef int (*OutputCb)(const char *ptr);
 
-enum {
+enum ULOG_LEVEL {
     ULOG_VERBOSE,
     ULOG_DEBUG,
     ULOG_INFO,
@@ -52,7 +52,7 @@ enum {
 #endif
 
 #if !defined(ULOG_DISABLE)
-#define _uLogLog(level, ...) uLogLog(__FILENAME__, __LINE__, level, ##__VA_ARGS__)
+#define _uLogLog(level, ...) uLogLog(level, __FILENAME__, __FUNCTION__, __LINE__, ##__VA_ARGS__)
 #else
 #define _uLogLog(level, ...)
 #endif
@@ -67,7 +67,7 @@ enum {
 #define Log_token(token) Log_debug(#token " = %f", (float) token)
 
 void uLogInit(OutputCb cb);
-void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...);
+void uLogLog(enum ULOG_LEVEL level, const char *file, const char *func, int line, const char *fmt, ...);
 
 #ifdef __cplusplus
 }

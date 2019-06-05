@@ -51,7 +51,7 @@ void uLogInit(OutputCb cb) {
 #endif
 }
 
-void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...) {
+void uLogLog(enum ULOG_LEVEL level, const char *file, const char *func, int line, const char *fmt, ...) {
 #if !defined(ULOG_DISABLE)
 
     if (!output_cb || !fmt || level < ULOG_OUTPUT_LEVEL)
@@ -77,9 +77,9 @@ void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...) {
     // Print level, file and line
     char *info_str = nullptr;
     switch (level) {
-#define  __FUNC_LINE_FORMAT__ STR_BLACK "/%s:%d "
+#define __FUNC_LINE_FORMAT__ STR_BLACK "/%s(%s:%d) "
         case ULOG_DEBUG:
-            info_str = (char *)STR_BOLD_BLUE "D" __FUNC_LINE_FORMAT__ STR_BLUE ;
+            info_str = (char *)STR_BOLD_BLUE "D" __FUNC_LINE_FORMAT__ STR_BLUE;
             break;
         case ULOG_INFO:
             info_str = (char *)STR_BOLD_GREEN "I" __FUNC_LINE_FORMAT__ STR_GREEN;
@@ -98,7 +98,7 @@ void uLogLog(const char *file, int line, unsigned level, const char *fmt, ...) {
             info_str = (char *)STR_BOLD_WHITE "V" __FUNC_LINE_FORMAT__ STR_WHITE;
 #undef __FUNC_LINE_FORMAT__
     }
-    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), info_str, file, line);
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), info_str, file, func, line);
     output_cb(log_out_buf);
     buf_ptr = log_out_buf;
 
