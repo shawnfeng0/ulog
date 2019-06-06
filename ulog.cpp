@@ -21,6 +21,21 @@ static uint16_t log_evt_num = 1;
 static OutputCb output_cb = nullptr;
 static pthread_mutex_t log_lock;
 
+enum {
+    INDEX_PRIMARY_COLOR = 0,
+    INDEX_SECONDARY_COLOR,
+    INDEX_LEVEL_MARK,
+    INDEX_MAX,
+};
+static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] {
+    {(char *) STR_BOLD_WHITE, (char *) STR_WHITE, (char *) "V"}, // VERBOSE
+    {(char *) STR_BOLD_BLUE, (char *) STR_BLUE, (char *) "D"}, // DEBUG
+    {(char *) STR_BOLD_GREEN, (char *) STR_GREEN, (char *) "I"}, // INFO
+    {(char *) STR_BOLD_YELLOW, (char *) STR_YELLOW, (char *) "W"}, // WARN
+    {(char *) STR_BOLD_RED, (char *) STR_RED, (char *) "E"}, // ERROR
+    {(char *) STR_BOLD_PURPLE, (char *) STR_PURPLE, (char *) "A"}, // ASSERT
+};
+
 class LockGuard {
    public:
     explicit LockGuard(pthread_mutex_t &_m) : mMutex(_m) {
@@ -63,42 +78,25 @@ void uLogLog(enum ULOG_LEVEL level, const char *file, const char *func, int line
     // The last three characters are '\r', '\n', '\0'
     char *buf_end_ptr = log_out_buf + LOG_OUTBUF_LEN - 3;
 
+    char *primary_color = level_infos[level][INDEX_PRIMARY_COLOR];
+
     /* Print serial number */
-    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), STR_RESET "#%06u ", log_evt_num++);
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s#%06u ", primary_color, log_evt_num++);
     buf_ptr = log_out_buf + strlen(log_out_buf);
 
     // Print time
     struct timespec tsp {};
     clock_gettime(CLOCK_MONOTONIC, &tsp);
-    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "[ %ld.%03ld ] ", tsp.tv_sec,
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "[%ld.%03ld] ", tsp.tv_sec,
              tsp.tv_nsec / (1000 * 1000));
     buf_ptr = log_out_buf + strlen(log_out_buf);
 
-    // Print level, file and line
-    char *info_str = nullptr;
-    switch (level) {
-#define __FUNC_LINE_FORMAT__ STR_BLACK "/%s(%s:%d) "
-        case ULOG_DEBUG:
-            info_str = (char *)STR_BOLD_BLUE "D" __FUNC_LINE_FORMAT__ STR_BLUE;
-            break;
-        case ULOG_INFO:
-            info_str = (char *)STR_BOLD_GREEN "I" __FUNC_LINE_FORMAT__ STR_GREEN;
-            break;
-        case ULOG_WARN:
-            info_str = (char *)STR_BOLD_YELLOW "W" __FUNC_LINE_FORMAT__ STR_YELLOW;
-            break;
-        case ULOG_ERROR:
-            info_str = (char *)STR_BOLD_RED "E" __FUNC_LINE_FORMAT__ STR_RED;
-            break;
-        case ULOG_ASSERT:
-            info_str = (char *)STR_BOLD_PURPLE "A" __FUNC_LINE_FORMAT__ STR_PURPLE;
-            break;
-        case ULOG_VERBOSE:
-        default:
-            info_str = (char *)STR_BOLD_WHITE "V" __FUNC_LINE_FORMAT__ STR_WHITE;
-#undef __FUNC_LINE_FORMAT__
-    }
-    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), info_str, file, func, line);
+    // Print level, file, function and line
+    char *level_mark = level_infos[level][INDEX_LEVEL_MARK];
+    char *info_str_fmt = (char *) "%s" STR_BLACK "/%s(%s:%d)%s ";
+    char *log_info_color = level_infos[level][INDEX_PRIMARY_COLOR];
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), info_str_fmt,
+            level_mark, file, func, line, log_info_color);
     output_cb(log_out_buf);
     buf_ptr = log_out_buf;
 

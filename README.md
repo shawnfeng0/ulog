@@ -47,4 +47,4 @@ int main() {
 
 ### Output
 
-[![2019-06-06-01-25.png](https://i.postimg.cc/JhNkgZ8r/2019-06-06-01-25.png)](https://postimg.cc/bGvrSGdW)
+[![2019-06-06-14-13.png](https://i.postimg.cc/bw2WS5md/2019-06-06-14-13.png)](https://postimg.cc/cv0XVFyN)

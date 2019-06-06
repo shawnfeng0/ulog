@@ -12,12 +12,13 @@ extern "C" {
 typedef int (*OutputCb)(const char *ptr);
 
 enum ULOG_LEVEL {
-    ULOG_VERBOSE,
+    ULOG_VERBOSE = 0,
     ULOG_DEBUG,
     ULOG_INFO,
     ULOG_WARN,
     ULOG_ERROR,
-    ULOG_ASSERT
+    ULOG_ASSERT,
+    ULOG_LEVEL_NUMBER
 };
 
 #if !defined(ULOG_NO_COLOR)
