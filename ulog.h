@@ -1,25 +1,9 @@
 #ifndef ULOG_ULOG_H
 #define ULOG_ULOG_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #if !defined(ULOG_OUTPUT_LEVEL)
 #define ULOG_OUTPUT_LEVEL ULOG_VERBOSE
 #endif
-
-typedef int (*OutputCb)(const char *ptr);
-
-enum ULOG_LEVEL {
-    ULOG_VERBOSE = 0,
-    ULOG_DEBUG,
-    ULOG_INFO,
-    ULOG_WARN,
-    ULOG_ERROR,
-    ULOG_ASSERT,
-    ULOG_LEVEL_NUMBER
-};
 
 #if !defined(ULOG_NO_COLOR)
 #define _STR_COLOR(color) "\x1b[" #color "m"
@@ -28,6 +12,8 @@ enum ULOG_LEVEL {
 #endif
 
 #define STR_RESET _STR_COLOR(0)
+#define STR_GRAY _STR_COLOR(38;5;8)
+
 #define STR_BLACK _STR_COLOR(0;30)
 #define STR_RED _STR_COLOR(0;31)
 #define STR_GREEN _STR_COLOR(0;32)
@@ -65,24 +51,28 @@ enum ULOG_LEVEL {
 #define Log_error(fmt, ...) _uLogLog(ULOG_ERROR, fmt, ##__VA_ARGS__)
 #define Log_assert(fmt, ...) _uLogLog(ULOG_ASSERT, fmt, ##__VA_ARGS__)
 
-#define __TYPE_CMP(X, Y) __builtin_types_compatible_p(typeof(X), Y)
+#ifdef __cplusplus
+#define __TYPE_CMP(X, Y) (typeid(X) == typeid(Y))
+#else
+#define __TYPE_CMP(X, Y) __builtin_types_compatible_p(typeof(X), typeof(Y))
+#endif
 
 #define Log_token(token) do { \
-    char *fmt = "(none) %s = "; \
+    char *fmt = (char *) "(none) %s = "; \
     if (__TYPE_CMP(token, float) || __TYPE_CMP(token, double)) { \
-        fmt = "(float) %s => %f";\
+        fmt = (char *) "(float) %s => %f";\
     } else if (__TYPE_CMP(token, int) || __TYPE_CMP(token, unsigned int) \
         || __TYPE_CMP(token, short) || __TYPE_CMP(token, unsigned short) \
         || __TYPE_CMP(token, long) || __TYPE_CMP(token, unsigned long) \
         || __TYPE_CMP(token, long long) || __TYPE_CMP(token, unsigned long long) \
         ) { \
-        fmt = "(int) %s => %d";\
+        fmt = (char *) "(int) %s => %d";\
     } else if (__TYPE_CMP(token, char) || __TYPE_CMP(token, unsigned char)) { \
-        fmt = "(char) %s => %c";\
+        fmt = (char *) "(char) %s => %c";\
     } else if (__TYPE_CMP(token, char *) || __TYPE_CMP(token, unsigned char*) \
         || __TYPE_CMP(token, char[]) || __TYPE_CMP(token, unsigned char[]) \
         ) { \
-        fmt = "(char*) %s => %s";\
+        fmt = (char *) "(char*) %s => %s";\
     } else if (__TYPE_CMP(token, void *) \
         || __TYPE_CMP(token, float*) || __TYPE_CMP(token, double*) \
         || __TYPE_CMP(token, int*) || __TYPE_CMP(token, unsigned int*) \
@@ -90,10 +80,26 @@ enum ULOG_LEVEL {
         || __TYPE_CMP(token, long*) || __TYPE_CMP(token, unsigned long*) \
         || __TYPE_CMP(token, long long*) || __TYPE_CMP(token, unsigned long long*) \
         ) { \
-        fmt = "(void*) %s => %x";\
+        fmt = (char *) "(void*) %s => %x";\
     } \
     Log_debug(fmt, #token, token); \
 } while(0);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef int (*OutputCb)(const char *ptr);
+
+enum ULOG_LEVEL {
+    ULOG_VERBOSE = 0,
+    ULOG_DEBUG,
+    ULOG_INFO,
+    ULOG_WARN,
+    ULOG_ERROR,
+    ULOG_ASSERT,
+    ULOG_LEVEL_NUMBER
+};
 
 void uLogInit(OutputCb cb);
 void uLogLog(enum ULOG_LEVEL level, const char *file, const char *func, int line, const char *fmt, ...);
