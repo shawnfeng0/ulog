@@ -52,6 +52,7 @@
 #define Log_assert(fmt, ...) _uLogLog(ULOG_ASSERT, fmt, ##__VA_ARGS__)
 
 #ifdef __cplusplus
+#include <typeinfo>
 #define __TYPE_CMP(X, Y) (typeid(X) == typeid(Y))
 #else
 #define __TYPE_CMP(X, Y) __builtin_types_compatible_p(typeof(X), typeof(Y))
