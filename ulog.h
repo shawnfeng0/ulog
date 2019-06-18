@@ -64,12 +64,20 @@
         fmt = (char *) "(double) %s => %f";\
     } else if (__TYPE_CMP(token, short) || __TYPE_CMP(token, unsigned short)) { \
         fmt = (char *) "(short) %s => %hd";\
-    } else if (__TYPE_CMP(token, int) || __TYPE_CMP(token, unsigned int)) { \
+    } else if (__TYPE_CMP(token, unsigned short)) { \
+        fmt = (char *) "(unsigned short) %s => %hu";\
+    } else if (__TYPE_CMP(token, int)) { \
         fmt = (char *) "(int) %s => %d";\
-    } else if (__TYPE_CMP(token, long) || __TYPE_CMP(token, unsigned long)) { \
+    } else if (__TYPE_CMP(token, unsigned int)) { \
+        fmt = (char *) "(unsigned int) %s => %u";\
+    } else if (__TYPE_CMP(token, long)) { \
         fmt = (char *) "(long) %s => %ld";\
-    } else if (__TYPE_CMP(token, long long) || __TYPE_CMP(token, unsigned long long)) { \
+    } else if (__TYPE_CMP(token, unsigned long)) { \
+        fmt = (char *) "(unsigned long) %s => %lu";\
+    } else if (__TYPE_CMP(token, long long)) { \
         fmt = (char *) "(long long) %s => %lld";\
+    } else if (__TYPE_CMP(token, unsigned long long)) { \
+        fmt = (char *) "(unsigned long long) %s => %llu";\
     } else if (__TYPE_CMP(token, char) || __TYPE_CMP(token, unsigned char)) { \
         fmt = (char *) "(char) %s => %c";\
     } else if (__TYPE_CMP(token, char *) || __TYPE_CMP(token, unsigned char*) \
