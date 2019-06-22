@@ -27,6 +27,7 @@ enum {
     INDEX_LEVEL_MARK,
     INDEX_MAX,
 };
+
 static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] {
     {(char *) STR_BOLD_WHITE, (char *) STR_WHITE, (char *) "V"}, // VERBOSE
     {(char *) STR_BOLD_BLUE, (char *) STR_BLUE, (char *) "D"}, // DEBUG

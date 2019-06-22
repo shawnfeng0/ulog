@@ -1,6 +1,9 @@
 #ifndef ULOG_ULOG_H
 #define ULOG_ULOG_H
 
+#include <time.h>
+#include <string.h>
+
 #if !defined(ULOG_OUTPUT_LEVEL)
 #define ULOG_OUTPUT_LEVEL ULOG_VERBOSE
 #endif
@@ -34,7 +37,6 @@
 
 // Precompiler define to get only filename;
 #if !defined(__FILENAME__)
-#include <string.h>
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #endif
 
@@ -59,31 +61,31 @@
 #endif
 
 #define Log_token(token) do { \
-    char *fmt = (char *) "(none) %s = "; \
+    char *__ulog_token_fmt = (char *) "(none) %s = "; \
     if (__TYPE_CMP(token, float) || __TYPE_CMP(token, double)) { \
-        fmt = (char *) "(double) %s => %f";\
+        __ulog_token_fmt = (char *) "(double) %s => %f";\
     } else if (__TYPE_CMP(token, short) || __TYPE_CMP(token, unsigned short)) { \
-        fmt = (char *) "(short) %s => %hd";\
+        __ulog_token_fmt = (char *) "(short) %s => %hd";\
     } else if (__TYPE_CMP(token, unsigned short)) { \
-        fmt = (char *) "(unsigned short) %s => %hu";\
+        __ulog_token_fmt = (char *) "(unsigned short) %s => %hu";\
     } else if (__TYPE_CMP(token, int)) { \
-        fmt = (char *) "(int) %s => %d";\
+        __ulog_token_fmt = (char *) "(int) %s => %d";\
     } else if (__TYPE_CMP(token, unsigned int)) { \
-        fmt = (char *) "(unsigned int) %s => %u";\
+        __ulog_token_fmt = (char *) "(unsigned int) %s => %u";\
     } else if (__TYPE_CMP(token, long)) { \
-        fmt = (char *) "(long) %s => %ld";\
+        __ulog_token_fmt = (char *) "(long) %s => %ld";\
     } else if (__TYPE_CMP(token, unsigned long)) { \
-        fmt = (char *) "(unsigned long) %s => %lu";\
+        __ulog_token_fmt = (char *) "(unsigned long) %s => %lu";\
     } else if (__TYPE_CMP(token, long long)) { \
-        fmt = (char *) "(long long) %s => %lld";\
+        __ulog_token_fmt = (char *) "(long long) %s => %lld";\
     } else if (__TYPE_CMP(token, unsigned long long)) { \
-        fmt = (char *) "(unsigned long long) %s => %llu";\
+        __ulog_token_fmt = (char *) "(unsigned long long) %s => %llu";\
     } else if (__TYPE_CMP(token, char) || __TYPE_CMP(token, unsigned char)) { \
-        fmt = (char *) "(char) %s => %c";\
+        __ulog_token_fmt = (char *) "(char) %s => %c";\
     } else if (__TYPE_CMP(token, char *) || __TYPE_CMP(token, unsigned char*) \
         || __TYPE_CMP(token, char[]) || __TYPE_CMP(token, unsigned char[]) \
         ) { \
-        fmt = (char *) "(char*) %s => %s";\
+        __ulog_token_fmt = (char *) "(char*) %s => %s";\
     } else if (__TYPE_CMP(token, void *) \
         || __TYPE_CMP(token, float*) || __TYPE_CMP(token, double*) \
         || __TYPE_CMP(token, int*) || __TYPE_CMP(token, unsigned int*) \
@@ -91,10 +93,25 @@
         || __TYPE_CMP(token, long*) || __TYPE_CMP(token, unsigned long*) \
         || __TYPE_CMP(token, long long*) || __TYPE_CMP(token, unsigned long long*) \
         ) { \
-        fmt = (char *) "(void*) %s => %x";\
+        __ulog_token_fmt = (char *) "(void*) %s => %x";\
     } \
-    Log_debug(fmt, #token, token); \
-} while(0)
+    Log_debug(__ulog_token_fmt, #token, token); \
+} while (0)
+
+#define __LOG_TIME_FUNCTION_LENGTH 50
+
+#define Log_time(function) do { \
+    struct timespec __ulog_time_tsp1 {}; \
+    struct timespec __ulog_time_tsp2 {}; \
+    clock_gettime(CLOCK_MONOTONIC, &__ulog_time_tsp1); \
+    function; \
+    clock_gettime(CLOCK_MONOTONIC, &__ulog_time_tsp2); \
+    float __ulog_time_timediff = (__ulog_time_tsp2.tv_sec - __ulog_time_tsp1.tv_sec) + (float) (__ulog_time_tsp2.tv_nsec - __ulog_time_tsp1.tv_nsec) / (1000 * 1000 * 1000); \
+    char __ulog_time_function_str[__LOG_TIME_FUNCTION_LENGTH] = {0}; \
+    memset(__ulog_time_function_str, 0, __LOG_TIME_FUNCTION_LENGTH); \
+    strncpy(__ulog_time_function_str, #function, __LOG_TIME_FUNCTION_LENGTH - 1); \
+    Log_debug("time {%s}: %fs", __ulog_time_function_str, __ulog_time_timediff); \
+} while (0)
 
 #ifdef __cplusplus
 extern "C" {
