@@ -5,7 +5,7 @@
 #include <string.h>
 
 #if !defined(ULOG_OUTPUT_LEVEL)
-#define ULOG_OUTPUT_LEVEL ULOG_VERBOSE
+#define ULOG_OUTPUT_LEVEL __ULOG_VERBOSE
 #endif
 
 #if !defined(ULOG_NO_COLOR)
@@ -46,12 +46,12 @@
 #define _uLogLog(level, ...)
 #endif
 
-#define Log_verbose(fmt, ...) _uLogLog(ULOG_VERBOSE, fmt, ##__VA_ARGS__)
-#define Log_debug(fmt, ...) _uLogLog(ULOG_DEBUG, fmt, ##__VA_ARGS__)
-#define Log_info(fmt, ...) _uLogLog(ULOG_INFO, fmt, ##__VA_ARGS__)
-#define Log_warn(fmt, ...) _uLogLog(ULOG_WARN, fmt, ##__VA_ARGS__)
-#define Log_error(fmt, ...) _uLogLog(ULOG_ERROR, fmt, ##__VA_ARGS__)
-#define Log_assert(fmt, ...) _uLogLog(ULOG_ASSERT, fmt, ##__VA_ARGS__)
+#define Log_verbose(fmt, ...) _uLogLog(__ULOG_VERBOSE, fmt, ##__VA_ARGS__)
+#define Log_debug(fmt, ...) _uLogLog(__ULOG_DEBUG, fmt, ##__VA_ARGS__)
+#define Log_info(fmt, ...) _uLogLog(__ULOG_INFO, fmt, ##__VA_ARGS__)
+#define Log_warn(fmt, ...) _uLogLog(__ULOG_WARN, fmt, ##__VA_ARGS__)
+#define Log_error(fmt, ...) _uLogLog(__ULOG_ERROR, fmt, ##__VA_ARGS__)
+#define Log_assert(fmt, ...) _uLogLog(__ULOG_ASSERT, fmt, ##__VA_ARGS__)
 
 #ifdef __cplusplus
 #include <typeinfo>
@@ -101,16 +101,17 @@
 #define __LOG_TIME_FUNCTION_LENGTH 50
 
 #define Log_time(function) do { \
-    struct timespec __ulog_time_tsp1 {}; \
-    struct timespec __ulog_time_tsp2 {}; \
+    struct timespec __ulog_time_tsp1 = {}; \
+    struct timespec __ulog_time_tsp2 = {}; \
     clock_gettime(CLOCK_MONOTONIC, &__ulog_time_tsp1); \
     function; \
     clock_gettime(CLOCK_MONOTONIC, &__ulog_time_tsp2); \
-    float __ulog_time_timediff = (__ulog_time_tsp2.tv_sec - __ulog_time_tsp1.tv_sec) + (float) (__ulog_time_tsp2.tv_nsec - __ulog_time_tsp1.tv_nsec) / (1000 * 1000 * 1000); \
+    float __ulog_time_timediff = (__ulog_time_tsp2.tv_sec - __ulog_time_tsp1.tv_sec) \
+        + (float) (__ulog_time_tsp2.tv_nsec - __ulog_time_tsp1.tv_nsec) / (1000 * 1000 * 1000); \
     char __ulog_time_function_str[__LOG_TIME_FUNCTION_LENGTH] = {0}; \
     memset(__ulog_time_function_str, 0, __LOG_TIME_FUNCTION_LENGTH); \
     strncpy(__ulog_time_function_str, #function, __LOG_TIME_FUNCTION_LENGTH - 1); \
-    Log_debug("time {%s}: %fs", __ulog_time_function_str, __ulog_time_timediff); \
+    Log_debug("time { %s }: %fs", __ulog_time_function_str, __ulog_time_timediff); \
 } while (0)
 
 #ifdef __cplusplus
@@ -120,13 +121,13 @@ extern "C" {
 typedef int (*OutputCb)(const char *ptr);
 
 enum ULOG_LEVEL {
-    ULOG_VERBOSE = 0,
-    ULOG_DEBUG,
-    ULOG_INFO,
-    ULOG_WARN,
-    ULOG_ERROR,
-    ULOG_ASSERT,
-    ULOG_LEVEL_NUMBER
+    __ULOG_VERBOSE = 0,
+    __ULOG_DEBUG,
+    __ULOG_INFO,
+    __ULOG_WARN,
+    __ULOG_ERROR,
+    __ULOG_ASSERT,
+    __ULOG_LEVEL_NUMBER
 };
 
 void uLogInit(OutputCb cb);

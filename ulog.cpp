@@ -17,7 +17,7 @@
 #if !defined(ULOG_DISABLE)
 
 static char log_out_buf[LOG_OUTBUF_LEN];
-static uint16_t log_evt_num = 1;
+static uint32_t log_evt_num = 1;
 static OutputCb output_cb = nullptr;
 static pthread_mutex_t log_lock;
 
@@ -28,7 +28,7 @@ enum {
     INDEX_MAX,
 };
 
-static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] {
+static char *level_infos[__ULOG_LEVEL_NUMBER][INDEX_MAX] {
     {(char *) STR_BOLD_WHITE, (char *) STR_WHITE, (char *) "V"}, // VERBOSE
     {(char *) STR_BOLD_BLUE, (char *) STR_BLUE, (char *) "D"}, // DEBUG
     {(char *) STR_BOLD_GREEN, (char *) STR_GREEN, (char *) "I"}, // INFO
@@ -94,22 +94,23 @@ void uLogLog(enum ULOG_LEVEL level, const char *file, const char *func, int line
 
     // Print level, file, function and line
     char *level_mark = level_infos[level][INDEX_LEVEL_MARK];
-    char *info_str_fmt = (char *) "%s" STR_GRAY "/(%s %s:%d) %s";
-    char *log_info_color = level_infos[level][INDEX_SECONDARY_COLOR];
+    char *info_str_fmt = (char *) "%s" STR_GRAY "/(%s:%d %s) ";
     snprintf(buf_ptr, (buf_end_ptr - buf_ptr), info_str_fmt,
-            level_mark, func, file, line, log_info_color);
+            level_mark, file, line, func);
     output_cb(log_out_buf);
     buf_ptr = log_out_buf;
+
+    char *log_info_color = level_infos[level][INDEX_SECONDARY_COLOR];
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s", log_info_color);
+    buf_ptr = log_out_buf + strlen(log_out_buf);
 
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ap);
+    buf_ptr = log_out_buf + strlen(log_out_buf);
     va_end(ap);
 
-    buf_ptr = log_out_buf + strlen(log_out_buf);
-
     snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s", STR_RESET);
-
     buf_ptr = log_out_buf + strlen(log_out_buf);
 
     *buf_ptr++ = '\r';
