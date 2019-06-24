@@ -94,10 +94,10 @@ void uLogLog(enum ULOG_LEVEL level, const char *file, const char *func, int line
 
     // Print level, file, function and line
     char *level_mark = level_infos[level][INDEX_LEVEL_MARK];
-    char *info_str_fmt = (char *) "%s" STR_GRAY "/%s(%s:%d) %s";
+    char *info_str_fmt = (char *) "%s" STR_GRAY "/(%s %s:%d) %s";
     char *log_info_color = level_infos[level][INDEX_SECONDARY_COLOR];
     snprintf(buf_ptr, (buf_end_ptr - buf_ptr), info_str_fmt,
-            level_mark, file, func, line, log_info_color);
+            level_mark, func, file, line, log_info_color);
     output_cb(log_out_buf);
     buf_ptr = log_out_buf;
 
