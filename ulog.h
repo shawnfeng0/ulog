@@ -1,11 +1,11 @@
-#ifndef ULOG_ULOG_H
-#define ULOG_ULOG_H
+#ifndef __ULOG_H__
+#define __ULOG_H__
 
 #include <time.h>
 #include <string.h>
 
 #if !defined(ULOG_OUTPUT_LEVEL)
-#define ULOG_OUTPUT_LEVEL __ULOG_VERBOSE
+#define ULOG_OUTPUT_LEVEL ULOG_VERBOSE
 #endif
 
 #if !defined(ULOG_NO_COLOR)
@@ -41,17 +41,17 @@
 #endif
 
 #if !defined(ULOG_DISABLE)
-#define _uLogLog(level, ...) uLogLog(level, __FILENAME__, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define _logger_log(level, ...) logger_log(level, __FILENAME__, __FUNCTION__, __LINE__, ##__VA_ARGS__)
 #else
-#define _uLogLog(level, ...)
+#define _logger_log(level, ...)
 #endif
 
-#define Log_verbose(fmt, ...) _uLogLog(__ULOG_VERBOSE, fmt, ##__VA_ARGS__)
-#define Log_debug(fmt, ...) _uLogLog(__ULOG_DEBUG, fmt, ##__VA_ARGS__)
-#define Log_info(fmt, ...) _uLogLog(__ULOG_INFO, fmt, ##__VA_ARGS__)
-#define Log_warn(fmt, ...) _uLogLog(__ULOG_WARN, fmt, ##__VA_ARGS__)
-#define Log_error(fmt, ...) _uLogLog(__ULOG_ERROR, fmt, ##__VA_ARGS__)
-#define Log_assert(fmt, ...) _uLogLog(__ULOG_ASSERT, fmt, ##__VA_ARGS__)
+#define LOG_VERBOSE(fmt, ...) _logger_log(ULOG_VERBOSE, fmt, ##__VA_ARGS__)
+#define LOG_DEBUG(fmt, ...) _logger_log(ULOG_DEBUG, fmt, ##__VA_ARGS__)
+#define LOG_INFO(fmt, ...) _logger_log(ULOG_INFO, fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...) _logger_log(ULOG_WARN, fmt, ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...) _logger_log(ULOG_ERROR, fmt, ##__VA_ARGS__)
+#define LOG_ASSERT(fmt, ...) _logger_log(ULOG_ASSERT, fmt, ##__VA_ARGS__)
 
 #ifdef __cplusplus
 #include <typeinfo>
@@ -60,8 +60,8 @@
 #define __TYPE_CMP(X, Y) __builtin_types_compatible_p(typeof(X), typeof(Y))
 #endif
 
-#define Log_token(token) do { \
-    char *__ulog_token_fmt = (char *) "(none) %s = "; \
+#define LOG_TOKEN(token) do { \
+    char *__ulog_token_fmt = (char *) "(none) %s = (unknown)"; \
     if (__TYPE_CMP(token, float) || __TYPE_CMP(token, double)) { \
         __ulog_token_fmt = (char *) "(double) %s => %f";\
     } else if (__TYPE_CMP(token, short) || __TYPE_CMP(token, unsigned short)) { \
@@ -95,12 +95,12 @@
         ) { \
         __ulog_token_fmt = (char *) "(void*) %s => %x";\
     } \
-    Log_debug(__ulog_token_fmt, #token, token); \
+    LOG_DEBUG(__ulog_token_fmt, #token, token); \
 } while (0)
 
 #define __LOG_TIME_FUNCTION_LENGTH 50
 
-#define Log_time(function) do { \
+#define LOG_TIME_CODE(function) do { \
     struct timespec __ulog_time_tsp1 = {}; \
     struct timespec __ulog_time_tsp2 = {}; \
     clock_gettime(CLOCK_MONOTONIC, &__ulog_time_tsp1); \
@@ -108,33 +108,33 @@
     clock_gettime(CLOCK_MONOTONIC, &__ulog_time_tsp2); \
     float __ulog_time_timediff = (__ulog_time_tsp2.tv_sec - __ulog_time_tsp1.tv_sec) \
         + (float) (__ulog_time_tsp2.tv_nsec - __ulog_time_tsp1.tv_nsec) / (1000 * 1000 * 1000); \
-    char __ulog_time_function_str[__LOG_TIME_FUNCTION_LENGTH] = {0}; \
+    char __ulog_time_function_str[__LOG_TIME_FUNCTION_LENGTH]; \
     memset(__ulog_time_function_str, 0, __LOG_TIME_FUNCTION_LENGTH); \
     strncpy(__ulog_time_function_str, #function, __LOG_TIME_FUNCTION_LENGTH - 1); \
-    Log_debug("time { %s }: %fs", __ulog_time_function_str, __ulog_time_timediff); \
+    LOG_DEBUG("time { %s }: %fs", __ulog_time_function_str, __ulog_time_timediff); \
 } while (0)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef int (*OutputCb)(const char *ptr);
+typedef int (*LogOutputCb)(const char *ptr);
 
-enum ULOG_LEVEL {
-    __ULOG_VERBOSE = 0,
-    __ULOG_DEBUG,
-    __ULOG_INFO,
-    __ULOG_WARN,
-    __ULOG_ERROR,
-    __ULOG_ASSERT,
-    __ULOG_LEVEL_NUMBER
+enum LoggerLevel {
+    ULOG_VERBOSE = 0,
+    ULOG_DEBUG,
+    ULOG_INFO,
+    ULOG_WARN,
+    ULOG_ERROR,
+    ULOG_ASSERT,
+    ULOG_LEVEL_NUMBER
 };
 
-void uLogInit(OutputCb cb);
-void uLogLog(enum ULOG_LEVEL level, const char *file, const char *func, int line, const char *fmt, ...);
+void logger_init(LogOutputCb output_cb);
+void logger_log(enum LoggerLevel level, const char *file, const char *func, int line, const char *fmt, ...);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  //ULOG_ULOG_H
+#endif  //__ULOG_H__

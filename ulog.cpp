@@ -18,7 +18,7 @@
 
 static char log_out_buf[LOG_OUTBUF_LEN];
 static uint32_t log_evt_num = 1;
-static OutputCb output_cb = nullptr;
+static LogOutputCb output_cb_ = nullptr;
 static pthread_mutex_t log_lock;
 
 enum {
@@ -28,7 +28,7 @@ enum {
     INDEX_MAX,
 };
 
-static char *level_infos[__ULOG_LEVEL_NUMBER][INDEX_MAX] {
+static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] {
     {(char *) STR_BOLD_WHITE, (char *) STR_WHITE, (char *) "V"}, // VERBOSE
     {(char *) STR_BOLD_BLUE, (char *) STR_BLUE, (char *) "D"}, // DEBUG
     {(char *) STR_BOLD_GREEN, (char *) STR_GREEN, (char *) "I"}, // INFO
@@ -53,11 +53,11 @@ class LockGuard {
 
 #endif
 
-void uLogInit(OutputCb cb) {
+void logger_init(LogOutputCb output_cb) {
 #if !defined(ULOG_DISABLE)
 
     pthread_mutex_init(&log_lock, nullptr);
-    output_cb = cb;
+    output_cb_ = output_cb;
 
 #if defined(ULOG_CLS)
     char clear_str[3] = {'\033', 'c', '\0'};  // clean screen
@@ -67,10 +67,10 @@ void uLogInit(OutputCb cb) {
 #endif
 }
 
-void uLogLog(enum ULOG_LEVEL level, const char *file, const char *func, int line, const char *fmt, ...) {
+void logger_log(enum LoggerLevel level, const char *file, const char *func, int line, const char *fmt, ...) {
 #if !defined(ULOG_DISABLE)
 
-    if (!output_cb || !fmt || level < ULOG_OUTPUT_LEVEL)
+    if (!output_cb_ || !fmt || level < ULOG_OUTPUT_LEVEL)
         return;
 
     LockGuard lock = LockGuard(log_lock);
@@ -97,7 +97,7 @@ void uLogLog(enum ULOG_LEVEL level, const char *file, const char *func, int line
     char *info_str_fmt = (char *) "%s" STR_GRAY "/(%s:%d %s) ";
     snprintf(buf_ptr, (buf_end_ptr - buf_ptr), info_str_fmt,
             level_mark, file, line, func);
-    output_cb(log_out_buf);
+    output_cb_(log_out_buf);
     buf_ptr = log_out_buf;
 
     char *log_info_color = level_infos[level][INDEX_SECONDARY_COLOR];
@@ -117,6 +117,6 @@ void uLogLog(enum ULOG_LEVEL level, const char *file, const char *func, int line
     *buf_ptr++ = '\n';
     *buf_ptr = '\0';
 
-    output_cb(log_out_buf);
+    output_cb_(log_out_buf);
 #endif
 }
