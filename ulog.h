@@ -59,43 +59,41 @@
 
 #ifdef __cplusplus
 #include <typeinfo>
-#define __TYPE_CMP(X, Y) (typeid(X) == typeid(Y))
+#define _TYPE_CMP(X, Y) (typeid(X) == typeid(Y))
 #else
-#define __TYPE_CMP(X, Y) __builtin_types_compatible_p(typeof(X), typeof(Y))
+#define _TYPE_CMP(X, Y) __builtin_types_compatible_p(typeof(X), typeof(Y))
 #endif
 
 #define LOG_TOKEN(token)                                                      \
     do {                                                                      \
-        if (__TYPE_CMP(token, float) || __TYPE_CMP(token, double)) {          \
+        if (_TYPE_CMP(token, float) || _TYPE_CMP(token, double)) {            \
             LOG_DEBUG("(float) %s => %f", #token, token);                     \
             /* Types with symbols below 64 bits */                            \
-        } else if (__TYPE_CMP(token, char) ||                                 \
-                   __TYPE_CMP(token, unsigned char) ||                        \
-                   __TYPE_CMP(token, short) ||                                \
-                   __TYPE_CMP(token, unsigned short) ||                       \
-                   __TYPE_CMP(token, int) || __TYPE_CMP(token, long) ||       \
-                   __TYPE_CMP(token, long long)) {                            \
+        } else if (_TYPE_CMP(token, char) ||                                  \
+                   _TYPE_CMP(token, unsigned char) ||                         \
+                   _TYPE_CMP(token, short) ||                                 \
+                   _TYPE_CMP(token, unsigned short) ||                        \
+                   _TYPE_CMP(token, int) || _TYPE_CMP(token, unsigned int) || \
+                   _TYPE_CMP(token, long) || _TYPE_CMP(token, long long)) {   \
             LOG_DEBUG("(int) %s => %" PRId64, #token, (int64_t)(token));      \
             /* May be a 64-bit type */                                        \
-        } else if (__TYPE_CMP(token, unsigned int) ||                         \
-                   __TYPE_CMP(token, unsigned long) ||                        \
-                   __TYPE_CMP(token, unsigned long long)) {                   \
+        } else if (_TYPE_CMP(token, unsigned long) ||                         \
+                   _TYPE_CMP(token, unsigned long long)) {                    \
             LOG_DEBUG("(int) %s => %" PRIu64, #token, (uint64_t)(token));     \
-        } else if (__TYPE_CMP(token, char *) ||                               \
-                   __TYPE_CMP(token, unsigned char *) ||                      \
-                   __TYPE_CMP(token, char[]) ||                               \
-                   __TYPE_CMP(token, unsigned char[])) {                      \
+        } else if (_TYPE_CMP(token, char *) ||                                \
+                   _TYPE_CMP(token, unsigned char *) ||                       \
+                   _TYPE_CMP(token, char[]) ||                                \
+                   _TYPE_CMP(token, unsigned char[])) {                       \
             LOG_DEBUG("(char*) %s => %s", #token, token);                     \
-        } else if (__TYPE_CMP(token, void *) || __TYPE_CMP(token, short *) || \
-                   __TYPE_CMP(token, unsigned short *) ||                     \
-                   __TYPE_CMP(token, int *) ||                                \
-                   __TYPE_CMP(token, unsigned int *) ||                       \
-                   __TYPE_CMP(token, long *) ||                               \
-                   __TYPE_CMP(token, unsigned long *) ||                      \
-                   __TYPE_CMP(token, long long *) ||                          \
-                   __TYPE_CMP(token, unsigned long long *) ||                 \
-                   __TYPE_CMP(token, float *) ||                              \
-                   __TYPE_CMP(token, double *)) {                             \
+        } else if (_TYPE_CMP(token, void *) || _TYPE_CMP(token, short *) ||   \
+                   _TYPE_CMP(token, unsigned short *) ||                      \
+                   _TYPE_CMP(token, int *) ||                                 \
+                   _TYPE_CMP(token, unsigned int *) ||                        \
+                   _TYPE_CMP(token, long *) ||                                \
+                   _TYPE_CMP(token, unsigned long *) ||                       \
+                   _TYPE_CMP(token, long long *) ||                           \
+                   _TYPE_CMP(token, unsigned long long *) ||                  \
+                   _TYPE_CMP(token, float *) || _TYPE_CMP(token, double *)) { \
             LOG_DEBUG("(void *) %s => %x", #token, token);                    \
         } else {                                                              \
             LOG_DEBUG("(none) %s = (unknown)", #token);                       \
