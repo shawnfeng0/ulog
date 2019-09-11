@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #if !defined(ULOG_OUTPUT_LEVEL)
 #define ULOG_OUTPUT_LEVEL ULOG_VERBOSE
@@ -102,23 +103,23 @@
 
 #define _LOG_TIME_FUNCTION_LENGTH 50
 
-#define LOG_TIME_CODE(function)                                          \
-    do {                                                                 \
-        struct timespec _ulog_time_tsp1 = {};                            \
-        struct timespec _ulog_time_tsp2 = {};                            \
-        clock_gettime(CLOCK_MONOTONIC, &_ulog_time_tsp1);                \
-        function;                                                        \
-        clock_gettime(CLOCK_MONOTONIC, &_ulog_time_tsp2);                \
-        float _ulog_time_timediff =                                      \
-            (_ulog_time_tsp2.tv_sec - _ulog_time_tsp1.tv_sec) +          \
-            (float)(_ulog_time_tsp2.tv_nsec - _ulog_time_tsp1.tv_nsec) / \
-                (1000 * 1000 * 1000);                                    \
-        char _ulog_time_function_str[_LOG_TIME_FUNCTION_LENGTH];         \
-        memset(_ulog_time_function_str, 0, _LOG_TIME_FUNCTION_LENGTH);   \
-        strncpy(_ulog_time_function_str, #function,                      \
-                _LOG_TIME_FUNCTION_LENGTH - 1);                          \
-        LOG_DEBUG("time { %s }: %fs", _ulog_time_function_str,           \
-                  _ulog_time_timediff);                                  \
+#define LOG_TIME_CODE(function)                                        \
+    do {                                                               \
+        struct timespec ulog_time_tsp1 = {};                           \
+        struct timespec ulog_time_tsp2 = {};                           \
+        clock_gettime(CLOCK_MONOTONIC, &ulog_time_tsp1);               \
+        function;                                                      \
+        clock_gettime(CLOCK_MONOTONIC, &ulog_time_tsp2);               \
+        float ulog_time_timediff =                                     \
+            (ulog_time_tsp2.tv_sec - ulog_time_tsp1.tv_sec) +          \
+            (float)(ulog_time_tsp2.tv_nsec - ulog_time_tsp1.tv_nsec) / \
+                (1000 * 1000 * 1000);                                  \
+        char ulog_time_function_str[_LOG_TIME_FUNCTION_LENGTH];        \
+        memset(ulog_time_function_str, 0, _LOG_TIME_FUNCTION_LENGTH);  \
+        strncpy(ulog_time_function_str, #function,                     \
+                _LOG_TIME_FUNCTION_LENGTH - 1);                        \
+        LOG_DEBUG("time { %s }: %fs", ulog_time_function_str,          \
+                  ulog_time_timediff);                                 \
     } while (0)
 
 #ifdef __cplusplus
