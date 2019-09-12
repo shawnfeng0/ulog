@@ -16,10 +16,25 @@
 
 #if !defined(ULOG_DISABLE)
 
-static char log_out_buf[LOG_OUTBUF_LEN];
-static uint32_t log_evt_num = 1;
+static char log_out_buf_[LOG_OUTBUF_LEN];
+static uint32_t log_evt_num_ = 1;
 static LogOutputCb output_cb_ = nullptr;
-static pthread_mutex_t log_lock;
+static pthread_mutex_t log_lock_;
+
+// Logger configuration
+static bool log_output_enable_ = true;
+
+#if !defined(ULOG_DISABLE_COLOR)
+static bool log_color_enable_ = true;
+#else
+static bool log_color_enable_ = false;
+#endif
+
+#if !defined(ULOG_DEFAULT_LEVEL)
+static LoggerLevel log_output_level_ = ULOG_VERBOSE;
+#else
+static LoggerLevel log_output_level_ = ULOG_DEFAULT_LEVEL;
+#endif
 
 enum {
     INDEX_PRIMARY_COLOR = 0,
@@ -28,13 +43,13 @@ enum {
     INDEX_MAX,
 };
 
-static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] {
-    {(char *) STR_BOLD_WHITE, (char *) STR_WHITE, (char *) "V"}, // VERBOSE
-    {(char *) STR_BOLD_BLUE, (char *) STR_BLUE, (char *) "D"}, // DEBUG
-    {(char *) STR_BOLD_GREEN, (char *) STR_GREEN, (char *) "I"}, // INFO
-    {(char *) STR_BOLD_YELLOW, (char *) STR_YELLOW, (char *) "W"}, // WARN
-    {(char *) STR_BOLD_RED, (char *) STR_RED, (char *) "E"}, // ERROR
-    {(char *) STR_BOLD_PURPLE, (char *) STR_PURPLE, (char *) "A"}, // ASSERT
+static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX]{
+    {(char *)STR_BOLD_WHITE, (char *)STR_WHITE, (char *)"V"},    // VERBOSE
+    {(char *)STR_BOLD_BLUE, (char *)STR_BLUE, (char *)"D"},      // DEBUG
+    {(char *)STR_BOLD_GREEN, (char *)STR_GREEN, (char *)"I"},    // INFO
+    {(char *)STR_BOLD_YELLOW, (char *)STR_YELLOW, (char *)"W"},  // WARN
+    {(char *)STR_BOLD_RED, (char *)STR_RED, (char *)"E"},        // ERROR
+    {(char *)STR_BOLD_PURPLE, (char *)STR_PURPLE, (char *)"A"},  // ASSERT
 };
 
 class LockGuard {
@@ -43,20 +58,48 @@ class LockGuard {
         pthread_mutex_lock(&mMutex);
     }
 
-    ~LockGuard() {
-        pthread_mutex_unlock(&mMutex);
-    }
+    ~LockGuard() { pthread_mutex_unlock(&mMutex); }
 
    private:
     pthread_mutex_t &mMutex;
 };
 
+#endif  // !ULOG_DISABLE
+
+void logger_enable_output() {
+#if !defined(ULOG_DISABLE)
+    log_output_enable_ = true;
 #endif
+}
+
+void logger_disable_output() {
+#if !defined(ULOG_DISABLE)
+    log_output_enable_ = false;
+#endif
+}
+
+void logger_enable_color() {
+#if !defined(ULOG_DISABLE)
+    log_color_enable_ = true;
+#endif
+}
+
+void logger_disable_color() {
+#if !defined(ULOG_DISABLE)
+    log_color_enable_ = false;
+#endif
+}
+
+void logger_set_output_level(LoggerLevel level) {
+#if !defined(ULOG_DISABLE)
+    log_output_level_ = level;
+#endif
+}
 
 void logger_init(LogOutputCb output_cb) {
 #if !defined(ULOG_DISABLE)
 
-    pthread_mutex_init(&log_lock, nullptr);
+    pthread_mutex_init(&log_lock_, nullptr);
     output_cb_ = output_cb;
 
 #if defined(ULOG_CLS)
@@ -67,56 +110,61 @@ void logger_init(LogOutputCb output_cb) {
 #endif
 }
 
-void logger_log(enum LoggerLevel level, const char *file, const char *func, int line, const char *fmt, ...) {
+void logger_log(LoggerLevel level, const char *file, const char *func, int line,
+                const char *fmt, ...) {
 #if !defined(ULOG_DISABLE)
 
-    if (!output_cb_ || !fmt || level < ULOG_OUTPUT_LEVEL)
+    if (!output_cb_ || !fmt || level < log_output_level_ || !log_output_enable_)
         return;
 
-    LockGuard lock = LockGuard(log_lock);
+    LockGuard lock = LockGuard(log_lock_);
 
-    char *buf_ptr = log_out_buf;
+    char *buf_ptr = log_out_buf_;
     // The last three characters are '\r', '\n', '\0'
-    char *buf_end_ptr = log_out_buf + LOG_OUTBUF_LEN - 3;
+    char *buf_end_ptr = log_out_buf_ + LOG_OUTBUF_LEN - 3;
 
-    char *primary_color = level_infos[level][INDEX_SECONDARY_COLOR];
+    char *log_info_color = log_color_enable_
+                               ? level_infos[level][INDEX_SECONDARY_COLOR]
+                               : (char *)"";
 
     /* Print serial number */
-    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s#%06u ", primary_color, log_evt_num++);
-    buf_ptr = log_out_buf + strlen(log_out_buf);
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s#%06u ", log_info_color,
+             log_evt_num_++);
+    buf_ptr = log_out_buf_ + strlen(log_out_buf_);
 
     // Print time
     struct timespec tsp {};
     clock_gettime(CLOCK_MONOTONIC, &tsp);
     snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "[%lu.%03lu] ", tsp.tv_sec,
              tsp.tv_nsec / (1000 * 1000));
-    buf_ptr = log_out_buf + strlen(log_out_buf);
+    buf_ptr = log_out_buf_ + strlen(log_out_buf_);
 
     // Print level, file, function and line
     char *level_mark = level_infos[level][INDEX_LEVEL_MARK];
-    char *info_str_fmt = (char *) "%s" STR_GRAY "/(%s:%d %s) ";
-    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), info_str_fmt,
-            level_mark, file, line, func);
-    output_cb_(log_out_buf);
-    buf_ptr = log_out_buf;
+    char *info_str_color = (char *)(log_color_enable_ ? STR_GRAY : "");
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s%s/(%s:%d %s) ", level_mark,
+             info_str_color, file, line, func);
+    output_cb_(log_out_buf_);
+    buf_ptr = log_out_buf_;
 
-    char *log_info_color = level_infos[level][INDEX_SECONDARY_COLOR];
+    // Print log info
     snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s", log_info_color);
-    buf_ptr = log_out_buf + strlen(log_out_buf);
+    buf_ptr = log_out_buf_ + strlen(log_out_buf_);
 
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ap);
-    buf_ptr = log_out_buf + strlen(log_out_buf);
+    buf_ptr = log_out_buf_ + strlen(log_out_buf_);
     va_end(ap);
 
-    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s", STR_RESET);
-    buf_ptr = log_out_buf + strlen(log_out_buf);
+    char *str_reset_color = (char *)(log_color_enable_ ? STR_RESET : "");
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s", str_reset_color);
+    buf_ptr = log_out_buf_ + strlen(log_out_buf_);
 
     *buf_ptr++ = '\r';
     *buf_ptr++ = '\n';
     *buf_ptr = '\0';
 
-    output_cb_(log_out_buf);
+    output_cb_(log_out_buf_);
 #endif
 }

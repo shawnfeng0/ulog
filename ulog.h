@@ -7,15 +7,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#if !defined(ULOG_OUTPUT_LEVEL)
-#define ULOG_OUTPUT_LEVEL ULOG_VERBOSE
-#endif
-
-#if !defined(ULOG_NO_COLOR)
 #define _STR_COLOR(color) "\x1b[" color "m"
-#else
-#define _STR_COLOR(color) ""
-#endif
 
 #define STR_RESET _STR_COLOR("0")
 #define STR_GRAY _STR_COLOR("38;5;8")
@@ -128,7 +120,7 @@ extern "C" {
 
 typedef int (*LogOutputCb)(const char *ptr);
 
-enum LoggerLevel {
+typedef enum {
     ULOG_VERBOSE = 0,
     ULOG_DEBUG,
     ULOG_INFO,
@@ -136,11 +128,16 @@ enum LoggerLevel {
     ULOG_ERROR,
     ULOG_ASSERT,
     ULOG_LEVEL_NUMBER
-};
+} LoggerLevel;
 
+void logger_enable_output(void);
+void logger_disable_output(void);
+void logger_enable_color(void);
+void logger_disable_color(void);
+void logger_set_output_level(LoggerLevel level);
 void logger_init(LogOutputCb output_cb);
-void logger_log(enum LoggerLevel level, const char *file, const char *func,
-                int line, const char *fmt, ...);
+void logger_log(LoggerLevel level, const char *file, const char *func, int line,
+                const char *fmt, ...);
 
 #ifdef __cplusplus
 }
