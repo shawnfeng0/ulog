@@ -66,27 +66,15 @@ class LockGuard {
 
 #endif  // !ULOG_DISABLE
 
-void logger_enable_output() {
+void logger_enable_output(uint8_t enable) {
 #if !defined(ULOG_DISABLE)
-    log_output_enable_ = true;
+    log_output_enable_ = (enable != 0);
 #endif
 }
 
-void logger_disable_output() {
+void logger_enable_color(uint8_t enable) {
 #if !defined(ULOG_DISABLE)
-    log_output_enable_ = false;
-#endif
-}
-
-void logger_enable_color() {
-#if !defined(ULOG_DISABLE)
-    log_color_enable_ = true;
-#endif
-}
-
-void logger_disable_color() {
-#if !defined(ULOG_DISABLE)
-    log_color_enable_ = false;
+    log_color_enable_ = (enable != 0);
 #endif
 }
 

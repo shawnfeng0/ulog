@@ -130,10 +130,8 @@ typedef enum {
     ULOG_LEVEL_NUMBER
 } LoggerLevel;
 
-void logger_enable_output(void);
-void logger_disable_output(void);
-void logger_enable_color(void);
-void logger_disable_color(void);
+void logger_enable_output(uint8_t enable);
+void logger_enable_color(uint8_t enable);
 void logger_set_output_level(LoggerLevel level);
 void logger_init(LogOutputCb output_cb);
 void logger_log(LoggerLevel level, const char *file, const char *func, int line,
