@@ -116,8 +116,8 @@ void logger_get_time(struct timespec *tp) {
   if (get_time_cb_) get_time_cb_(tp);
 }
 
-void logger_log(LogLevel level, const char *file, const char *func, uint32_t line,
-                const char *fmt, ...) {
+void logger_log(LogLevel level, const char *file, const char *func,
+                uint32_t line, const char *fmt, ...) {
 #if !defined(ULOG_DISABLE)
 
   if (!output_cb_ || !fmt || level < log_output_level_ || !log_output_enable_)
@@ -149,8 +149,8 @@ void logger_log(LogLevel level, const char *file, const char *func, uint32_t lin
   // Print level, file, function and line
   char *level_mark = level_infos[level][INDEX_LEVEL_MARK];
   char *info_str_color = (char *)(log_color_enable_ ? STR_GRAY : "");
-  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s%s/(%s:%" PRIu32 " %s) ", level_mark,
-           info_str_color, file, line, func);
+  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s%s/(%s:%" PRIu32 " %s) ",
+           level_mark, info_str_color, file, line, func);
   output_cb_(log_out_buf_);
   buf_ptr = log_out_buf_;
 

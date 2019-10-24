@@ -136,8 +136,8 @@ void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
 void logger_set_time_callback(LogGetTime get_time_cb);
 void logger_init(LogOutputCb output_cb);
 void logger_get_time(struct timespec *tp);
-void logger_log(LogLevel level, const char *file, const char *func, uint32_t line,
-                const char *fmt, ...);
+void logger_log(LogLevel level, const char *file, const char *func,
+                uint32_t line, const char *fmt, ...);
 
 #ifdef __cplusplus
 }
