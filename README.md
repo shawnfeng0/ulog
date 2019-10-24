@@ -9,6 +9,7 @@ Ulog is a micro log library suitable for use with lightweight embedded devices.
 ```C++
 #include "ulog/ulog.h"
 #include <stdio.h>
+#include <unistd.h>
 
 int put_str(const char *str) { return printf("%s", str); }
 
