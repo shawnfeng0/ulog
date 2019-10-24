@@ -2,10 +2,10 @@
 #define __ULOG_H__
 
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
 
 #define _STR_COLOR(color) "\x1b[" color "m"
 
@@ -94,11 +94,11 @@
 
 #define LOG_TIME_CODE(function)                                                \
   do {                                                                         \
-    struct timespec ulog_time_tsp1 = {};                                       \
-    struct timespec ulog_time_tsp2 = {};                                       \
-    clock_gettime(CLOCK_MONOTONIC, &ulog_time_tsp1);                           \
+    struct timespec ulog_time_tsp1 = {0, 0};                                   \
+    struct timespec ulog_time_tsp2 = {0, 0};                                   \
+    logger_get_time(&ulog_time_tsp1);                                          \
     function;                                                                  \
-    clock_gettime(CLOCK_MONOTONIC, &ulog_time_tsp2);                           \
+    logger_get_time(&ulog_time_tsp2);                                          \
     float ulog_time_timediff =                                                 \
         (ulog_time_tsp2.tv_sec - ulog_time_tsp1.tv_sec) +                      \
         (float)(ulog_time_tsp2.tv_nsec - ulog_time_tsp1.tv_nsec) /             \
@@ -114,6 +114,9 @@ extern "C" {
 #endif
 
 typedef int (*LogOutputCb)(const char *ptr);
+typedef int (*LogMutexUnlock)(void *mutex);
+typedef int (*LogMutexLock)(void *mutex);
+typedef int (*LogGetTime)(struct timespec *tp);
 
 typedef enum {
   ULOG_VERBOSE = 0,
@@ -123,13 +126,17 @@ typedef enum {
   ULOG_ERROR,
   ULOG_ASSERT,
   ULOG_LEVEL_NUMBER
-} LoggerLevel;
+} LogLevel;
 
-void logger_enable_output(uint8_t enable);
-void logger_enable_color(uint8_t enable);
-void logger_set_output_level(LoggerLevel level);
+void logger_enable_output(bool enable);
+void logger_enable_color(bool enable);
+void logger_set_output_level(LogLevel level);
+void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
+                           LogMutexUnlock mutex_unlock_cb);
+void logger_set_time_callback(LogGetTime get_time_cb);
 void logger_init(LogOutputCb output_cb);
-void logger_log(LoggerLevel level, const char *file, const char *func, int line,
+void logger_get_time(struct timespec *tp);
+void logger_log(LogLevel level, const char *file, const char *func, uint32_t line,
                 const char *fmt, ...);
 
 #ifdef __cplusplus
