@@ -46,6 +46,12 @@ static bool log_color_enable_ = true;
 static bool log_color_enable_ = false;
 #endif
 
+static bool log_number_output_ = true;
+static bool log_time_output_ = true;
+static bool log_level_output_ = true;
+static bool log_file_line_output_ = true;
+static bool log_function_output_ = true;
+
 #if !defined(ULOG_DEFAULT_LEVEL)
 static LogLevel log_output_level_ = ULOG_VERBOSE;
 #else
@@ -79,6 +85,36 @@ void logger_enable_output(bool enable) {
 void logger_enable_color(bool enable) {
 #if !defined(ULOG_DISABLE)
   log_color_enable_ = enable;
+#endif
+}
+
+void logger_enable_number_output(bool enable) {
+#if !defined(ULOG_DISABLE)
+  log_number_output_ = enable;
+#endif
+}
+
+void logger_enable_time_output(bool enable) {
+#if !defined(ULOG_DISABLE)
+  log_time_output_ = enable;
+#endif
+}
+
+void logger_enable_level_output(bool enable) {
+#if !defined(ULOG_DISABLE)
+  log_level_output_ = enable;
+#endif
+}
+
+void logger_enable_file_line_output(bool enable) {
+#if !defined(ULOG_DISABLE)
+  log_file_line_output_ = enable;
+#endif
+}
+
+void logger_enable_function_output(bool enable) {
+#if !defined(ULOG_DISABLE)
+  log_function_output_ = enable;
 #endif
 }
 
@@ -133,40 +169,71 @@ void logger_log(LogLevel level, const char *file, const char *func,
   char *log_info_color = log_color_enable_
                              ? level_infos[level][INDEX_SECONDARY_COLOR]
                              : (char *)"";
+#define SNPRINTF_WRAPPER(fmt, ...) \
+  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__);
+#define VSNPRINTF_WRAPPER(fmt, ...) \
+  vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__);
 
-  /* Print serial number */
-  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s#%06" PRIu32 " ", log_info_color,
-           log_evt_num_++);
-  buf_ptr = log_out_buf_ + strlen(log_out_buf_);
+  // Color
+  if (log_number_output_ || log_time_output_ || log_level_output_) {
+    buf_ptr += SNPRINTF_WRAPPER("%s", log_info_color);
+  }
+
+  // Print serial number
+  if (log_number_output_) {
+    buf_ptr += SNPRINTF_WRAPPER("#%06" PRIu32 " ", log_evt_num_++);
+  }
 
   // Print time
-  struct timespec tsp = {0, 0};
-  logger_get_time(&tsp);
-  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "[%ld.%03ld] ", tsp.tv_sec,
-           tsp.tv_nsec / (1000 * 1000));
-  buf_ptr = log_out_buf_ + strlen(log_out_buf_);
+  if (log_time_output_) {
+    struct timespec tsp = {0, 0};
+    logger_get_time(&tsp);
+    buf_ptr += SNPRINTF_WRAPPER("[%ld.%03ld] ", tsp.tv_sec,
+                                tsp.tv_nsec / (1000 * 1000));
+  }
 
-  // Print level, file, function and line
-  char *level_mark = level_infos[level][INDEX_LEVEL_MARK];
-  char *info_str_color = (char *)(log_color_enable_ ? STR_GRAY : "");
-  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s%s/(%s:%" PRIu32 " %s) ",
-           level_mark, info_str_color, file, line, func);
-  output_cb_(log_out_buf_);
-  buf_ptr = log_out_buf_;
+  // Print level
+  if (log_level_output_) {
+    char *level_mark = level_infos[level][INDEX_LEVEL_MARK];
+    char *info_str_color = (char *)(log_color_enable_ ? STR_GRAY : "");
+    buf_ptr += SNPRINTF_WRAPPER("%s%s%s", level_mark, info_str_color,
+                                log_level_output_ ? "/" : "");
+  }
+
+  // Print color
+  if (log_file_line_output_ || log_function_output_) {
+    buf_ptr += SNPRINTF_WRAPPER("(");
+  }
+
+  // Print file and line
+  if (log_file_line_output_) {
+    buf_ptr += SNPRINTF_WRAPPER("%s:%" PRIu32, file, line);
+  }
+
+  // Print function
+  if (log_function_output_) {
+    buf_ptr += SNPRINTF_WRAPPER("%s%s", log_file_line_output_ ? " " : "", func);
+  }
+
+  if (log_file_line_output_ || log_function_output_) {
+    buf_ptr += SNPRINTF_WRAPPER(") ");
+  }
+
+  if (buf_ptr != log_out_buf_) {
+    output_cb_(log_out_buf_);
+    buf_ptr = log_out_buf_;
+  }
 
   // Print log info
-  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s", log_info_color);
-  buf_ptr = log_out_buf_ + strlen(log_out_buf_);
+  buf_ptr += SNPRINTF_WRAPPER("%s", log_info_color);
 
   va_list ap;
   va_start(ap, fmt);
-  vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ap);
-  buf_ptr = log_out_buf_ + strlen(log_out_buf_);
+  buf_ptr += VSNPRINTF_WRAPPER(fmt, ap);
   va_end(ap);
 
   char *str_reset_color = (char *)(log_color_enable_ ? STR_RESET : "");
-  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s", str_reset_color);
-  buf_ptr = log_out_buf_ + strlen(log_out_buf_);
+  buf_ptr += SNPRINTF_WRAPPER("%s", str_reset_color);
 
   *buf_ptr++ = '\r';
   *buf_ptr++ = '\n';

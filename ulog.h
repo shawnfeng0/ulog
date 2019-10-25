@@ -130,6 +130,11 @@ typedef enum {
 
 void logger_enable_output(bool enable);
 void logger_enable_color(bool enable);
+void logger_enable_number_output(bool enable);
+void logger_enable_time_output(bool enable);
+void logger_enable_level_output(bool enable);
+void logger_enable_file_line_output(bool enable);
+void logger_enable_function_output(bool enable);
 void logger_set_output_level(LogLevel level);
 void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
                            LogMutexUnlock mutex_unlock_cb);
