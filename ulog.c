@@ -197,10 +197,18 @@ void logger_log(LogLevel level, const char *file, const char *func,
   // Print level
   if (log_level_output_) {
     char *level_mark = level_infos[level][INDEX_LEVEL_MARK];
-    char *info_str_color = (char *)(log_color_enable_ ? STR_GRAY : "");
-    buf_ptr += SNPRINTF_WRAPPER("%s%s%s", level_mark, info_str_color,
-                                log_level_output_ ? "/" : "");
+    buf_ptr += SNPRINTF_WRAPPER("%s", level_mark);
   }
+
+  // Print gray color
+  if (log_level_output_ || log_file_line_output_ || log_function_output_) {
+    char *info_str_color = (char *)(log_color_enable_ ? STR_GRAY : "");
+    buf_ptr += SNPRINTF_WRAPPER("%s", info_str_color);
+  }
+
+  // Print '/'
+  if (log_level_output_)
+    buf_ptr += SNPRINTF_WRAPPER("%s", log_level_output_ ? "/" : "");
 
   // Print color
   if (log_file_line_output_ || log_function_output_)
