@@ -135,7 +135,7 @@ void logger_log(LogLevel level, const char *file, const char *func,
                              : (char *)"";
 
   /* Print serial number */
-  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s#%06" PRIu32, log_info_color,
+  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), "%s#%06" PRIu32 " ", log_info_color,
            log_evt_num_++);
   buf_ptr = log_out_buf_ + strlen(log_out_buf_);
 
