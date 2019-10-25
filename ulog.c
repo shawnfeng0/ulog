@@ -179,14 +179,12 @@ void logger_log(LogLevel level, const char *file, const char *func,
   vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__);
 
   // Color
-  if (log_number_output_ || log_time_output_ || log_level_output_) {
+  if (log_number_output_ || log_time_output_ || log_level_output_)
     buf_ptr += SNPRINTF_WRAPPER("%s", log_info_color);
-  }
 
   // Print serial number
-  if (log_number_output_) {
+  if (log_number_output_)
     buf_ptr += SNPRINTF_WRAPPER("#%06" PRIu32 " ", log_evt_num_++);
-  }
 
   // Print time
   if (log_time_output_) {
@@ -205,23 +203,19 @@ void logger_log(LogLevel level, const char *file, const char *func,
   }
 
   // Print color
-  if (log_file_line_output_ || log_function_output_) {
+  if (log_file_line_output_ || log_function_output_)
     buf_ptr += SNPRINTF_WRAPPER("(");
-  }
 
   // Print file and line
-  if (log_file_line_output_) {
+  if (log_file_line_output_)
     buf_ptr += SNPRINTF_WRAPPER("%s:%" PRIu32, file, line);
-  }
 
   // Print function
-  if (log_function_output_) {
+  if (log_function_output_)
     buf_ptr += SNPRINTF_WRAPPER("%s%s", log_file_line_output_ ? " " : "", func);
-  }
 
-  if (log_file_line_output_ || log_function_output_) {
+  if (log_file_line_output_ || log_function_output_)
     buf_ptr += SNPRINTF_WRAPPER(") ");
-  }
 
   if (buf_ptr != log_out_buf_) {
     output_cb_(log_out_buf_);

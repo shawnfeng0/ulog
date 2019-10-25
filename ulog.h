@@ -92,21 +92,20 @@
 
 #define _LOG_TIME_FUNCTION_LENGTH 50
 
-#define LOG_TIME_CODE(function)                                                \
-  do {                                                                         \
-    struct timespec ulog_time_tsp1 = {0, 0};                                   \
-    struct timespec ulog_time_tsp2 = {0, 0};                                   \
-    logger_get_time(&ulog_time_tsp1);                                          \
-    function;                                                                  \
-    logger_get_time(&ulog_time_tsp2);                                          \
-    float ulog_time_timediff =                                                 \
-        (ulog_time_tsp2.tv_sec - ulog_time_tsp1.tv_sec) +                      \
-        (float)(ulog_time_tsp2.tv_nsec - ulog_time_tsp1.tv_nsec) /             \
-            (1000 * 1000 * 1000);                                              \
-    char ulog_time_function_str[_LOG_TIME_FUNCTION_LENGTH];                    \
-    memset(ulog_time_function_str, 0, _LOG_TIME_FUNCTION_LENGTH);              \
-    strncpy(ulog_time_function_str, #function, _LOG_TIME_FUNCTION_LENGTH - 1); \
-    LOG_DEBUG("time { %s }: %fs", ulog_time_function_str, ulog_time_timediff); \
+#define LOG_TIME_CODE(function)                                      \
+  do {                                                               \
+    struct timespec tsp1 = {0, 0};                                   \
+    struct timespec tsp2 = {0, 0};                                   \
+    logger_get_time(&tsp1);                                          \
+    function;                                                        \
+    logger_get_time(&tsp2);                                          \
+    float timediff =                                                 \
+        (tsp2.tv_sec - tsp1.tv_sec) +                                \
+        (float)(tsp2.tv_nsec - tsp1.tv_nsec) / (1000 * 1000 * 1000); \
+    char function_str[_LOG_TIME_FUNCTION_LENGTH];                    \
+    memset(function_str, 0, _LOG_TIME_FUNCTION_LENGTH);              \
+    strncpy(function_str, #function, _LOG_TIME_FUNCTION_LENGTH - 1); \
+    LOG_DEBUG("time { %s }: %fs", function_str, timediff);           \
   } while (0)
 
 #ifdef __cplusplus
