@@ -126,30 +126,34 @@ void logger_set_output_level(LogLevel level) {
 
 void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
                            LogMutexUnlock mutex_unlock_cb) {
+#if !defined(ULOG_DISABLE)
   mutex_ = mutex;
   mutex_lock_cb_ = mutex_lock_cb;
   mutex_unlock_cb_ = mutex_unlock_cb;
+#endif
 }
 
 void logger_set_time_callback(LogGetTime get_time_cb) {
+#if !defined(ULOG_DISABLE)
   get_time_cb_ = get_time_cb;
+#endif
 }
 
 void logger_init(LogOutputCb output_cb) {
 #if !defined(ULOG_DISABLE)
-
   output_cb_ = output_cb;
 
 #if defined(ULOG_CLS)
   char clear_str[3] = {'\033', 'c', '\0'};  // clean screen
   if (output_cb) output_cb(clear_str);
 #endif
-
 #endif
 }
 
 void logger_get_time(struct timespec *tp) {
+#if !defined(ULOG_DISABLE)
   if (get_time_cb_) get_time_cb_(tp);
+#endif
 }
 
 void logger_log(LogLevel level, const char *file, const char *func,
