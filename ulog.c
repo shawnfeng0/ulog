@@ -234,8 +234,9 @@ void logger_log(LogLevel level, const char *file, const char *func,
   }
 
   // Print log info
-  buf_ptr +=
-      SNPRINTF_WRAPPER("%s", log_color_enabled_ ? level_infos[level][INDEX_SECONDARY_COLOR] : "");
+  buf_ptr += SNPRINTF_WRAPPER(
+      "%s",
+      log_color_enabled_ ? level_infos[level][INDEX_SECONDARY_COLOR] : "");
 
   va_list ap;
   va_start(ap, fmt);

@@ -94,20 +94,24 @@
 
 #define _LOG_TIME_FUNCTION_LENGTH 50
 
-#define LOG_TIME_CODE(function)                                      \
-  do {                                                               \
-    struct timespec tsp1 = {0, 0};                                   \
-    struct timespec tsp2 = {0, 0};                                   \
-    logger_get_time(&tsp1);                                          \
-    function;                                                        \
-    logger_get_time(&tsp2);                                          \
-    float timediff =                                                 \
-        (tsp2.tv_sec - tsp1.tv_sec) +                                \
-        (float)(tsp2.tv_nsec - tsp1.tv_nsec) / (1000 * 1000 * 1000); \
-    char function_str[_LOG_TIME_FUNCTION_LENGTH];                    \
-    memset(function_str, 0, _LOG_TIME_FUNCTION_LENGTH);              \
-    strncpy(function_str, #function, _LOG_TIME_FUNCTION_LENGTH - 1); \
-    LOG_DEBUG("time { %s }: %fs", function_str, timediff);           \
+#define LOG_TIME_CODE(function)                                           \
+  do {                                                                    \
+    struct timespec tsp1 = {0, 0};                                        \
+    struct timespec tsp2 = {0, 0};                                        \
+    logger_get_time(&tsp1);                                               \
+    function;                                                             \
+    logger_get_time(&tsp2);                                               \
+    float timediff =                                                      \
+        (tsp2.tv_sec - tsp1.tv_sec) +                                     \
+        (float)(tsp2.tv_nsec - tsp1.tv_nsec) / (1000 * 1000 * 1000);      \
+    char function_str[_LOG_TIME_FUNCTION_LENGTH];                         \
+    memset(function_str, 0, _LOG_TIME_FUNCTION_LENGTH);                   \
+    strncpy(function_str, #function, _LOG_TIME_FUNCTION_LENGTH - 1);      \
+    LOG_DEBUG("time { %s%s }: %fs", function_str,                         \
+              strncmp(#function, function_str, _LOG_TIME_FUNCTION_LENGTH) \
+                  ? " ..."                                                \
+                  : "",                                                   \
+              timediff);                                                  \
   } while (0)
 
 #else
