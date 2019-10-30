@@ -115,7 +115,7 @@
 #define LOG_TOKEN(token)
 #define LOG_TIME_CODE(function)
 
-#endif // !defined(ULOG_DISABLE)
+#endif  // !defined(ULOG_DISABLE)
 
 #ifdef __cplusplus
 extern "C" {

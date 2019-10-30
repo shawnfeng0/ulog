@@ -38,24 +38,24 @@ LogGetTime get_time_cb_ = NULL;
 #endif
 
 // Logger configuration
-static bool log_output_enable_ = true;
+static bool log_output_enabled_ = true;
 
 #if !defined(ULOG_DISABLE_COLOR)
-static bool log_color_enable_ = true;
+static bool log_color_enabled_ = true;
 #else
-static bool log_color_enable_ = false;
+static bool log_color_enabled_ = false;
 #endif
 
-static bool log_number_output_ = true;
-static bool log_time_output_ = true;
-static bool log_level_output_ = true;
-static bool log_file_line_output_ = true;
-static bool log_function_output_ = true;
+static bool log_number_enabled_ = true;
+static bool log_time_enabled_ = true;
+static bool log_level_enabled_ = true;
+static bool log_file_line_enabled_ = true;
+static bool log_function_enabled_ = true;
 
 #if !defined(ULOG_DEFAULT_LEVEL)
-static LogLevel log_output_level_ = ULOG_VERBOSE;
+static LogLevel log_level_ = ULOG_VERBOSE;
 #else
-static LogLevel log_output_level_ = ULOG_DEFAULT_LEVEL;
+static LogLevel log_level_ = ULOG_DEFAULT_LEVEL;
 #endif
 
 enum {
@@ -78,49 +78,49 @@ static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
 
 void logger_enable_output(bool enable) {
 #if !defined(ULOG_DISABLE)
-  log_output_enable_ = enable;
+  log_output_enabled_ = enable;
 #endif
 }
 
 void logger_enable_color(bool enable) {
 #if !defined(ULOG_DISABLE)
-  log_color_enable_ = enable;
+  log_color_enabled_ = enable;
 #endif
 }
 
 void logger_enable_number_output(bool enable) {
 #if !defined(ULOG_DISABLE)
-  log_number_output_ = enable;
+  log_number_enabled_ = enable;
 #endif
 }
 
 void logger_enable_time_output(bool enable) {
 #if !defined(ULOG_DISABLE)
-  log_time_output_ = enable;
+  log_time_enabled_ = enable;
 #endif
 }
 
 void logger_enable_level_output(bool enable) {
 #if !defined(ULOG_DISABLE)
-  log_level_output_ = enable;
+  log_level_enabled_ = enable;
 #endif
 }
 
 void logger_enable_file_line_output(bool enable) {
 #if !defined(ULOG_DISABLE)
-  log_file_line_output_ = enable;
+  log_file_line_enabled_ = enable;
 #endif
 }
 
 void logger_enable_function_output(bool enable) {
 #if !defined(ULOG_DISABLE)
-  log_function_output_ = enable;
+  log_function_enabled_ = enable;
 #endif
 }
 
 void logger_set_output_level(LogLevel level) {
 #if !defined(ULOG_DISABLE)
-  log_output_level_ = level;
+  log_level_ = level;
 #endif
 }
 
@@ -160,88 +160,89 @@ void logger_log(LogLevel level, const char *file, const char *func,
                 uint32_t line, const char *fmt, ...) {
 #if !defined(ULOG_DISABLE)
 
-  if (!output_cb_ || !fmt || level < log_output_level_ || !log_output_enable_)
-    return;
+  if (!output_cb_ || !fmt || level < log_level_ || !log_output_enabled_) return;
 
   // Lock the log mutex
   if (mutex_lock_cb_ && mutex_) mutex_lock_cb_(mutex_);
 
   char *buf_ptr = log_out_buf_;
+
   // The last three characters are '\r', '\n', '\0'
   char *buf_end_ptr = log_out_buf_ + LOG_OUTBUF_LEN - 3;
 
-  char *log_info_color = log_color_enable_
-                             ? level_infos[level][INDEX_SECONDARY_COLOR]
-                             : (char *)"";
 #define SNPRINTF_WRAPPER(fmt, ...) \
   snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__);
 #define VSNPRINTF_WRAPPER(fmt, ...) \
   vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__);
 
   // Color
-  if (log_number_output_ || log_time_output_ || log_level_output_)
-    buf_ptr += SNPRINTF_WRAPPER("%s", log_info_color);
+  if (log_number_enabled_ || log_time_enabled_ || log_level_enabled_)
+    buf_ptr += SNPRINTF_WRAPPER(
+        "%s",
+        log_color_enabled_ ? level_infos[level][INDEX_SECONDARY_COLOR] : "");
 
   // Print serial number
-  if (log_number_output_)
+  if (log_number_enabled_)
     buf_ptr += SNPRINTF_WRAPPER("#%06" PRIu32 " ", log_evt_num_++);
 
   // Print time
-  if (log_time_output_) {
+  if (log_time_enabled_) {
     struct timespec tsp = {0, 0};
     logger_get_time(&tsp);
     int64_t second = tsp.tv_sec;
     int64_t millisecond = tsp.tv_nsec / (1000 * 1000);
-    buf_ptr += SNPRINTF_WRAPPER("[%" PRId64 ".%03" PRId64 "] ", second,
-                                millisecond);
+    buf_ptr +=
+        SNPRINTF_WRAPPER("[%" PRId64 ".%03" PRId64 "] ", second, millisecond);
   }
 
   // Print level
-  if (log_level_output_) {
-    char *level_mark = level_infos[level][INDEX_LEVEL_MARK];
-    buf_ptr += SNPRINTF_WRAPPER("%s", level_mark);
-  }
+  if (log_level_enabled_)
+    buf_ptr += SNPRINTF_WRAPPER("%s", level_infos[level][INDEX_LEVEL_MARK]);
 
   // Print gray color
-  if (log_level_output_ || log_file_line_output_ || log_function_output_) {
-    char *info_str_color = (char *)(log_color_enable_ ? STR_GRAY : "");
-    buf_ptr += SNPRINTF_WRAPPER("%s", info_str_color);
-  }
+  if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_)
+    buf_ptr += SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_GRAY : "");
 
   // Print '/'
-  if (log_level_output_)
-    buf_ptr += SNPRINTF_WRAPPER("%s", log_level_output_ ? "/" : "");
+  if (log_level_enabled_) buf_ptr += SNPRINTF_WRAPPER("/");
 
-  // Print color
-  if (log_file_line_output_ || log_function_output_)
+  // Print '('
+  if (log_file_line_enabled_ || log_function_enabled_)
     buf_ptr += SNPRINTF_WRAPPER("(");
 
   // Print file and line
-  if (log_file_line_output_)
+  if (log_file_line_enabled_)
     buf_ptr += SNPRINTF_WRAPPER("%s:%" PRIu32, file, line);
 
   // Print function
-  if (log_function_output_)
-    buf_ptr += SNPRINTF_WRAPPER("%s%s", log_file_line_output_ ? " " : "", func);
+  if (log_function_enabled_)
+    buf_ptr +=
+        SNPRINTF_WRAPPER("%s%s", log_file_line_enabled_ ? " " : "", func);
 
-  if (log_file_line_output_ || log_function_output_)
-    buf_ptr += SNPRINTF_WRAPPER(") ");
+  // Print ')'
+  if (log_file_line_enabled_ || log_function_enabled_)
+    buf_ptr += SNPRINTF_WRAPPER(")");
 
+  // Print ' '
+  if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_)
+    buf_ptr += SNPRINTF_WRAPPER(" ");
+
+  // Reset output pointer if auxiliary information is output
   if (buf_ptr != log_out_buf_) {
     output_cb_(log_out_buf_);
     buf_ptr = log_out_buf_;
   }
 
   // Print log info
-  buf_ptr += SNPRINTF_WRAPPER("%s", log_info_color);
+  buf_ptr +=
+      SNPRINTF_WRAPPER("%s", log_color_enabled_ ? level_infos[level][INDEX_SECONDARY_COLOR] : "");
 
   va_list ap;
   va_start(ap, fmt);
   buf_ptr += VSNPRINTF_WRAPPER(fmt, ap);
   va_end(ap);
 
-  char *str_reset_color = (char *)(log_color_enable_ ? STR_RESET : "");
-  buf_ptr += SNPRINTF_WRAPPER("%s", str_reset_color);
+  buf_ptr += SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_RESET : "");
 
   *buf_ptr++ = '\r';
   *buf_ptr++ = '\n';
