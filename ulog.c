@@ -190,8 +190,10 @@ void logger_log(LogLevel level, const char *file, const char *func,
   if (log_time_output_) {
     struct timespec tsp = {0, 0};
     logger_get_time(&tsp);
-    buf_ptr += SNPRINTF_WRAPPER("[%ld.%03ld] ", tsp.tv_sec,
-                                tsp.tv_nsec / (1000 * 1000));
+    int64_t second = tsp.tv_sec;
+    int64_t millisecond = tsp.tv_nsec / (1000 * 1000);
+    buf_ptr += SNPRINTF_WRAPPER("[%" PRId64 ".%03" PRId64 "] ", second,
+                                millisecond);
   }
 
   // Print level
