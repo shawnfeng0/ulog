@@ -50,6 +50,8 @@
 #define LOG_ERROR(fmt, ...) _logger_log(ULOG_ERROR, fmt, ##__VA_ARGS__)
 #define LOG_ASSERT(fmt, ...) _logger_log(ULOG_ASSERT, fmt, ##__VA_ARGS__)
 
+#if !defined(ULOG_DISABLE)
+
 #ifdef __cplusplus
 #include <typeinfo>
 #define _TYPE_CMP(X, Y) (typeid(X) == typeid(Y))
@@ -107,6 +109,13 @@
     strncpy(function_str, #function, _LOG_TIME_FUNCTION_LENGTH - 1); \
     LOG_DEBUG("time { %s }: %fs", function_str, timediff);           \
   } while (0)
+
+#else
+
+#define LOG_TOKEN(token)
+#define LOG_TIME_CODE(function)
+
+#endif // !defined(ULOG_DISABLE)
 
 #ifdef __cplusplus
 extern "C" {
