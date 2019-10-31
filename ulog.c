@@ -170,20 +170,24 @@ void logger_log(LogLevel level, const char *file, const char *func,
   // The last three characters are '\r', '\n', '\0'
   char *buf_end_ptr = log_out_buf_ + LOG_OUTBUF_LEN - 3;
 
-#define SNPRINTF_WRAPPER(fmt, ...) \
-  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__);
-#define VSNPRINTF_WRAPPER(fmt, ...) \
-  vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__);
+#define SNPRINTF_WRAPPER(fmt, ...)                                \
+  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
+  buf_ptr = log_out_buf_ + strlen(log_out_buf_);
+#define VSNPRINTF_WRAPPER(fmt, ...)                                \
+  vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
+  buf_ptr = log_out_buf_ + strlen(log_out_buf_);
 
   // Color
-  if (log_number_enabled_ || log_time_enabled_ || log_level_enabled_)
-    buf_ptr += SNPRINTF_WRAPPER(
-        "%s",
-        log_color_enabled_ ? level_infos[level][INDEX_SECONDARY_COLOR] : "");
+  if (log_number_enabled_ || log_time_enabled_ || log_level_enabled_) {
+    SNPRINTF_WRAPPER("%s", log_color_enabled_
+                               ? level_infos[level][INDEX_SECONDARY_COLOR]
+                               : "");
+  }
 
   // Print serial number
-  if (log_number_enabled_)
-    buf_ptr += SNPRINTF_WRAPPER("#%06" PRIu32 " ", log_evt_num_++);
+  if (log_number_enabled_) {
+    SNPRINTF_WRAPPER("#%06" PRIu32 " ", log_evt_num_++);
+  }
 
   // Print time
   if (log_time_enabled_) {
@@ -191,41 +195,48 @@ void logger_log(LogLevel level, const char *file, const char *func,
     logger_get_time(&tsp);
     int64_t second = tsp.tv_sec;
     int64_t millisecond = tsp.tv_nsec / (1000 * 1000);
-    buf_ptr +=
-        SNPRINTF_WRAPPER("[%" PRId64 ".%03" PRId64 "] ", second, millisecond);
+    SNPRINTF_WRAPPER("[%" PRId64 ".%03" PRId64 "] ", second, millisecond);
   }
 
   // Print level
-  if (log_level_enabled_)
-    buf_ptr += SNPRINTF_WRAPPER("%s", level_infos[level][INDEX_LEVEL_MARK]);
+  if (log_level_enabled_) {
+    SNPRINTF_WRAPPER("%s", level_infos[level][INDEX_LEVEL_MARK]);
+  }
 
   // Print gray color
-  if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_)
-    buf_ptr += SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_GRAY : "");
+  if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_) {
+    SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_GRAY : "");
+  }
 
   // Print '/'
-  if (log_level_enabled_) buf_ptr += SNPRINTF_WRAPPER("/");
+  if (log_level_enabled_) {
+    SNPRINTF_WRAPPER("/");
+  }
 
   // Print '('
-  if (log_file_line_enabled_ || log_function_enabled_)
-    buf_ptr += SNPRINTF_WRAPPER("(");
+  if (log_file_line_enabled_ || log_function_enabled_) {
+    SNPRINTF_WRAPPER("(");
+  }
 
   // Print file and line
-  if (log_file_line_enabled_)
-    buf_ptr += SNPRINTF_WRAPPER("%s:%" PRIu32, file, line);
+  if (log_file_line_enabled_) {
+    SNPRINTF_WRAPPER("%s:%" PRIu32, file, line);
+  }
 
   // Print function
-  if (log_function_enabled_)
-    buf_ptr +=
-        SNPRINTF_WRAPPER("%s%s", log_file_line_enabled_ ? " " : "", func);
+  if (log_function_enabled_) {
+    SNPRINTF_WRAPPER("%s%s", log_file_line_enabled_ ? " " : "", func);
+  }
 
   // Print ')'
-  if (log_file_line_enabled_ || log_function_enabled_)
-    buf_ptr += SNPRINTF_WRAPPER(")");
+  if (log_file_line_enabled_ || log_function_enabled_) {
+    SNPRINTF_WRAPPER(")");
+  }
 
   // Print ' '
-  if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_)
-    buf_ptr += SNPRINTF_WRAPPER(" ");
+  if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_) {
+    SNPRINTF_WRAPPER(" ");
+  }
 
   // Reset output pointer if auxiliary information is output
   if (buf_ptr != log_out_buf_) {
@@ -234,16 +245,16 @@ void logger_log(LogLevel level, const char *file, const char *func,
   }
 
   // Print log info
-  buf_ptr += SNPRINTF_WRAPPER(
-      "%s",
-      log_color_enabled_ ? level_infos[level][INDEX_SECONDARY_COLOR] : "");
+  SNPRINTF_WRAPPER("%s", log_color_enabled_
+                             ? level_infos[level][INDEX_SECONDARY_COLOR]
+                             : "");
 
   va_list ap;
   va_start(ap, fmt);
-  buf_ptr += VSNPRINTF_WRAPPER(fmt, ap);
+  VSNPRINTF_WRAPPER(fmt, ap);
   va_end(ap);
 
-  buf_ptr += SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_RESET : "");
+  SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_RESET : "");
 
   *buf_ptr++ = '\r';
   *buf_ptr++ = '\n';
