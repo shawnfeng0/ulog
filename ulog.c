@@ -167,8 +167,8 @@ void logger_log(LogLevel level, const char *file, const char *func,
 
   char *buf_ptr = log_out_buf_;
 
-  // The last three characters are '\r', '\n', '\0'
-  char *buf_end_ptr = log_out_buf_ + LOG_OUTBUF_LEN - 3;
+  // The last two characters are '\r', '\n'
+  char *buf_end_ptr = log_out_buf_ + LOG_OUTBUF_LEN - 2;
 
 #define SNPRINTF_WRAPPER(fmt, ...)                                \
   snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
