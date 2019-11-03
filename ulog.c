@@ -17,11 +17,12 @@
 
 static char log_out_buf_[LOG_OUTBUF_LEN];
 static uint32_t log_evt_num_ = 1;
-static LogOutputCb output_cb_ = NULL;
 
 // Log mutex lock and time
 #if defined(__unix__)
 #include <pthread.h>
+static int printf_wrapper(const char *str) { return printf("%s", str); }
+static LogOutputCb output_cb_ = printf_wrapper;
 static pthread_mutex_t log_pthread_mutex_ = PTHREAD_MUTEX_INITIALIZER;
 static void *mutex_ = &log_pthread_mutex_;
 static LogMutexLock mutex_lock_cb_ = (LogMutexLock)pthread_mutex_lock;
@@ -31,6 +32,7 @@ static int clock_gettime_wrapper(struct timespec *tp) {
 }
 LogGetTime get_time_cb_ = clock_gettime_wrapper;
 #else
+static LogOutputCb output_cb_ = NULL;
 static void *mutex_ = NULL;
 static LogMutexLock mutex_lock_cb_ = NULL;
 static LogMutexUnlock mutex_unlock_cb_ = NULL;
@@ -172,10 +174,10 @@ void logger_log(LogLevel level, const char *file, const char *func,
 
 #define SNPRINTF_WRAPPER(fmt, ...)                                \
   snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
-  buf_ptr = log_out_buf_ + strlen(log_out_buf_);
+  buf_ptr = log_out_buf_ + strlen(log_out_buf_)
 #define VSNPRINTF_WRAPPER(fmt, ...)                                \
   vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
-  buf_ptr = log_out_buf_ + strlen(log_out_buf_);
+  buf_ptr = log_out_buf_ + strlen(log_out_buf_)
 
   // Color
   if (log_number_enabled_ || log_time_enabled_ || log_level_enabled_) {
