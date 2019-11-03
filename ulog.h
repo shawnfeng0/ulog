@@ -109,7 +109,7 @@
     strncpy(function_str, #__VA_ARGS__, _LOG_TIME_FUNCTION_LENGTH - 1);      \
     LOG_DEBUG("time { %s%s }: %fs", function_str,                            \
               strncmp(#__VA_ARGS__, function_str, _LOG_TIME_FUNCTION_LENGTH) \
-                  ? " ..."                                                   \
+                  ? "..."                                                    \
                   : "",                                                      \
               timediff);                                                     \
   } while (0)
