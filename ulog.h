@@ -79,7 +79,8 @@
                _TYPE_CMP(token, char[]) || _TYPE_CMP(token, const char[]) ||  \
                _TYPE_CMP(token, unsigned char[]) ||                           \
                _TYPE_CMP(token, const unsigned char[])) {                     \
-      LOG_DEBUG("(char*) %s => %s", #token, token);                           \
+      LOG_DEBUG("(char*)[%" PRIu32 "] %s => %s", (uint32_t)strlen(token),     \
+                #token, token);                                               \
     } else if (_TYPE_CMP(token, void *) || _TYPE_CMP(token, short *) ||       \
                _TYPE_CMP(token, unsigned short *) ||                          \
                _TYPE_CMP(token, int *) || _TYPE_CMP(token, unsigned int *) || \
