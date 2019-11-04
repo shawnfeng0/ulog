@@ -90,6 +90,14 @@ void logger_enable_color(bool enable) {
 #endif
 }
 
+bool logger_color_is_enabled() {
+#if !defined(ULOG_DISABLE)
+  return log_color_enabled_;
+#else
+  return false;
+#endif
+}
+
 void logger_enable_number_output(bool enable) {
 #if !defined(ULOG_DISABLE)
   log_number_enabled_ = enable;
