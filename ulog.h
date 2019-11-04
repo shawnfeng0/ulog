@@ -73,10 +73,12 @@
     } else if (_TYPE_CMP(token, unsigned long) ||                             \
                _TYPE_CMP(token, unsigned long long)) {                        \
       LOG_DEBUG("(int) %s => %" PRIu64, #token, (uint64_t)(token));           \
-    } else if (_TYPE_CMP(token, char *) ||                                    \
+    } else if (_TYPE_CMP(token, char *) || _TYPE_CMP(token, const char *) ||  \
                _TYPE_CMP(token, unsigned char *) ||                           \
-               _TYPE_CMP(token, char[]) ||                                    \
-               _TYPE_CMP(token, unsigned char[])) {                           \
+               _TYPE_CMP(token, const unsigned char *) ||                     \
+               _TYPE_CMP(token, char[]) || _TYPE_CMP(token, const char[]) ||  \
+               _TYPE_CMP(token, unsigned char[]) ||                           \
+               _TYPE_CMP(token, const unsigned char[])) {                     \
       LOG_DEBUG("(char*) %s => %s", #token, token);                           \
     } else if (_TYPE_CMP(token, void *) || _TYPE_CMP(token, short *) ||       \
                _TYPE_CMP(token, unsigned short *) ||                          \
