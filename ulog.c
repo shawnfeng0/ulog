@@ -180,24 +180,26 @@ void logger_log(LogLevel level, const char *file, const char *func,
   // The last two characters are '\r', '\n'
   char *buf_end_ptr = log_out_buf_ + LOG_OUTBUF_LEN - 2;
 
-#define SNPRINTF_WRAPPER(fmt, ...)                                \
-  snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
-  buf_ptr = log_out_buf_ + strlen(log_out_buf_)
-#define VSNPRINTF_WRAPPER(fmt, ...)                                \
-  vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
-  buf_ptr = log_out_buf_ + strlen(log_out_buf_)
+#define SNPRINTF_WRAPPER(fmt, ...)                                  \
+  do {                                                              \
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
+    buf_ptr = log_out_buf_ + strlen(log_out_buf_);                  \
+  } while (0)
+
+#define VSNPRINTF_WRAPPER(fmt, ...)                                  \
+  do {                                                               \
+    vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
+    buf_ptr = log_out_buf_ + strlen(log_out_buf_);                   \
+  } while (0)
 
   // Color
-  if (log_number_enabled_ || log_time_enabled_ || log_level_enabled_) {
+  if (log_number_enabled_ || log_time_enabled_ || log_level_enabled_)
     SNPRINTF_WRAPPER("%s", log_color_enabled_
                                ? level_infos[level][INDEX_SECONDARY_COLOR]
                                : "");
-  }
 
   // Print serial number
-  if (log_number_enabled_) {
-    SNPRINTF_WRAPPER("#%06" PRIu32 " ", log_evt_num_++);
-  }
+  if (log_number_enabled_) SNPRINTF_WRAPPER("#%06" PRIu32 " ", log_evt_num_++);
 
   // Print time
   if (log_time_enabled_) {
@@ -209,44 +211,32 @@ void logger_log(LogLevel level, const char *file, const char *func,
   }
 
   // Print level
-  if (log_level_enabled_) {
+  if (log_level_enabled_)
     SNPRINTF_WRAPPER("%s", level_infos[level][INDEX_LEVEL_MARK]);
-  }
 
   // Print gray color
-  if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_) {
+  if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_)
     SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_GRAY : "");
-  }
 
   // Print '/'
-  if (log_level_enabled_) {
-    SNPRINTF_WRAPPER("/");
-  }
+  if (log_level_enabled_) SNPRINTF_WRAPPER("/");
 
   // Print '('
-  if (log_file_line_enabled_ || log_function_enabled_) {
-    SNPRINTF_WRAPPER("(");
-  }
+  if (log_file_line_enabled_ || log_function_enabled_) SNPRINTF_WRAPPER("(");
 
   // Print file and line
-  if (log_file_line_enabled_) {
-    SNPRINTF_WRAPPER("%s:%" PRIu32, file, line);
-  }
+  if (log_file_line_enabled_) SNPRINTF_WRAPPER("%s:%" PRIu32, file, line);
 
   // Print function
-  if (log_function_enabled_) {
+  if (log_function_enabled_)
     SNPRINTF_WRAPPER("%s%s", log_file_line_enabled_ ? " " : "", func);
-  }
 
   // Print ')'
-  if (log_file_line_enabled_ || log_function_enabled_) {
-    SNPRINTF_WRAPPER(")");
-  }
+  if (log_file_line_enabled_ || log_function_enabled_) SNPRINTF_WRAPPER(")");
 
   // Print ' '
-  if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_) {
+  if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_)
     SNPRINTF_WRAPPER(" ");
-  }
 
   // Reset output pointer if auxiliary information is output
   if (buf_ptr != log_out_buf_) {
