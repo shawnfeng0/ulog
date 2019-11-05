@@ -111,6 +111,10 @@
   } while (0)
 
 #define _LOG_TIME_FUNCTION_LENGTH 50
+#define _LOG_TIME_FORMAT                                                    \
+  logger_color_is_enabled() ? STR_GREEN                                     \
+      "time " STR_RED "{ " STR_BLUE "%s%s " STR_RED "} => " STR_GREEN "%fs" \
+                            : "time { %s%s } => %fs"
 
 #define LOG_TIME_CODE(...)                                                   \
   do {                                                                       \
@@ -125,7 +129,7 @@
     char function_str[_LOG_TIME_FUNCTION_LENGTH];                            \
     memset(function_str, 0, _LOG_TIME_FUNCTION_LENGTH);                      \
     strncpy(function_str, #__VA_ARGS__, _LOG_TIME_FUNCTION_LENGTH - 1);      \
-    LOG_DEBUG("time { %s%s }: %fs", function_str,                            \
+    LOG_DEBUG(_LOG_TIME_FORMAT, function_str,                                \
               strncmp(#__VA_ARGS__, function_str, _LOG_TIME_FUNCTION_LENGTH) \
                   ? "..."                                                    \
                   : "",                                                      \
