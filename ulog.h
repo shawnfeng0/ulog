@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 
@@ -37,8 +38,11 @@
 #endif
 
 #if !defined(ULOG_DISABLE)
-#define _logger_log(level, ...) \
-  logger_log(level, __FILENAME__, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define _logger_log(level, ...)                                             \
+  do {                                                                      \
+    snprintf(0, 0, __VA_ARGS__);                                            \
+    logger_log(level, __FILENAME__, __FUNCTION__, __LINE__, ##__VA_ARGS__); \
+  } while (0)
 #else
 #define _logger_log(level, ...)
 #endif
