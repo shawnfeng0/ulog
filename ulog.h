@@ -61,8 +61,11 @@
 #ifdef __cplusplus
 #include <typeinfo>
 #define _TYPE_CMP(X, Y) (typeid(X) == typeid(Y))
-#else
+#elif defined(__GNUC__) || defined(__clang__)
 #define _TYPE_CMP(X, Y) __builtin_types_compatible_p(typeof(X), typeof(Y))
+#else
+#warning "LOG_TOKEN is not available, please use clang or gcc compiler."
+#define _TYPE_CMP(X, Y) false
 #endif
 
 #define _LOG_TOKEN_FORMAT(prefix, suffix)                                 \
@@ -106,7 +109,7 @@
       _LOG_DEBUG(_LOG_TOKEN_FORMAT("(void *)", "%" PRIx64), #token,           \
                  (uint64_t)(token));                                          \
     } else {                                                                  \
-      _LOG_DEBUG(_LOG_TOKEN_FORMAT("(none)", "(unknown)"), #token);           \
+      _LOG_DEBUG(_LOG_TOKEN_FORMAT("(unknown)", "(none)"), #token);           \
     }                                                                         \
   } while (0)
 
