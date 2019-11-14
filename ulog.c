@@ -5,17 +5,17 @@
 #include <string.h>
 #include <time.h>
 
-#ifndef LOG_OUTBUF_LEN
-#define LOG_OUTBUF_LEN 128 /* Size of buffer used for log printout */
+#ifndef ULOG_OUTBUF_LEN
+#define ULOG_OUTBUF_LEN 256 /* Size of buffer used for log printout */
 #endif
 
-#if LOG_OUTBUF_LEN < 64
-#error "LOG_OUTBUF_LEN does not have enough size."
+#if ULOG_OUTBUF_LEN < 64
+#warning "ULOG_OUTBUF_LEN is too small, it is recommended to be greater than 64"
 #endif
 
 #if !defined(ULOG_DISABLE)
 
-static char log_out_buf_[LOG_OUTBUF_LEN];
+static char log_out_buf_[ULOG_OUTBUF_LEN];
 static uint32_t log_evt_num_ = 1;
 
 // Log mutex lock and time
@@ -178,7 +178,7 @@ void logger_log(LogLevel level, const char *file, const char *func,
   char *buf_ptr = log_out_buf_;
 
   // The last two characters are '\r', '\n'
-  char *buf_end_ptr = log_out_buf_ + LOG_OUTBUF_LEN - 2;
+  char *buf_end_ptr = log_out_buf_ + sizeof(log_out_buf_) - 2;
 
 #define SNPRINTF_WRAPPER(fmt, ...)                                  \
   do {                                                              \

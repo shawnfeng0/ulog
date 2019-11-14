@@ -38,10 +38,11 @@
 #endif
 
 #if !defined(ULOG_DISABLE)
-#define _LOGGER_LOG(level, ...)                                             \
-  do {                                                                      \
-    snprintf(0, 0, __VA_ARGS__);                                            \
-    logger_log(level, __FILENAME__, __FUNCTION__, __LINE__, ##__VA_ARGS__); \
+#define _LOGGER_LOG(level, ...)                                                \
+  do {                                                                         \
+    snprintf(0, 0, __VA_ARGS__); /* Causes the compiler to automatically check \
+                                    the format. */                             \
+    logger_log(level, __FILENAME__, __FUNCTION__, __LINE__, ##__VA_ARGS__);    \
   } while (0)
 #else
 #define _LOGGER_LOG(level, ...)
