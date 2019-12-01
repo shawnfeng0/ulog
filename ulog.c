@@ -10,7 +10,7 @@
 #endif
 
 #if ULOG_OUTBUF_LEN < 64
-#warning "ULOG_OUTBUF_LEN is too small, it is recommended to be greater than 64"
+#pragma message("ULOG_OUTBUF_LEN is recommended to be greater than 64")
 #endif
 
 #if !defined(ULOG_DISABLE)

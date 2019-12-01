@@ -33,8 +33,10 @@
 
 // Precompiler define to get only filename;
 #if !defined(__FILENAME__)
-#define __FILENAME__ \
-  (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#define __FILENAME__                \
+  (strrchr(__FILE__, '/')           \
+       ? strrchr(__FILE__, '/') + 1 \
+       : strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
 #endif
 
 #if !defined(ULOG_DISABLE)
@@ -65,7 +67,7 @@
 #elif defined(__GNUC__) || defined(__clang__)
 #define _TYPE_CMP(X, Y) __builtin_types_compatible_p(typeof(X), typeof(Y))
 #else
-#warning "LOG_TOKEN is not available, please use clang or gcc compiler."
+#pragma message("LOG_TOKEN is not available, please use clang or gcc compiler.")
 #define _TYPE_CMP(X, Y) false
 #endif
 
