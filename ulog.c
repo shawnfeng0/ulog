@@ -167,32 +167,27 @@ void logger_get_time(struct timespec *tp) {
 #endif
 }
 
-void logger_hex_dump(const char *str, size_t width) {
-  char buffer[width + 1];  // Use unsigned char,prevent hex overflow.
-  uint32_t hex_index = 0;
-  size_t count = 0;
-  memset(buffer, '\0', sizeof(buffer));
-  while (0 != (count = strlen(strncpy(buffer, str, sizeof(buffer) - 1)))) {
-    printf("%08x  ", hex_index);
-    for (size_t i = 0; i < width; i++) {
-      if (i < count) {
-        printf("%02x ", buffer[i]);
-      } else {
-        printf("%2s ", "");
-      }
-      if (i == width / 2 - 1) {
-        putchar(' ');
-      }
+uintptr_t hex_dump(const uint8_t *data, size_t length, size_t width,
+                      uintptr_t base_address, bool tail_addr_out) {
+    const uint8_t *data_cur = data;
+    if (!data || width == 0) return 0;
+    while (length) {
+        printf("%08" PRIxPTR "  ", data_cur - data + base_address);
+        for (size_t i = 0; i < width; i++) {
+            if (i < length)
+                printf("%02" PRIx8 " %s", data_cur[i], i == width / 2 - 1 ? " " : "");
+            else
+                printf("   %s", i == width / 2 - 1 ? " " : "");
+        }
+        printf(" |");
+        for (size_t i = 0; i < width && i < length; i++)
+            printf("%c", isprint(data_cur[i]) ? data_cur[i] : '.');
+        printf("|\n");
+        data_cur += length < width ? length : width;
+        length -= length < width ? length : width;
     }
-    printf(" |");
-    for (size_t i = 0; i < width && i < count; i++) {
-      printf("%c", isprint(buffer[i]) ? buffer[i] : '.');
-    }
-    printf("|\n");
-    hex_index += count;
-    str += count;
-  }
-  if (hex_index) printf("%08x  \n", hex_index);
+    if (tail_addr_out) printf("%08" PRIxPTR "\n", data_cur - data + base_address);
+    return data_cur - data + base_address;
 }
 
 void logger_log(LogLevel level, const char *file, const char *func,
