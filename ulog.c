@@ -167,27 +167,57 @@ void logger_get_time(struct timespec *tp) {
 #endif
 }
 
-uintptr_t hex_dump(const uint8_t *data, size_t length, size_t width,
-                      uintptr_t base_address, bool tail_addr_out) {
-    const uint8_t *data_cur = data;
-    if (!data || width == 0) return 0;
-    while (length) {
-        printf("%08" PRIxPTR "  ", data_cur - data + base_address);
-        for (size_t i = 0; i < width; i++) {
-            if (i < length)
-                printf("%02" PRIx8 " %s", data_cur[i], i == width / 2 - 1 ? " " : "");
-            else
-                printf("   %s", i == width / 2 - 1 ? " " : "");
-        }
-        printf(" |");
-        for (size_t i = 0; i < width && i < length; i++)
-            printf("%c", isprint(data_cur[i]) ? data_cur[i] : '.');
-        printf("|\n");
-        data_cur += length < width ? length : width;
-        length -= length < width ? length : width;
+uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
+                          uintptr_t base_address, bool tail_addr_out) {
+  if (!data || width == 0) return 0;
+
+  const uint8_t *data_raw = data;
+  const uint8_t *data_cur = data;
+  char *buf_ptr = log_out_buf_;
+  // The last two characters are '\r', '\n'
+  char *buf_end_ptr = log_out_buf_ + sizeof(log_out_buf_) - 2;
+
+#define SNPRINTF_WRAPPER(fmt, ...)                                  \
+  do {                                                              \
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
+    buf_ptr = log_out_buf_ + strlen(log_out_buf_);                  \
+  } while (0)
+
+  // Lock the log mutex
+  if (mutex_lock_cb_ && mutex_) mutex_lock_cb_(mutex_);
+
+  while (length) {
+    SNPRINTF_WRAPPER("%08" PRIxPTR "  ", data_cur - data_raw + base_address);
+    for (size_t i = 0; i < width; i++) {
+      if (i < length)
+        SNPRINTF_WRAPPER("%02" PRIx8 " %s", data_cur[i],
+                         i == width / 2 - 1 ? " " : "");
+      else
+        SNPRINTF_WRAPPER("   %s", i == width / 2 - 1 ? " " : "");
     }
-    if (tail_addr_out) printf("%08" PRIxPTR "\n", data_cur - data + base_address);
-    return data_cur - data + base_address;
+    SNPRINTF_WRAPPER(" |");
+    for (size_t i = 0; i < width && i < length; i++)
+      SNPRINTF_WRAPPER("%c", isprint(data_cur[i]) ? data_cur[i] : '.');
+    SNPRINTF_WRAPPER("|");
+
+    strncpy(buf_ptr, "\r\n", 3);
+
+    output_cb_(log_out_buf_);
+    buf_ptr = log_out_buf_;
+
+    data_cur += length < width ? length : width;
+    length -= length < width ? length : width;
+  }
+
+  if (tail_addr_out) {
+    SNPRINTF_WRAPPER("%08" PRIxPTR "\r\n", data_cur - data_raw + base_address);
+    output_cb_(log_out_buf_);
+  }
+
+  // Unlock the log mutex
+  if (mutex_unlock_cb_ && mutex_) mutex_unlock_cb_(mutex_);
+  return data_cur - data_raw + base_address;
+#undef SNPRINTF_WRAPPER
 }
 
 void logger_log(LogLevel level, const char *file, const char *func,
@@ -280,13 +310,13 @@ void logger_log(LogLevel level, const char *file, const char *func,
 
   SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_RESET : "");
 
-  *buf_ptr++ = '\r';
-  *buf_ptr++ = '\n';
-  *buf_ptr = '\0';
+  strncpy(buf_ptr, "\r\n", 3);
 
   output_cb_(log_out_buf_);
 
   // Unlock the log mutex
   if (mutex_unlock_cb_ && mutex_) mutex_unlock_cb_(mutex_);
+#undef SNPRINTF_WRAPPER
+#undef VSNPRINTF_WRAPPER
 #endif
 }

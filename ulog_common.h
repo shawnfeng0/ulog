@@ -2,6 +2,7 @@
 #define _ULOG_COMMON_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define _STR_COLOR(color) "\x1b[" color "m"
 
@@ -128,6 +129,22 @@
                   ? "..."                                                    \
                   : "",                                                      \
               timediff);                                                     \
+  } while (0)
+
+#define _LOG_HEX_DUMP_COLOR(place1, place2, place3, place4) \
+  STR_RED place1 STR_GREEN place2 STR_RED place3 STR_BLUE place4
+#define _LOG_HEX_DUMP_FORMAT                                          \
+  logger_color_is_enabled()                                           \
+      ? _LOG_HEX_DUMP_COLOR(STR_GREEN "hex_dump(", "data", ":", "%s") \
+            _LOG_HEX_DUMP_COLOR(", ", "length", ":", "%" PRIuMAX)     \
+                _LOG_HEX_DUMP_COLOR(", ", "width", ":",               \
+                                    "%" PRIuMAX STR_RED ") =>")       \
+      : "hex_dump(data:%s, length:%" PRIuMAX ", width:%" PRIuMAX ")"
+#define _LOG_HEX_DUMP(data, length, width)                       \
+  do {                                                           \
+    LOG_DEBUG(_LOG_HEX_DUMP_FORMAT, #data, (uintmax_t)length,    \
+              (uintmax_t)width);                                 \
+    logger_hex_dump(data, length, width, (uintptr_t)data, true); \
   } while (0)
 
 #else

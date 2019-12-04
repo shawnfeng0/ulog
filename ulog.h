@@ -19,6 +19,8 @@
 
 #define LOG_TOKEN(token) _LOG_TOKEN(token)
 #define LOG_TIME_CODE(...) _LOG_TIME_CODE(__VA_ARGS__)
+#define LOG_HEX_DUMP(data, length, width) \
+  _LOG_HEX_DUMP(data, length, width)
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,6 +45,8 @@ void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
 void logger_set_time_callback(LogGetTime get_time_cb);
 void logger_init(LogOutputCb output_cb);
 void logger_get_time(struct timespec *tp);
+uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
+                          uintptr_t base_address, bool tail_addr_out);
 
 #ifdef __cplusplus
 }
