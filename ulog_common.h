@@ -1,8 +1,8 @@
 #ifndef _ULOG_COMMON_H
 #define _ULOG_COMMON_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #define _STR_COLOR(color) "\x1b[" color "m"
 
@@ -113,14 +113,10 @@
 
 #define _LOG_TIME_CODE(...)                                                  \
   do {                                                                       \
-    struct timespec tsp1 = {0, 0};                                           \
-    struct timespec tsp2 = {0, 0};                                           \
-    logger_get_time(&tsp1);                                                  \
+    uint64_t start_time_us = logger_get_time_us();                           \
     __VA_ARGS__;                                                             \
-    logger_get_time(&tsp2);                                                  \
-    float timediff =                                                         \
-        (tsp2.tv_sec - tsp1.tv_sec) +                                        \
-        (float)(tsp2.tv_nsec - tsp1.tv_nsec) / (1000 * 1000 * 1000);         \
+    uint64_t end_time_us = logger_get_time_us();                             \
+    float timediff = (end_time_us - start_time_us) / 1000.f / 1000.f;        \
     char function_str[_LOG_TIME_FUNCTION_LENGTH];                            \
     memset(function_str, 0, _LOG_TIME_FUNCTION_LENGTH);                      \
     strncpy(function_str, #__VA_ARGS__, _LOG_TIME_FUNCTION_LENGTH - 1);      \

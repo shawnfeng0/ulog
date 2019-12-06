@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 
 #ifndef ULOG_OUTBUF_LEN
 #define ULOG_OUTBUF_LEN 256 /* Size of buffer used for log printout */
@@ -23,21 +22,23 @@ static uint32_t log_evt_num_ = 1;
 #if defined(__unix__)
 #include <pthread.h>
 static int printf_wrapper(const char *str) { return printf("%s", str); }
-static LogOutputCb output_cb_ = printf_wrapper;
+static LogOutput output_cb_ = printf_wrapper;
 static pthread_mutex_t log_pthread_mutex_ = PTHREAD_MUTEX_INITIALIZER;
 static void *mutex_ = &log_pthread_mutex_;
 static LogMutexLock mutex_lock_cb_ = (LogMutexLock)pthread_mutex_lock;
 static LogMutexUnlock mutex_unlock_cb_ = (LogMutexUnlock)pthread_mutex_unlock;
-static int clock_gettime_wrapper(struct timespec *tp) {
-  return clock_gettime(CLOCK_MONOTONIC, tp);
+static uint64_t clock_gettime_wrapper() {
+  struct timespec tp;
+  clock_gettime(CLOCK_MONOTONIC, &tp);
+  return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
 }
-LogGetTime get_time_cb_ = clock_gettime_wrapper;
+LogGetTimeUs get_time_us_cb_ = clock_gettime_wrapper;
 #else
-static LogOutputCb output_cb_ = NULL;
+static LogOutput output_cb_ = NULL;
 static void *mutex_ = NULL;
 static LogMutexLock mutex_lock_cb_ = NULL;
 static LogMutexUnlock mutex_unlock_cb_ = NULL;
-LogGetTime get_time_cb_ = NULL;
+LogGetTimeUs get_time_us_cb_ = NULL;
 #endif
 
 // Logger configuration
@@ -144,13 +145,13 @@ void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
 #endif
 }
 
-void logger_set_time_callback(LogGetTime get_time_cb) {
+void logger_set_time_callback(LogGetTimeUs get_time_us_cb) {
 #if !defined(ULOG_DISABLE)
-  get_time_cb_ = get_time_cb;
+  get_time_us_cb_ = get_time_us_cb;
 #endif
 }
 
-void logger_init(LogOutputCb output_cb) {
+void logger_init(LogOutput output_cb) {
 #if !defined(ULOG_DISABLE)
   output_cb_ = output_cb;
 
@@ -161,9 +162,11 @@ void logger_init(LogOutputCb output_cb) {
 #endif
 }
 
-void logger_get_time(struct timespec *tp) {
+uint64_t logger_get_time_us() {
 #if !defined(ULOG_DISABLE)
-  if (get_time_cb_) get_time_cb_(tp);
+  return get_time_us_cb_ ? get_time_us_cb_() : 0;
+#else
+  return 0;
 #endif
 }
 
@@ -257,11 +260,9 @@ void logger_log(LogLevel level, const char *file, const char *func,
 
   // Print time
   if (log_time_enabled_) {
-    struct timespec tsp = {0, 0};
-    logger_get_time(&tsp);
-    int64_t second = tsp.tv_sec;
-    int64_t millisecond = tsp.tv_nsec / (1000 * 1000);
-    SNPRINTF_WRAPPER("[%" PRId64 ".%03" PRId64 "] ", second, millisecond);
+    uint64_t time_ms = logger_get_time_us() / 1000;
+    SNPRINTF_WRAPPER("[%" PRId64 ".%03" PRId64 "] ", time_ms / 1000,
+                     time_ms % 1000);
   }
 
   // Print level
