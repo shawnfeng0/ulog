@@ -20,14 +20,14 @@
 #define LOG_TIME_CODE(...) _LOG_TIME_CODE(__VA_ARGS__)
 #define LOG_HEX_DUMP(data, length, width) _LOG_HEX_DUMP(data, length, width)
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 typedef int (*LogOutput)(const char *ptr);
 typedef int (*LogMutexUnlock)(void *mutex);
 typedef int (*LogMutexLock)(void *mutex);
-typedef uint64_t (*LogGetTimeUs)(void);
+typedef uint64_t (*LogGetTimeUs)();
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 void logger_enable_output(bool enable);
 void logger_enable_color(bool enable);
