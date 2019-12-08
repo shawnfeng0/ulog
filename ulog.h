@@ -15,6 +15,7 @@
 #define LOG_WARN(fmt, ...) _LOGGER_LOG(ULOG_WARN, fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) _LOGGER_LOG(ULOG_ERROR, fmt, ##__VA_ARGS__)
 #define LOG_ASSERT(fmt, ...) _LOGGER_LOG(ULOG_ASSERT, fmt, ##__VA_ARGS__)
+#define LOG_RAW(fmt, ...) logger_raw(fmt, ##__VA_ARGS__)
 
 #define LOG_TOKEN(token) _LOG_TOKEN(token)
 #define LOG_TIME_CODE(...) _LOG_TIME_CODE(__VA_ARGS__)
@@ -45,6 +46,7 @@ void logger_init(LogOutput output_cb);
 uint64_t logger_get_time_us(void);
 uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
                           uintptr_t base_address, bool tail_addr_out);
+void logger_raw(const char *fmt, ...);
 
 #ifdef __cplusplus
 }
