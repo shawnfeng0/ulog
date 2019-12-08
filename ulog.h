@@ -53,8 +53,8 @@
 #define LOG_TIME_CODE(...) _LOG_TIME_CODE(__VA_ARGS__)
 
 /**
- * Display file contents in hexadecimal and ascii. Same format as "hexdump -C
- * filename"
+ * Display contents in hexadecimal and ascii.
+ * Same format as "hexdump -C filename"
  * example:
  *  char str1[5] = "test";
  *  char str2[10] = "1234";
@@ -168,8 +168,8 @@ void logger_init(LogOutput output_cb);
 uint64_t logger_get_time_us(void);
 
 /**
- * Display file contents in hexadecimal and ascii. Same format as "hexdump -C
- * filename"
+ * Display contents in hexadecimal and ascii.
+ * Same format as "hexdump -C filename"
  * @param data The starting address of the data to be displayed
  * @param length Display length starting from "data"
  * @param width How many bytes of data are displayed in each line

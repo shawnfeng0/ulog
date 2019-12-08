@@ -69,6 +69,9 @@
   do {                                                                         \
     if (_TYPE_CMP(token, float) || _TYPE_CMP(token, double)) {                 \
       _LOG_DEBUG_NO_CHECK(_LOG_TOKEN_FORMAT("(float)", "%f"), #token, token);  \
+    } else if (_TYPE_CMP(token, bool)) {                                       \
+      _LOG_DEBUG_NO_CHECK(_LOG_TOKEN_FORMAT("(bool)", "%s"), #token,           \
+                          token ? "true" : "false");                           \
       /* Types with symbols below 64 bits */                                   \
     } else if (_TYPE_CMP(token, char) || _TYPE_CMP(token, unsigned char) ||    \
                _TYPE_CMP(token, short) || _TYPE_CMP(token, unsigned short) ||  \
@@ -88,7 +91,7 @@
                _TYPE_CMP(token, unsigned char[]) ||                            \
                _TYPE_CMP(token, const unsigned char[])) {                      \
       const char *token_value = (const char *)(uintptr_t)(token);              \
-      _LOG_DEBUG_NO_CHECK(_LOG_TOKEN_FORMAT("(char*)[%" PRIu32 "]", "%s"),     \
+      _LOG_DEBUG_NO_CHECK(_LOG_TOKEN_FORMAT("(char *)[%" PRIu32 "]", "%s"),    \
                           (uint32_t)strlen(token_value), #token, token_value); \
     } else if (_TYPE_CMP(token, void *) || _TYPE_CMP(token, short *) ||        \
                _TYPE_CMP(token, unsigned short *) ||                           \
