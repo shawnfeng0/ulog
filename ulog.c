@@ -14,10 +14,10 @@
 #endif
 
 // Lock the log mutex
-static int logger_lock();
+static int logger_lock(void);
 
 // Unlock the log mutex
-static int logger_unlock();
+static int logger_unlock(void);
 
 #define LOGGER_LOCK_GUARD(...) \
   do {                         \
@@ -40,7 +40,7 @@ static pthread_mutex_t log_pthread_mutex_ = PTHREAD_MUTEX_INITIALIZER;
 static void *mutex_ = &log_pthread_mutex_;
 static LogMutexLock mutex_lock_cb_ = (LogMutexLock)pthread_mutex_lock;
 static LogMutexUnlock mutex_unlock_cb_ = (LogMutexUnlock)pthread_mutex_unlock;
-static uint64_t clock_gettime_wrapper() {
+static uint64_t clock_gettime_wrapper(void) {
   struct timespec tp;
   clock_gettime(CLOCK_MONOTONIC, &tp);
   return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
@@ -105,7 +105,7 @@ void logger_enable_color(bool enable) {
 #endif
 }
 
-bool logger_color_is_enabled() {
+bool logger_color_is_enabled(void) {
 #if !defined(ULOG_DISABLE)
   return log_color_enabled_;
 #else
@@ -175,7 +175,7 @@ void logger_init(LogOutput output_cb) {
 #endif
 }
 
-uint64_t logger_get_time_us() {
+uint64_t logger_get_time_us(void) {
 #if !defined(ULOG_DISABLE)
   return get_time_us_cb_ ? get_time_us_cb_() : 0;
 #else
@@ -184,12 +184,12 @@ uint64_t logger_get_time_us() {
 }
 
 // Lock the log mutex
-static int logger_lock() {
+static int logger_lock(void) {
   return (mutex_lock_cb_ && mutex_) ? mutex_lock_cb_(mutex_) : 0;
 }
 
 // Unlock the log mutex
-static int logger_unlock() {
+static int logger_unlock(void) {
   return (mutex_unlock_cb_ && mutex_) ? mutex_unlock_cb_(mutex_) : 0;
 }
 

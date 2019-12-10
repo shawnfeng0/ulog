@@ -74,7 +74,7 @@
 typedef int (*LogOutput)(const char *ptr);
 typedef int (*LogMutexUnlock)(void *mutex);
 typedef int (*LogMutexLock)(void *mutex);
-typedef uint64_t (*LogGetTimeUs)();
+typedef uint64_t (*LogGetTimeUs)(void);
 
 #ifdef __cplusplus
 extern "C" {
