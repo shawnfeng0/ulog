@@ -58,7 +58,7 @@
  * example:
  *  char str1[5] = "test";
  *  char str2[10] = "1234";
- *  LOG_HEX_DUMP(&pi, 100, 16);
+ *  LOG_HEX_DUMP(&str1, 100, 16);
  * output:
  *  hex_dump(data:&str1, length:20, width:8) =>
  *  7fff2f556921  74 65 73 74  00 31 32 33  |test.123|
