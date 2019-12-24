@@ -70,7 +70,7 @@ static bool log_color_enabled_ = true;
 static bool log_color_enabled_ = false;
 #endif
 
-static bool log_number_enabled_ = true;
+static bool log_number_enabled_ = false;
 static bool log_time_enabled_ = true;
 static bool log_level_enabled_ = true;
 static bool log_file_line_enabled_ = true;
