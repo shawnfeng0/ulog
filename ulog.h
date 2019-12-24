@@ -76,6 +76,11 @@ typedef int (*LogMutexUnlock)(void *mutex);
 typedef int (*LogMutexLock)(void *mutex);
 typedef uint64_t (*LogGetTimeUs)(void);
 
+typedef enum LogTimeFormat {
+  LOG_TIME_FORMAT_TIMESTAMP,
+  LOG_TIME_FORMAT_LOCAL_TIME,
+} LogTimeFormat;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -152,6 +157,14 @@ void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
  * @param get_time_us_cb Callback function to get time
  */
 void logger_set_time_callback(LogGetTimeUs get_time_us_cb);
+
+/**
+ * Set time output format
+ * @param time_format
+ * LOG_TIME_FORMAT_TIMESTAMP: Output like this: 1576886405.225
+ * LOG_TIME_FORMAT_LOCAL_TIME: Output like this: 2019-01-01 17:45:22.564
+ */
+void logger_set_time_format(LogTimeFormat time_format);
 
 /**
  * Initialize the logger and set the string output callback function. The

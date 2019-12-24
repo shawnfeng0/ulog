@@ -4,6 +4,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#if defined(WIN32) || defined(__unix__) || defined(__APPLE__)
+#define LOG_LOCAL_TIME_SUPPORT 1
+#else
+#define LOG_LOCAL_TIME_SUPPORT 0
+#endif
+
 #define _STR_COLOR(color) "\x1b[" color "m"
 
 #define STR_RESET _STR_COLOR("0")

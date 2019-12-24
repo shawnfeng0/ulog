@@ -2,26 +2,38 @@
 
 Ulog is a micro log library suitable for use with lightweight embedded devices.
 
-## Example
+## QuickStart
 
 ### Code
 
 ```C++
+#include "../src/ulog.h"
 #include <stdio.h>
+
+#if defined(WIN32)
 #include <time.h>
-#include "ulog/ulog.h"
 
 static uint64_t get_time_us() {
   struct timespec tp = {0, 0};
-#if defined(WIN32)
   timespec_get(&tp, TIME_UTC);
-#elif defined(__unix__)
-  clock_gettime(CLOCK_REALTIME, &tp);
-#else
-  // Need to implement a function to get time
-#endif
   return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
 }
+
+#elif defined(__unix__)
+#include <time.h>
+
+static uint64_t get_time_us() {
+  struct timespec tp = {0, 0};
+  clock_gettime(CLOCK_REALTIME, &tp);
+  return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
+}
+
+#else
+
+// Need to implement a function to get time
+static uint64_t get_time_us() { return 0; }
+
+#endif
 
 static int put_str(const char *str) {
 #if defined(WIN32) || defined(__unix__)
@@ -33,7 +45,8 @@ static int put_str(const char *str) {
 
 int main() {
   double pi = 3.14159265;
-  char *text = (char *)"Ulog is a micro log library.";
+  char *text =
+      (char *) "Ulog is a micro log library.";
 
   // Initial logger
   logger_set_time_callback(get_time_us);

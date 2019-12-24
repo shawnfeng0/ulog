@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #ifndef ULOG_OUTBUF_LEN
 #define ULOG_OUTBUF_LEN 256 /* Size of buffer used for log printout */
@@ -11,6 +12,10 @@
 
 #if ULOG_OUTBUF_LEN < 64
 #pragma message("ULOG_OUTBUF_LEN is recommended to be greater than 64")
+#endif
+
+#if !defined(ULOG_DEFAULT_LEVEL)
+#define ULOG_DEFAULT_LEVEL ULOG_VERBOSE;
 #endif
 
 // Lock the log mutex
@@ -42,7 +47,7 @@ static LogMutexLock mutex_lock_cb_ = (LogMutexLock)pthread_mutex_lock;
 static LogMutexUnlock mutex_unlock_cb_ = (LogMutexUnlock)pthread_mutex_unlock;
 static uint64_t clock_gettime_wrapper(void) {
   struct timespec tp;
-  clock_gettime(CLOCK_MONOTONIC, &tp);
+  clock_gettime(CLOCK_REALTIME, &tp);
   return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
 }
 LogGetTimeUs get_time_us_cb_ = clock_gettime_wrapper;
@@ -53,6 +58,8 @@ static LogMutexLock mutex_lock_cb_ = NULL;
 static LogMutexUnlock mutex_unlock_cb_ = NULL;
 LogGetTimeUs get_time_us_cb_ = NULL;
 #endif
+LogTimeFormat time_format_ = LOG_LOCAL_TIME_SUPPORT ? LOG_TIME_FORMAT_LOCAL_TIME
+                                 : LOG_TIME_FORMAT_TIMESTAMP;
 
 // Logger configuration
 static bool log_output_enabled_ = true;
@@ -69,11 +76,7 @@ static bool log_level_enabled_ = true;
 static bool log_file_line_enabled_ = true;
 static bool log_function_enabled_ = true;
 
-#if !defined(ULOG_DEFAULT_LEVEL)
-static LogLevel log_level_ = ULOG_VERBOSE;
-#else
 static LogLevel log_level_ = ULOG_DEFAULT_LEVEL;
-#endif
 
 enum {
   INDEX_PRIMARY_COLOR = 0,
@@ -161,6 +164,12 @@ void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
 void logger_set_time_callback(LogGetTimeUs get_time_us_cb) {
 #if !defined(ULOG_DISABLE)
   get_time_us_cb_ = get_time_us_cb;
+#endif
+}
+
+void logger_set_time_format(LogTimeFormat time_format) {
+#if !defined(ULOG_DISABLE)
+  time_format_ = time_format;
 #endif
 }
 
@@ -300,8 +309,17 @@ void logger_log(LogLevel level, const char *file, const char *func,
       // Print time
       if (log_time_enabled_) {
         uint64_t time_ms = logger_get_time_us() / 1000;
-        SNPRINTF_WRAPPER("[%" PRId64 ".%03" PRId64 "] ", time_ms / 1000,
-                         time_ms % 1000);
+        if (time_format_ == LOG_TIME_FORMAT_LOCAL_TIME) {
+          time_t time_s = time_ms / 1000;
+          struct tm *ts = localtime(&time_s);
+          SNPRINTF_WRAPPER("[%04d-%02d-%02d %02d:%02d:%02d.%03d] ",
+                           ts->tm_year + 1900, ts->tm_mon + 1, ts->tm_mday,
+                           ts->tm_hour, ts->tm_min, ts->tm_sec,
+                           (int)(time_ms % 1000));
+        } else {
+          SNPRINTF_WRAPPER("[%" PRId64 ".%03" PRId64 "] ", time_ms / 1000,
+                           time_ms % 1000);
+        }
       }
 
       // Print level
