@@ -32,7 +32,7 @@ static char log_out_buf_[ULOG_OUTBUF_LEN];
 static uint32_t log_evt_num_ = 1;
 
 // Log mutex lock and time
-#if defined(__unix__)
+#if defined(__unix__) || defined(__APPLE__)
 #include <pthread.h>
 static int printf_wrapper(const char *str) { return printf("%s", str); }
 static LogOutput output_cb_ = printf_wrapper;
