@@ -49,15 +49,24 @@
   } while (0)
 
 #if !defined(ULOG_DISABLE)
-#define _LOGGER_LOG(level, ...)                                             \
-  do {                                                                      \
-    /* Causes the compiler to automatically check the format. */            \
-    char temp[1];                                                           \
-    snprintf(temp, sizeof(temp), __VA_ARGS__);                              \
-    logger_log(level, __FILENAME__, __FUNCTION__, __LINE__, true, ##__VA_ARGS__); \
+#define _LOGGER_LOG(level, ...)                                   \
+  do {                                                            \
+    _LOG_FORMAT_CHECK(__VA_ARGS__);                               \
+    logger_log(level, __FILENAME__, __FUNCTION__, __LINE__, true, \
+               ##__VA_ARGS__);                                    \
   } while (0)
+
+#define _LOGGER_RAW(fmt, ...)              \
+  do {                                     \
+    _LOG_FORMAT_CHECK(fmt, ##__VA_ARGS__); \
+    logger_raw(fmt, ##__VA_ARGS__);        \
+  } while (0)
+
 #else
+
 #define _LOGGER_LOG(level, ...)
+#define _LOGGER_RAW(fmt, ...)
+
 #endif
 
 #if !defined(ULOG_DISABLE)
@@ -77,8 +86,9 @@
                                                         "=> " STR_GREEN suffix \
                             : prefix "%s => " suffix
 
-#define _LOG_DEBUG_NO_CHECK(...) \
-  logger_log(ULOG_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, true, ##__VA_ARGS__)
+#define _LOG_DEBUG_NO_CHECK(...)                                     \
+  logger_log(ULOG_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, true, \
+             ##__VA_ARGS__)
 
 #define _LOG_TOKEN(token, output_cb, info_out)                                 \
   do {                                                                         \
@@ -135,9 +145,9 @@
   } while (0)
 
 /**
-* Get the number of parameters of the function-like macro
-*/
-#define _ARG_COUNT(...)                                                        \
+ * Get the number of parameters of the function-like macro
+ */
+#define _ARG_COUNT(...)                                                       \
   _ARG_COUNT_PRIVATE(NULL, ##__VA_ARGS__, 64, 63, 62, 61, 60, 59, 58, 57, 56, \
                      55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42,  \
                      41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28,  \
@@ -153,13 +163,14 @@
   _64
 
 /**
-* String concatenation
-*/
+ * String concatenation
+ */
 #define _MACRO_CONCAT_PRIVATE(l, r) l##r
 #define _MACRO_CONCAT(l, r) _MACRO_CONCAT_PRIVATE(l, r)
 
-#define _LOG_DEBUG_NO_NEWLINE(...) \
-  logger_log(ULOG_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, false, ##__VA_ARGS__)
+#define _LOG_DEBUG_NO_NEWLINE(...)                                    \
+  logger_log(ULOG_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, false, \
+             ##__VA_ARGS__)
 
 #define _LOG_MULTI_TOKEN(...)                                        \
   do {                                                               \
@@ -173,8 +184,8 @@
     if (left) logger_raw(logger_color_is_enabled() ? STR_RED ", " : ", "); \
   } while (0)
 
-#define _LOG_TOKEN_AUX(_1, ...)                                                \
-  _TOKEN_OUTPUT_WRAPPER(_1, _ARG_COUNT(__VA_ARGS__));                           \
+#define _LOG_TOKEN_AUX(_1, ...)                       \
+  _TOKEN_OUTPUT_WRAPPER(_1, _ARG_COUNT(__VA_ARGS__)); \
   _MACRO_CONCAT(_TOKEN_AUX_, _ARG_COUNT(__VA_ARGS__))
 
 #define _TOKEN_AUX_0(_1, ...) logger_raw("\r\n");
@@ -194,7 +205,6 @@
 #define _TOKEN_AUX_14(_1, ...) _LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__)
 #define _TOKEN_AUX_15(_1, ...) _LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__)
 #define _TOKEN_AUX_16(_1, ...) _LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__)
-
 
 #define _LOG_TIME_FUNCTION_LENGTH 50
 #define _LOG_TIME_FORMAT                                                    \

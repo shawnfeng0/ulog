@@ -20,7 +20,7 @@
 #define LOG_WARN(fmt, ...) _LOGGER_LOG(ULOG_WARN, fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) _LOGGER_LOG(ULOG_ERROR, fmt, ##__VA_ARGS__)
 #define LOG_ASSERT(fmt, ...) _LOGGER_LOG(ULOG_ASSERT, fmt, ##__VA_ARGS__)
-#define LOG_RAW(fmt, ...) logger_raw(fmt, ##__VA_ARGS__)
+#define LOG_RAW(fmt, ...) _LOGGER_RAW(fmt, ##__VA_ARGS__)
 
 /**
  * Output various tokens
