@@ -41,8 +41,7 @@
 /**
  * Output multiple tokens to one line
  * example:
- *  time_t now;
- *  now = time(NULL);
+ *  time_t now = 1577232000; // 2019-12-25 00:00:00
  *  struct tm* lt = localtime(&now);
  *  LOG_MULTI_TOKEN(lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday);
  * output:
