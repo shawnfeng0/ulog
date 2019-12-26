@@ -15,7 +15,7 @@
 #endif
 
 #if !defined(ULOG_DEFAULT_LEVEL)
-#define ULOG_DEFAULT_LEVEL ULOG_VERBOSE;
+#define ULOG_DEFAULT_LEVEL ULOG_TRACE;
 #endif
 
 // Lock the log mutex
@@ -91,12 +91,12 @@ enum {
 };
 
 static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
-    {(char *)STR_BOLD_WHITE, (char *)STR_WHITE, (char *)"V"},    // VERBOSE
+    {(char *)STR_BOLD_WHITE, (char *)STR_WHITE, (char *)"T"},    // TRACE
     {(char *)STR_BOLD_BLUE, (char *)STR_BLUE, (char *)"D"},      // DEBUG
     {(char *)STR_BOLD_GREEN, (char *)STR_GREEN, (char *)"I"},    // INFO
     {(char *)STR_BOLD_YELLOW, (char *)STR_YELLOW, (char *)"W"},  // WARN
     {(char *)STR_BOLD_RED, (char *)STR_RED, (char *)"E"},        // ERROR
-    {(char *)STR_BOLD_PURPLE, (char *)STR_PURPLE, (char *)"A"},  // ASSERT
+    {(char *)STR_BOLD_PURPLE, (char *)STR_PURPLE, (char *)"F"},  // FATAL
 };
 
 #endif  // !ULOG_DISABLE
@@ -352,10 +352,10 @@ void logger_log(LogLevel level, const char *file, const char *func,
         uint64_t time_ms = logger_get_time_us() / 1000;
         if (time_format_ == LOG_TIME_FORMAT_LOCAL_TIME) {
           time_t time_s = time_ms / 1000;
-          struct tm *ts = localtime(&time_s);
+          struct tm lt = *localtime(&time_s);
           SNPRINTF_WRAPPER("[%04d-%02d-%02d %02d:%02d:%02d.%03d] ",
-                           ts->tm_year + 1900, ts->tm_mon + 1, ts->tm_mday,
-                           ts->tm_hour, ts->tm_min, ts->tm_sec,
+                           lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday,
+                           lt.tm_hour, lt.tm_min, lt.tm_sec,
                            (int)(time_ms % 1000));
         } else {
           SNPRINTF_WRAPPER("[%" PRId64 ".%03" PRId64 "] ", time_ms / 1000,

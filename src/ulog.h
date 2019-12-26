@@ -14,22 +14,22 @@
  * @param fmt Format of the format string
  * @param ... Parameters in the format
  */
-#define LOG_VERBOSE(fmt, ...) _LOGGER_LOG(ULOG_VERBOSE, fmt, ##__VA_ARGS__)
+#define LOG_TRACE(fmt, ...) _LOGGER_LOG(ULOG_TRACE, fmt, ##__VA_ARGS__)
 #define LOG_DEBUG(fmt, ...) _LOGGER_LOG(ULOG_DEBUG, fmt, ##__VA_ARGS__)
 #define LOG_INFO(fmt, ...) _LOGGER_LOG(ULOG_INFO, fmt, ##__VA_ARGS__)
 #define LOG_WARN(fmt, ...) _LOGGER_LOG(ULOG_WARN, fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) _LOGGER_LOG(ULOG_ERROR, fmt, ##__VA_ARGS__)
-#define LOG_ASSERT(fmt, ...) _LOGGER_LOG(ULOG_ASSERT, fmt, ##__VA_ARGS__)
+#define LOG_FATAL(fmt, ...) _LOGGER_LOG(ULOG_FATAL, fmt, ##__VA_ARGS__)
 
 // Prevent redefinition
 #if defined(ABORT)
 #undef ABORT
 #endif
 
-#define ABORT(fmt, ...) \
- do { \
-    LOG_ASSERT(fmt, ##__VA_ARGS__); \
-    logger_assert_handler();                      \
+#define ABORT(fmt, ...)            \
+  do {                             \
+    LOG_FATAL(fmt, ##__VA_ARGS__); \
+    logger_assert_handler();       \
   } while (0)
 
 // Prevent redefinition

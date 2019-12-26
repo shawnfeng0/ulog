@@ -41,12 +41,12 @@ int main() {
 
   double pi = 3.14159265;
   // Different log levels
-  LOG_VERBOSE("PI = %.3f", pi);
+  LOG_TRACE("PI = %.3f", pi);
   LOG_DEBUG("PI = %.3f", pi);
   LOG_INFO("PI = %.3f", pi);
   LOG_WARN("PI = %.3f", pi);
   LOG_ERROR("PI = %.3f", pi);
-  LOG_ASSERT("PI = %.3f", pi);
+  LOG_FATAL("PI = %.3f", pi);
   LOG_RAW("PI = %.3f\r\n", pi);
 
   // Output debugging expression
@@ -62,9 +62,10 @@ int main() {
 
   // Output multiple tokens to one line
   time_t now = 1577259816;
-  struct tm *lt = localtime(&now);
-  LOG_MULTI_TOKEN(lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday);
-  LOG_MULTI_TOKEN(lt->tm_wday, lt->tm_hour, lt->tm_min, lt->tm_sec);
+  struct tm lt = *localtime(&now);
+
+  LOG_MULTI_TOKEN(lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday);
+  LOG_MULTI_TOKEN(lt.tm_wday, lt.tm_hour, lt.tm_min, lt.tm_sec);
 
   // Output execution time of some statements
   LOG_TIME_CODE(

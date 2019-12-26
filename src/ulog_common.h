@@ -262,12 +262,12 @@ extern "C" {
 #endif
 
 typedef enum {
-  ULOG_VERBOSE = 0,
+  ULOG_TRACE = 0,
   ULOG_DEBUG,
   ULOG_INFO,
   ULOG_WARN,
   ULOG_ERROR,
-  ULOG_ASSERT,
+  ULOG_FATAL,
   ULOG_LEVEL_NUMBER
 } LogLevel;
 
