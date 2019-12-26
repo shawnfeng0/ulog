@@ -272,7 +272,7 @@ void logger_raw(const char *fmt, ...) {
 }
 
 void logger_log(LogLevel level, const char *file, const char *func,
-                uint32_t line, const char *fmt, ...) {
+                uint32_t line, bool newline, const char *fmt, ...) {
 #if !defined(ULOG_DISABLE)
 
   if (!output_cb_ || !fmt || level < log_level_ || !log_output_enabled_) return;
@@ -367,7 +367,7 @@ void logger_log(LogLevel level, const char *file, const char *func,
 
       SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_RESET : "");
 
-      strncpy(buf_ptr, "\r\n", 3);
+      if (newline) strncpy(buf_ptr, "\r\n", 3);
 
       output_cb_(log_out_buf_);
 

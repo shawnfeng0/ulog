@@ -1,8 +1,8 @@
 #include "../src/ulog.h"
 #include <stdio.h>
+#include <time.h>
 
 #if defined(WIN32)
-#include <time.h>
 
 static uint64_t get_time_us() {
   struct timespec tp = {0, 0};
@@ -11,7 +11,6 @@ static uint64_t get_time_us() {
 }
 
 #elif defined(__unix__) || defined(__APPLE__)
-#include <time.h>
 
 static uint64_t get_time_us() {
   struct timespec tp = {0, 0};
@@ -57,6 +56,10 @@ int main() {
   LOG_TOKEN(50 * pi / 180);
   LOG_TOKEN(&pi);  // print address of pi
   LOG_TOKEN((char *)text);
+
+  time_t now = 1577232000; // 2019-12-25 00:00:00
+  struct tm* lt = localtime(&now);
+  LOG_MULTI_TOKEN(lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday);
 
   // Hex dump
   LOG_HEX_DUMP(text, 45, 16);

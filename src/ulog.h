@@ -39,6 +39,20 @@
 #define LOG_TOKEN(token) _LOG_TOKEN(token, _LOG_DEBUG_NO_CHECK, true)
 
 /**
+ * Output multiple tokens to one line
+ * example:
+ *  time_t now;
+ *  now = time(NULL);
+ *  struct tm* lt = localtime(&now);
+ *  LOG_MULTI_TOKEN(lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday);
+ * output:
+ *  lt->tm_year + 1900 => 2019, lt->tm_mon + 1 => 12, lt->tm_mday => 25
+ * @param token Same definition as LOG_TOKEN parameter, but can output up to 16
+ * tokens at the same time
+ */
+#define LOG_MULTI_TOKEN(...) _LOG_MULTI_TOKEN(__VA_ARGS__)
+
+/**
  * Statistics code running time,
  * example:
  * LOG_TIME_CODE(
