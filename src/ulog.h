@@ -36,7 +36,7 @@
  * @param token Can be float, double, [unsigned / signed] char / short / int /
  * long / long long and pointers of the above type
  */
-#define LOG_TOKEN(token) _LOG_TOKEN(token)
+#define LOG_TOKEN(token) _LOG_TOKEN(token, _LOG_DEBUG_NO_CHECK, true)
 
 /**
  * Statistics code running time,

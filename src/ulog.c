@@ -59,7 +59,7 @@ static LogMutexUnlock mutex_unlock_cb_ = NULL;
 LogGetTimeUs get_time_us_cb_ = NULL;
 #endif
 LogTimeFormat time_format_ = LOG_LOCAL_TIME_SUPPORT ? LOG_TIME_FORMAT_LOCAL_TIME
-                                 : LOG_TIME_FORMAT_TIMESTAMP;
+                                                    : LOG_TIME_FORMAT_TIMESTAMP;
 
 // Logger configuration
 static bool log_output_enabled_ = true;
