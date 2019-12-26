@@ -20,6 +20,26 @@
 #define LOG_WARN(fmt, ...) _LOGGER_LOG(ULOG_WARN, fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) _LOGGER_LOG(ULOG_ERROR, fmt, ##__VA_ARGS__)
 #define LOG_ASSERT(fmt, ...) _LOGGER_LOG(ULOG_ASSERT, fmt, ##__VA_ARGS__)
+
+// Prevent redefinition
+#if defined(ABORT)
+#undef ABORT
+#endif
+
+#define ABORT(fmt, ...) \
+ do { \
+    LOG_ASSERT(fmt, ##__VA_ARGS__); \
+    logger_assert_handler();                      \
+  } while (0)
+
+// Prevent redefinition
+#if defined(ASSERT)
+#undef ASSERT
+#endif
+
+#define ASSERT(exp) \
+  if (!(exp)) ABORT("Assertion '" #exp "' failed.")
+
 #define LOG_RAW(fmt, ...) _LOGGER_RAW(fmt, ##__VA_ARGS__)
 
 /**
@@ -88,6 +108,7 @@ typedef int (*LogOutput)(const char *ptr);
 typedef int (*LogMutexUnlock)(void *mutex);
 typedef int (*LogMutexLock)(void *mutex);
 typedef uint64_t (*LogGetTimeUs)(void);
+typedef void (*LogAssertHandlerCb)(void);
 
 typedef enum LogTimeFormat {
   LOG_TIME_FORMAT_TIMESTAMP,
@@ -186,6 +207,18 @@ void logger_set_time_callback(LogGetTimeUs get_time_us_cb);
  * LOG_TIME_FORMAT_LOCAL_TIME: Output like this: 2019-01-01 17:45:22.564
  */
 void logger_set_time_format(LogTimeFormat time_format);
+
+/**
+ * Assertion failure handler function, call the function set by
+ * logger_set_assert_callback
+ */
+void logger_assert_handler(void);
+
+/**
+ * Set assertion failure handler function
+ * @param assert_handler_cb assert handler function
+ */
+void logger_set_assert_callback(LogAssertHandlerCb assert_handler_cb);
 
 /**
  * Initialize the logger and set the string output callback function. The

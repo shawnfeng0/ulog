@@ -51,7 +51,8 @@ static uint64_t clock_gettime_wrapper(void) {
   clock_gettime(CLOCK_REALTIME, &tp);
   return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
 }
-LogGetTimeUs get_time_us_cb_ = clock_gettime_wrapper;
+static LogGetTimeUs get_time_us_cb_ = clock_gettime_wrapper;
+static LogAssertHandlerCb assert_handler_cb_ = abort;
 static bool log_process_id_enabled_ = true;
 #else
 static LogOutput output_cb_ = NULL;
@@ -59,6 +60,7 @@ static void *mutex_ = NULL;
 static LogMutexLock mutex_lock_cb_ = NULL;
 static LogMutexUnlock mutex_unlock_cb_ = NULL;
 LogGetTimeUs get_time_us_cb_ = NULL;
+LogAssertHandlerCb assert_handler_cb_ = NULL;
 static bool log_process_id_enabled_ = false;
 #endif
 LogTimeFormat time_format_ = LOG_LOCAL_TIME_SUPPORT ? LOG_TIME_FORMAT_LOCAL_TIME
@@ -197,6 +199,18 @@ void logger_set_time_callback(LogGetTimeUs get_time_us_cb) {
 void logger_set_time_format(LogTimeFormat time_format) {
 #if !defined(ULOG_DISABLE)
   time_format_ = time_format;
+#endif
+}
+
+void logger_assert_handler(void) {
+#if !defined(ULOG_DISABLE)
+  if (assert_handler_cb_) assert_handler_cb_();
+#endif
+}
+
+void logger_set_assert_callback(LogAssertHandlerCb assert_handler_cb) {
+#if !defined(ULOG_DISABLE)
+  assert_handler_cb_ = assert_handler_cb;
 #endif
 }
 
