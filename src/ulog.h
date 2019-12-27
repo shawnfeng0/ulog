@@ -117,7 +117,7 @@ void logger_enable_color(bool enable);
 bool logger_color_is_enabled(void);
 
 /**
- * Enable log number output, enabled by default
+ * Enable log number output, disabled by default
  * @param enable True is enabled, false is disabled
  */
 void logger_enable_number_output(bool enable);
@@ -127,6 +127,14 @@ void logger_enable_number_output(bool enable);
  * @param enable True is enabled, false is disabled
  */
 void logger_enable_time_output(bool enable);
+
+#if defined(_LOG_UNIX_LIKE_PLATFORM)
+/**
+ * Enable process and thread id output, enabled by default
+ * @param enable True is enabled, false is disabled
+ */
+void logger_enable_process_id_output(bool enable);
+#endif
 
 /**
  * Enable log level output, enabled by default

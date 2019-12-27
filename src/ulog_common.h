@@ -4,7 +4,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#if defined(WIN32) || defined(__unix__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__)
+#define _LOG_UNIX_LIKE_PLATFORM 1
+#endif
+
+#if defined(WIN32) || defined(_LOG_UNIX_LIKE_PLATFORM)
 #define LOG_LOCAL_TIME_SUPPORT 1
 #else
 #define LOG_LOCAL_TIME_SUPPORT 0

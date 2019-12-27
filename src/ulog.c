@@ -37,8 +37,9 @@ static char log_out_buf_[ULOG_OUTBUF_LEN];
 static uint32_t log_evt_num_ = 1;
 
 // Log mutex lock and time
-#if defined(__unix__) || defined(__APPLE__)
+#if defined(_LOG_UNIX_LIKE_PLATFORM)
 #include <pthread.h>
+#include <stdlib.h>  // For abort()
 static int printf_wrapper(const char *str) { return printf("%s", str); }
 static LogOutput output_cb_ = printf_wrapper;
 static pthread_mutex_t log_pthread_mutex_ = PTHREAD_MUTEX_INITIALIZER;
@@ -51,12 +52,14 @@ static uint64_t clock_gettime_wrapper(void) {
   return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
 }
 LogGetTimeUs get_time_us_cb_ = clock_gettime_wrapper;
+static bool log_process_id_enabled_ = true;
 #else
 static LogOutput output_cb_ = NULL;
 static void *mutex_ = NULL;
 static LogMutexLock mutex_lock_cb_ = NULL;
 static LogMutexUnlock mutex_unlock_cb_ = NULL;
 LogGetTimeUs get_time_us_cb_ = NULL;
+static bool log_process_id_enabled_ = false;
 #endif
 LogTimeFormat time_format_ = LOG_LOCAL_TIME_SUPPORT ? LOG_TIME_FORMAT_LOCAL_TIME
                                                     : LOG_TIME_FORMAT_TIMESTAMP;
@@ -96,6 +99,22 @@ static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
 
 #endif  // !ULOG_DISABLE
 
+#if defined(_LOG_UNIX_LIKE_PLATFORM)
+#include <unistd.h>
+#define GET_PID() getpid()
+#if defined(__APPLE__)
+#include <pthread.h>
+#define GET_TID() pthread_mach_thread_np(pthread_self())
+#else  // defined(__APPLE__)
+#include <sys/syscall.h>
+#define GET_TID() syscall(SYS_gettid)
+#endif  // defined(__APPLE__)
+
+#else  // defined(_LOG_UNIX_LIKE_PLATFORM)
+#define GET_PID() 0
+#define GET_TID() 0
+#endif  // defined(_LOG_UNIX_LIKE_PLATFORM)
+
 void logger_enable_output(bool enable) {
 #if !defined(ULOG_DISABLE)
   log_output_enabled_ = enable;
@@ -127,6 +146,14 @@ void logger_enable_time_output(bool enable) {
   log_time_enabled_ = enable;
 #endif
 }
+
+#if defined(_LOG_UNIX_LIKE_PLATFORM)
+void logger_enable_process_id_output(bool enable) {
+#if !defined(ULOG_DISABLE)
+  log_process_id_enabled_ = enable;
+#endif
+}
+#endif
 
 void logger_enable_level_output(bool enable) {
 #if !defined(ULOG_DISABLE)
@@ -321,6 +348,10 @@ void logger_log(LogLevel level, const char *file, const char *func,
                            time_ms % 1000);
         }
       }
+
+      // Print process and thread id
+      if (log_process_id_enabled_) SNPRINTF_WRAPPER(
+          "%" PRId32 "-%" PRId32 " ", (int32_t)GET_PID(), (int32_t)GET_TID());
 
       // Print level
       if (log_level_enabled_)
