@@ -6,7 +6,7 @@
 
 static uint64_t get_time_us() {
   struct timespec tp = {0, 0};
-  timespec_get(&tp, TIME_UTC);
+  (void) timespec_get(&tp, TIME_UTC);
   return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
 }
 
