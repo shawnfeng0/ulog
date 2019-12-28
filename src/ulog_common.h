@@ -41,11 +41,19 @@
        : strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
 #endif
 
+#define _LOG_FORMAT_CHECK(...)                                   \
+  do {                                                           \
+    /* Causes the compiler to automatically check the format. */ \
+    char c;                                                \
+    snprintf(&c, 0, __VA_ARGS__);                   \
+  } while (0)
+
 #if !defined(ULOG_DISABLE)
 #define _LOGGER_LOG(level, ...)                                             \
   do {                                                                      \
     /* Causes the compiler to automatically check the format. */            \
-    snprintf(0, 0, __VA_ARGS__);                                            \
+    char temp[1];                                                           \
+    snprintf(temp, sizeof(temp), __VA_ARGS__);                              \
     logger_log(level, __FILENAME__, __FUNCTION__, __LINE__, ##__VA_ARGS__); \
   } while (0)
 #else
