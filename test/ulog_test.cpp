@@ -1,4 +1,5 @@
 #include "../src/ulog.h"
+#include "../src/map.h" // From https://github.com/swansontec/map-macro
 #include <stdio.h>
 #include <time.h>
 
@@ -25,10 +26,15 @@ static int put_str(const char *str) {
 #endif
 }
 
+#define CALL(x) _LOG_TOKEN(x, logger_raw, false); logger_raw(", ");
+
 int main() {
   // Initial logger
   logger_set_time_callback(get_time_us);
   logger_init(put_str);
+
+  MAP(CALL, 'a', 'b', 'c')
+  puts("\r\n");
 
   double pi = 3.14159265;
   // Different log levels
