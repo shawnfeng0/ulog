@@ -235,16 +235,25 @@ uint64_t logger_get_time_us(void) {
 
 // Lock the log mutex
 static int logger_lock(void) {
+#if !defined(ULOG_DISABLE)
   return (mutex_lock_cb_ && mutex_) ? mutex_lock_cb_(mutex_) : 0;
+#else
+  return 0;
+#endif
 }
 
 // Unlock the log mutex
 static int logger_unlock(void) {
+#if !defined(ULOG_DISABLE)
   return (mutex_unlock_cb_ && mutex_) ? mutex_unlock_cb_(mutex_) : 0;
+#else
+  return 0;
+#endif
 }
 
 uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
                           uintptr_t base_address, bool tail_addr_out) {
+#if !defined(ULOG_DISABLE)
   if (!data || width == 0 || !output_cb_ || !log_output_enabled_) return 0;
 
   const uint8_t *data_raw = data;
@@ -295,9 +304,11 @@ uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
   );  // LOGGER_LOCK_GUARD
   return data_cur - data_raw + base_address;
 #undef SNPRINTF_WRAPPER
+#endif
 }
 
 void logger_raw(const char *fmt, ...) {
+#if !defined(ULOG_DISABLE)
   if (!output_cb_ || !fmt || !log_output_enabled_) return;
 
   char *buf_ptr = log_out_buf_;
@@ -310,6 +321,7 @@ void logger_raw(const char *fmt, ...) {
       output_cb_(log_out_buf_);
 
   );  // LOGGER_LOCK_GUARD()
+#endif
 }
 
 void logger_log(LogLevel level, const char *file, const char *func,

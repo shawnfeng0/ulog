@@ -255,8 +255,10 @@
 
 #else
 
-#define _LOG_TOKEN(token)
-#define _LOG_TIME_CODE(...)
+#define _LOG_TOKEN(...)
+#define _LOG_TIME_CODE(...) __VA_ARGS__;
+#define _LOG_HEX_DUMP(...)
+#define _LOG_MULTI_TOKEN(...)
 
 #endif  // !defined(ULOG_DISABLE)
 
