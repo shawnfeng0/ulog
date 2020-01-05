@@ -5,7 +5,7 @@
 static uint64_t get_time_us() {
 #if defined(WIN32)
   struct timespec tp = {0, 0};
-  (void) timespec_get(&tp, TIME_UTC);
+  (void)timespec_get(&tp, TIME_UTC);
   return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
 #elif defined(__unix__) || defined(__APPLE__)
   struct timespec tp = {0, 0};

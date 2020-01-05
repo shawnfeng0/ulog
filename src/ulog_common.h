@@ -48,8 +48,8 @@
 #define _LOG_FORMAT_CHECK(...)                                   \
   do {                                                           \
     /* Causes the compiler to automatically check the format. */ \
-    char c;                                                \
-    snprintf(&c, 0, __VA_ARGS__);                   \
+    char c;                                                      \
+    snprintf(&c, 0, __VA_ARGS__);                                \
   } while (0)
 
 #if !defined(ULOG_DISABLE)
@@ -149,19 +149,19 @@
   } while (0)
 
 #define _EXPAND(...) __VA_ARGS__
-#define EAT_COMMA(...) ,##__VA_ARGS__
+#define EAT_COMMA(...) , ##__VA_ARGS__
 /**
  * Get the number of parameters of the function-like macro
  */
 #define _ARG_COUNT(...)                                                       \
-  _ARG_COUNT_PRIVATE(NULL EAT_COMMA(__VA_ARGS__), 64, 63, 62, 61, 60, 59, 58, 57, 56, \
-                     55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42,  \
-                     41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28,  \
-                     27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14,  \
-                     13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+  _ARG_COUNT_PRIVATE(NULL EAT_COMMA(__VA_ARGS__), 64, 63, 62, 61, 60, 59, 58, \
+                     57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44,  \
+                     43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30,  \
+                     29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16,  \
+                     15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 
 #define _ARG_COUNT_PRIVATE(...) _EXPAND(_ARG_COUNT_PRIVATE_MSVC(__VA_ARGS__))
-#define _ARG_COUNT_PRIVATE_MSVC(                                                    \
+#define _ARG_COUNT_PRIVATE_MSVC(                                               \
     _none, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14,    \
     _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, \
     _30, _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, _41, _42, _43, _44, \
@@ -179,9 +179,9 @@
   logger_log(ULOG_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, false, \
              ##__VA_ARGS__)
 
-#define _LOG_MULTI_TOKEN(...)                                        \
-  do {                                                               \
-    _LOG_DEBUG_NO_NEWLINE("");                                       \
+#define _LOG_MULTI_TOKEN(...)                                                 \
+  do {                                                                        \
+    _LOG_DEBUG_NO_NEWLINE("");                                                \
     _EXPAND(_MACRO_CONCAT(_TOKEN_AUX_, _ARG_COUNT(__VA_ARGS__))(__VA_ARGS__)) \
   } while (0)
 
@@ -196,22 +196,38 @@
   _MACRO_CONCAT(_TOKEN_AUX_, _ARG_COUNT(__VA_ARGS__))
 
 #define _TOKEN_AUX_0(...) logger_raw("\r\n");
-#define _TOKEN_AUX_1(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_2(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_3(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_4(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_5(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_6(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_7(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_8(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_9(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_10(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_11(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_12(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_13(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_14(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_15(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_16(_1, ...) _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_1(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_2(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_3(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_4(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_5(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_6(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_7(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_8(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_9(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_10(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_11(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_12(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_13(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_14(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_15(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
+#define _TOKEN_AUX_16(_1, ...) \
+  _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
 
 #define _LOG_TIME_FUNCTION_LENGTH 50
 #define _LOG_TIME_FORMAT                                                    \
