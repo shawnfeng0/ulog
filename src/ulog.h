@@ -38,7 +38,7 @@
 #endif
 
 #define ASSERT(exp) \
-  if (!(exp)) ABORT("Assertion '" #exp "' failed.")
+  if (!(exp)) ABORT("Assertion '%s' failed.", #exp)
 
 #define LOG_RAW(fmt, ...) _LOGGER_RAW(fmt, ##__VA_ARGS__)
 
