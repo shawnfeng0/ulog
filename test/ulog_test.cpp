@@ -10,7 +10,7 @@ static uint64_t get_time_us() {
 #elif defined(__unix__) || defined(__APPLE__)
   struct timespec tp = {0, 0};
   clock_gettime(CLOCK_REALTIME, &tp);
-  return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
+  return static_cast<uint64_t>(tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000);
 #else
   // Need to implement a function to get time
   return 0;

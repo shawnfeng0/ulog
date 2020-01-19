@@ -15,7 +15,7 @@
 #endif
 
 #if !defined(ULOG_DEFAULT_LEVEL)
-#define ULOG_DEFAULT_LEVEL ULOG_TRACE;
+#define ULOG_DEFAULT_LEVEL ULOG_TRACE
 #endif
 
 // Lock the log mutex
@@ -49,7 +49,7 @@ static LogMutexUnlock mutex_unlock_cb_ = (LogMutexUnlock)pthread_mutex_unlock;
 static uint64_t clock_gettime_wrapper(void) {
   struct timespec tp;
   clock_gettime(CLOCK_REALTIME, &tp);
-  return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
+  return (uint64_t)(tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000);
 }
 static LogGetTimeUs get_time_us_cb_ = clock_gettime_wrapper;
 static LogAssertHandlerCb assert_handler_cb_ = abort;
