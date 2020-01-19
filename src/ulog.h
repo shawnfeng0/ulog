@@ -1,25 +1,29 @@
 #ifndef __ULOG_H__
 #define __ULOG_H__
 
-#include "ulog_common.h"
-
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "ulog_common.h"
+
 /**
  * Different levels of log output
  * @param fmt Format of the format string
  * @param ... Parameters in the format
  */
-#define LOG_TRACE(fmt, ...) _LOGGER_LOG(ULOG_TRACE, fmt, ##__VA_ARGS__)
-#define LOG_DEBUG(fmt, ...) _LOGGER_LOG(ULOG_DEBUG, fmt, ##__VA_ARGS__)
-#define LOG_INFO(fmt, ...) _LOGGER_LOG(ULOG_INFO, fmt, ##__VA_ARGS__)
-#define LOG_WARN(fmt, ...) _LOGGER_LOG(ULOG_WARN, fmt, ##__VA_ARGS__)
-#define LOG_ERROR(fmt, ...) _LOGGER_LOG(ULOG_ERROR, fmt, ##__VA_ARGS__)
-#define LOG_FATAL(fmt, ...) _LOGGER_LOG(ULOG_FATAL, fmt, ##__VA_ARGS__)
+#define LOG_TRACE(fmt, ...) \
+  _LOGGER_LOG_WITH_LOCK(ULOG_TRACE, fmt, ##__VA_ARGS__)
+#define LOG_DEBUG(fmt, ...) \
+  _LOGGER_LOG_WITH_LOCK(ULOG_DEBUG, fmt, ##__VA_ARGS__)
+#define LOG_INFO(fmt, ...) _LOGGER_LOG_WITH_LOCK(ULOG_INFO, fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...) _LOGGER_LOG_WITH_LOCK(ULOG_WARN, fmt, ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...) \
+  _LOGGER_LOG_WITH_LOCK(ULOG_ERROR, fmt, ##__VA_ARGS__)
+#define LOG_FATAL(fmt, ...) \
+  _LOGGER_LOG_WITH_LOCK(ULOG_FATAL, fmt, ##__VA_ARGS__)
 
 // Prevent redefinition
 #if defined(ABORT)
@@ -40,7 +44,7 @@
 #define ASSERT(exp) \
   if (!(exp)) ABORT("Assertion '%s' failed.", #exp)
 
-#define LOG_RAW(fmt, ...) _LOGGER_RAW(fmt, ##__VA_ARGS__)
+#define LOG_RAW(fmt, ...) _LOGGER_RAW_WITH_LOCK(fmt, ##__VA_ARGS__)
 
 /**
  * Output various tokens
@@ -56,7 +60,7 @@
  * @param token Can be float, double, [unsigned / signed] char / short / int /
  * long / long long and pointers of the above type
  */
-#define LOG_TOKEN(token) _LOG_TOKEN(token, _LOG_DEBUG_NO_CHECK, true)
+#define LOG_TOKEN(token) _LOG_TOKEN(token, _LOG_DEBUG_NO_CHECK_WITH_LOCK, true)
 
 /**
  * Output multiple tokens to one line
@@ -102,7 +106,8 @@
  * @param length Display length starting from "data"
  * @param width How many bytes of data are displayed in each line
  */
-#define LOG_HEX_DUMP(data, length, width) _LOG_HEX_DUMP(data, length, width)
+#define LOG_HEX_DUMP(data, length, width) \
+  _LOG_HEX_DUMP_WITH_LOCK(data, length, width)
 
 typedef int (*LogOutput)(const char *ptr);
 typedef int (*LogMutexUnlock)(void *mutex);
@@ -244,17 +249,22 @@ uint64_t logger_get_time_us(void);
  * value
  * @param tail_addr_out Tail address output, whether to output the last address
  * after output
+ * @param need_lock Whether the output needs to be locked during output, it is
+ * recommended to lock
  * @return
  */
 uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
-                          uintptr_t base_address, bool tail_addr_out);
+                          uintptr_t base_address, bool tail_addr_out,
+                          bool need_lock);
 
 /**
  * Raw data output, similar to printf
  * @param fmt Format of the format string
+ * @param need_lock Whether the output needs to be locked during output, it is
+ * recommended to lock
  * @param ... Parameters in the format
  */
-void logger_raw(const char *fmt, ...);
+void logger_raw(bool need_lock, const char *fmt, ...);
 
 #ifdef __cplusplus
 }
