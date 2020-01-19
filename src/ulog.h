@@ -239,33 +239,6 @@ void logger_init(LogOutput output_cb);
  */
 uint64_t logger_get_time_us(void);
 
-/**
- * Display contents in hexadecimal and ascii.
- * Same format as "hexdump -C filename"
- * @param data The starting address of the data to be displayed
- * @param length Display length starting from "data"
- * @param width How many bytes of data are displayed in each line
- * @param base_address Base address, the displayed address starts from this
- * value
- * @param tail_addr_out Tail address output, whether to output the last address
- * after output
- * @param need_lock Whether the output needs to be locked during output, it is
- * recommended to lock
- * @return
- */
-uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
-                          uintptr_t base_address, bool tail_addr_out,
-                          bool need_lock);
-
-/**
- * Raw data output, similar to printf
- * @param fmt Format of the format string
- * @param need_lock Whether the output needs to be locked during output, it is
- * recommended to lock
- * @param ... Parameters in the format
- */
-void logger_raw(bool need_lock, const char *fmt, ...);
-
 #ifdef __cplusplus
 }
 #endif
