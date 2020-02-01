@@ -1,7 +1,13 @@
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.10)
 project(ulog_test)
 
 set(CMAKE_C_STANDARD 99)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+#set_property(TARGET ulog_test PROPERTY C_STANDARD 99)
+#set_property(TARGET ulog_test PROPERTY CXX_STANDARD 11)
+#set_property(TARGET ulog_test PROPERTY CXX_STANDARD_REQUIRED ON)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -9,7 +15,11 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 #ADD_DEFINITIONS(-DULOG_DISABLE)
 ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
 
-add_executable(ulog_test test/ulog_test.cpp src/ulog.c src/ulog.h src/ulog_common.h)
+add_library(ulog src/ulog.c)
+
+add_executable(ulog_test test/ulog_test.cpp)
+target_link_libraries(ulog_test ulog)
+
 
 enable_testing()
 add_test(test ulog_test)
