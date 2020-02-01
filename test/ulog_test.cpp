@@ -1,4 +1,5 @@
-#include "../src/ulog.h"
+#include "src/ulog.h"
+
 #include <stdio.h>
 #include <time.h>
 
