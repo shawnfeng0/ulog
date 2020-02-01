@@ -49,4 +49,4 @@ script:
   - mkdir build && cd build
   - cmake ../ && cmake --build ./ && ls -al
   - if [ "$TRAVIS_OS_NAME" != "windows" ]; then ./ulog_test; fi
-  - if [ "$TRAVIS_OS_NAME" = "windows" ]; then ./Debug/ulog_test.exe; fi
+  - if [ "$TRAVIS_OS_NAME" = "windows" ]; then ./Debug/ulog_test.exe; echo | clang -dM -E -; fi

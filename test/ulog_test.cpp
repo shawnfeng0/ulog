@@ -66,5 +66,13 @@ int main() {
 
   );
 
+#ifdef __GNUC__
+LOG_INFO("GNUC support");
+#endif
+
+#if defined(__clang__) || defined(__llvm__)
+  LOG_INFO("clang support");
+#endif
+
   return 0;
 }

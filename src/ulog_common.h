@@ -80,13 +80,46 @@
 #if !defined(ULOG_DISABLE)
 
 #ifdef __cplusplus
-#include <typeinfo>
-#define _TYPE_CMP(X, Y) (typeid(X) == typeid(Y))
+
+// with line number
+#define STRING2(x) #x
+#define STRING(x) STRING2(x)
+
+#pragma message("__cplusplus = " STRING(__cplusplus))
+
+template <typename T1, typename T2>
+struct _ULOG_IS_SAME_TYPE {
+  static const bool x = false;
+};
+
+template <typename T>
+struct _ULOG_IS_SAME_TYPE<T, T> {
+  static const bool x = true;
+};
+
+// "decltype" implementation in C++ 11, But msvc can be used after the 2010
+// version, it is strange, but it can be used
+#if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER > 1600)
+#define _TYPE_CMP(var, type) _ULOG_IS_SAME_TYPE<decltype(var), type>::x
+
+// "typeof" implementation in GCC extension
 #elif defined(__GNUC__) || defined(__clang__)
-#define _TYPE_CMP(X, Y) __builtin_types_compatible_p(typeof(X), typeof(Y))
+#define _TYPE_CMP(var, type) _ULOG_IS_SAME_TYPE<typeof(var), type>::x
+
 #else
-#pragma message("LOG_TOKEN is not available, please use clang or gcc compiler.")
-#define _TYPE_CMP(X, Y) false
+#pragma message( \
+    "LOG_TOKEN is not available, plese use c++11 or clang or gcc compiler.")
+#define _TYPE_CMP(var, type) false
+#endif  // __cplusplus >= 201103L
+
+// C version: implemented through GCC extensionn
+#elif defined(__GNUC__) || defined(__clang__)
+#define _TYPE_CMP(var, type) \
+  __builtin_types_compatible_p(typeof(var), typeof(type))
+#else
+#pragma message( \
+    "LOG_TOKEN is not available, plese use c++11 or clang or gcc compiler.")
+#define _TYPE_CMP(var, type) false
 #endif
 
 #define _LOG_TOKEN_FORMAT(prefix, suffix)                                      \
