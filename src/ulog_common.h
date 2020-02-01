@@ -81,12 +81,6 @@
 
 #ifdef __cplusplus
 
-// with line number
-#define STRING2(x) #x
-#define STRING(x) STRING2(x)
-
-#pragma message("__cplusplus = " STRING(__cplusplus))
-
 template <typename T1, typename T2>
 struct _ULOG_IS_SAME_TYPE {
   static const bool x = false;
