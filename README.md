@@ -1,5 +1,7 @@
 # ulog
 
+[![Build Status](https://travis-ci.org/shawnfeng0/ulog.svg?branch=master)](https://travis-ci.org/shawnfeng0/ulog)
+
 Ulog is a micro log library suitable for use with lightweight embedded devices.
 
 ## QuickStart
