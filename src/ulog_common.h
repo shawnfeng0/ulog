@@ -50,8 +50,8 @@
 #define _LOG_FORMAT_CHECK(...)                                   \
   do {                                                           \
     /* Causes the compiler to automatically check the format. */ \
-    char c;                                                      \
-    snprintf(&c, 0, __VA_ARGS__);                                \
+    char _ulog_c##__LINE__;                                      \
+    snprintf(&_ulog_c##__LINE__, 0, __VA_ARGS__);                \
   } while (0)
 
 #if !defined(ULOG_DISABLE)
@@ -131,11 +131,11 @@
                _TYPE_CMP(token, char[]) || _TYPE_CMP(token, const char[]) ||  \
                _TYPE_CMP(token, unsigned char[]) ||                           \
                _TYPE_CMP(token, const unsigned char[])) {                     \
-      const char *token_value = (const char *)(uintptr_t)(token);             \
+      const char *_ulog_value = (const char *)(uintptr_t)(token);             \
       (info_out)                                                              \
           ? output_cb(_LOG_TOKEN_FORMAT("(char *)[%" PRIu32 "] ", "%s"),      \
-                      (uint32_t)strlen(token_value), #token, token_value)     \
-          : output_cb(_LOG_TOKEN_FORMAT("", "%s"), #token, token_value);      \
+                      (uint32_t)strlen(_ulog_value), #token, _ulog_value)     \
+          : output_cb(_LOG_TOKEN_FORMAT("", "%s"), #token, _ulog_value);      \
     } else if (_TYPE_CMP(token, void *) || _TYPE_CMP(token, short *) ||       \
                _TYPE_CMP(token, unsigned short *) ||                          \
                _TYPE_CMP(token, int *) || _TYPE_CMP(token, unsigned int *) || \
@@ -249,20 +249,22 @@
       "time " STR_RED "{ " STR_BLUE "%s%s " STR_RED "} => " STR_GREEN "%fs" \
                             : "time { %s%s } => %fs"
 
-#define _LOG_TIME_CODE(...)                                                  \
-  do {                                                                       \
-    uint64_t start_time_us = logger_get_time_us();                           \
-    __VA_ARGS__;                                                             \
-    uint64_t end_time_us = logger_get_time_us();                             \
-    float timediff = (end_time_us - start_time_us) / 1000.f / 1000.f;        \
-    char function_str[_LOG_TIME_FUNCTION_LENGTH];                            \
-    memset(function_str, 0, _LOG_TIME_FUNCTION_LENGTH);                      \
-    strncpy(function_str, #__VA_ARGS__, _LOG_TIME_FUNCTION_LENGTH - 1);      \
-    LOG_DEBUG(_LOG_TIME_FORMAT, function_str,                                \
-              strncmp(#__VA_ARGS__, function_str, _LOG_TIME_FUNCTION_LENGTH) \
-                  ? "..."                                                    \
-                  : "",                                                      \
-              timediff);                                                     \
+#define _LOG_TIME_CODE(...)                                                   \
+  do {                                                                        \
+    uint64_t _ulog_start_time_us = logger_get_time_us();                      \
+    __VA_ARGS__;                                                              \
+    uint64_t _ulog_end_time_us = logger_get_time_us();                        \
+    float _ulog_timediff =                                                    \
+        (_ulog_end_time_us - _ulog_start_time_us) / 1000.f / 1000.f;          \
+    char _ulog_function_str[_LOG_TIME_FUNCTION_LENGTH];                       \
+    memset(_ulog_function_str, 0, _LOG_TIME_FUNCTION_LENGTH);                 \
+    strncpy(_ulog_function_str, #__VA_ARGS__, _LOG_TIME_FUNCTION_LENGTH - 1); \
+    LOG_DEBUG(                                                                \
+        _LOG_TIME_FORMAT, _ulog_function_str,                                 \
+        strncmp(#__VA_ARGS__, _ulog_function_str, _LOG_TIME_FUNCTION_LENGTH)  \
+            ? "..."                                                           \
+            : "",                                                             \
+        _ulog_timediff);                                                      \
   } while (0)
 
 #define _LOG_HEX_DUMP_COLOR(place1, place2, place3, place4) \
