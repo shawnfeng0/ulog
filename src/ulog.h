@@ -14,26 +14,22 @@
  * @param fmt Format of the format string
  * @param ... Parameters in the format
  */
-#define LOG_TRACE(fmt, ...) \
-  _LOGGER_LOG_WITH_LOCK(ULOG_TRACE, fmt, ##__VA_ARGS__)
-#define LOG_DEBUG(fmt, ...) \
-  _LOGGER_LOG_WITH_LOCK(ULOG_DEBUG, fmt, ##__VA_ARGS__)
-#define LOG_INFO(fmt, ...) _LOGGER_LOG_WITH_LOCK(ULOG_INFO, fmt, ##__VA_ARGS__)
-#define LOG_WARN(fmt, ...) _LOGGER_LOG_WITH_LOCK(ULOG_WARN, fmt, ##__VA_ARGS__)
-#define LOG_ERROR(fmt, ...) \
-  _LOGGER_LOG_WITH_LOCK(ULOG_ERROR, fmt, ##__VA_ARGS__)
-#define LOG_FATAL(fmt, ...) \
-  _LOGGER_LOG_WITH_LOCK(ULOG_FATAL, fmt, ##__VA_ARGS__)
+#define LOG_TRACE(fmt, ...) _OUT_LOG(ULOG_LEVEL_TRACE, fmt, ##__VA_ARGS__)
+#define LOG_DEBUG(fmt, ...) _OUT_LOG(ULOG_LEVEL_DEBUG, fmt, ##__VA_ARGS__)
+#define LOG_INFO(fmt, ...) _OUT_LOG(ULOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...) _OUT_LOG(ULOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...) _OUT_LOG(ULOG_LEVEL_ERROR, fmt, ##__VA_ARGS__)
+#define LOG_FATAL(fmt, ...) _OUT_LOG(ULOG_LEVEL_FATAL, fmt, ##__VA_ARGS__)
 
 // Prevent redefinition
 #if defined(ABORT)
 #undef ABORT
 #endif
 
-#define ABORT(fmt, ...)            \
-  do {                             \
-    LOG_FATAL(fmt, ##__VA_ARGS__); \
-    logger_assert_handler();       \
+#define ABORT(fmt, ...)                                                        \
+  do {                                                                         \
+    LOG_FATAL(fmt, ##__VA_ARGS__);                                             \
+    logger_assert_handler();                                                   \
   } while (0)
 
 // Prevent redefinition
@@ -41,10 +37,11 @@
 #undef ASSERT
 #endif
 
-#define ASSERT(exp) \
-  if (!(exp)) ABORT("Assertion '%s' failed.", #exp)
+#define ASSERT(exp)                                                            \
+  if (!(exp))                                                                  \
+  ABORT("Assertion '%s' failed.", #exp)
 
-#define LOG_RAW(fmt, ...) _LOGGER_RAW_WITH_LOCK(fmt, ##__VA_ARGS__)
+#define LOG_RAW(fmt, ...) _OUT_RAW_WITH_LOCK(fmt, ##__VA_ARGS__)
 
 /**
  * Output various tokens
@@ -60,7 +57,7 @@
  * @param token Can be float, double, [unsigned / signed] char / short / int /
  * long / long long and pointers of the above type
  */
-#define LOG_TOKEN(token) _LOG_TOKEN(token, _LOG_DEBUG_NO_CHECK_WITH_LOCK, true)
+#define LOG_TOKEN(token) _OUT_TOKEN(token, _OUT_TOKEN_CB, true)
 
 /**
  * Output multiple tokens to one line
@@ -73,7 +70,7 @@
  * @param token Same definition as LOG_TOKEN parameter, but can output up to 16
  * tokens at the same time
  */
-#define LOG_MULTI_TOKEN(...) _LOG_MULTI_TOKEN(__VA_ARGS__)
+#define LOG_MULTI_TOKEN(...) _OUT_MULTI_TOKEN(__VA_ARGS__)
 
 /**
  * Statistics code running time,
@@ -87,7 +84,7 @@
  * output:
  * time { uint32_t n = 1000 * 1000; while (n--); } => 0.001315s
  */
-#define LOG_TIME_CODE(...) _LOG_TIME_CODE(__VA_ARGS__)
+#define LOG_TIME_CODE(...) _TIME_CODE(__VA_ARGS__)
 
 /**
  * Display contents in hexadecimal and ascii.
@@ -106,8 +103,7 @@
  * @param length Display length starting from "data"
  * @param width How many bytes of data are displayed in each line
  */
-#define LOG_HEX_DUMP(data, length, width) \
-  _LOG_HEX_DUMP_WITH_LOCK(data, length, width)
+#define LOG_HEX_DUMP(data, length, width) _HEX_DUMP(data, length, width)
 
 typedef int (*LogOutput)(const char *ptr);
 typedef int (*LogMutexUnlock)(void *mutex);
@@ -243,4 +239,4 @@ uint64_t logger_get_time_us(void);
 }
 #endif
 
-#endif  //__ULOG_H__
+#endif //__ULOG_H__

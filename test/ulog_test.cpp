@@ -22,7 +22,7 @@ static int put_str(const char *str) {
 #if defined(WIN32) || defined(__unix__) || defined(__APPLE__)
   return printf("%s", str);
 #else
-  return 0;  // Need to implement a function to put string
+  return 0; // Need to implement a function to put string
 #endif
 }
 
@@ -44,7 +44,7 @@ int main() {
   // Output debugging expression
   LOG_TOKEN(pi);
   LOG_TOKEN(50 * pi / 180);
-  LOG_TOKEN(&pi);  // print address of pi
+  LOG_TOKEN(&pi); // print address of pi
 
   char *text = (char *)"Ulog is a micro log library.";
   LOG_TOKEN((char *)text);

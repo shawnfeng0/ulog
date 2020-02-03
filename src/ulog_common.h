@@ -41,39 +41,39 @@
 
 // Precompiler define to get only filename;
 #if !defined(__FILENAME__)
-#define __FILENAME__                \
-  (strrchr(__FILE__, '/')           \
-       ? strrchr(__FILE__, '/') + 1 \
+#define __FILENAME__                                                           \
+  (strrchr(__FILE__, '/')                                                      \
+       ? strrchr(__FILE__, '/') + 1                                            \
        : strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
 #endif
 
-#define _LOG_FORMAT_CHECK(...)                                   \
-  do {                                                           \
-    /* Causes the compiler to automatically check the format. */ \
-    char _ulog_c##__LINE__;                                      \
-    snprintf(&_ulog_c##__LINE__, 0, __VA_ARGS__);                \
+#define _CHECK_LOG_FORMAT(...)                                                 \
+  do {                                                                         \
+    /* Causes the compiler to automatically check the format. */               \
+    char _ulog_c##__LINE__;                                                    \
+    snprintf(&_ulog_c##__LINE__, 0, __VA_ARGS__);                              \
   } while (0)
 
 #if !defined(ULOG_DISABLE)
-#define _LOGGER_LOG_WITH_LOCK(level, ...)                               \
-  do {                                                                  \
-    _LOG_FORMAT_CHECK(__VA_ARGS__);                                     \
-    logger_log(level, __FILENAME__, __FUNCTION__, __LINE__, true, true, \
-               ##__VA_ARGS__);                                          \
+#define _OUT_LOG(level, ...)                                                   \
+  do {                                                                         \
+    _CHECK_LOG_FORMAT(__VA_ARGS__);                                            \
+    logger_log(level, __FILENAME__, __FUNCTION__, __LINE__, true, true,        \
+               ##__VA_ARGS__);                                                 \
   } while (0)
 
-#define _LOGGER_RAW_WITH_LOCK(fmt, ...)    \
-  do {                                     \
-    _LOG_FORMAT_CHECK(fmt, ##__VA_ARGS__); \
-    logger_raw(true, fmt, ##__VA_ARGS__);  \
+#define _OUT_RAW_WITH_LOCK(fmt, ...)                                           \
+  do {                                                                         \
+    _CHECK_LOG_FORMAT(fmt, ##__VA_ARGS__);                                     \
+    logger_raw(true, fmt, ##__VA_ARGS__);                                      \
   } while (0)
 
-#define _LOGGER_RAW_NO_LOCK(fmt, ...) logger_raw(false, fmt, ##__VA_ARGS__)
+#define _OUT_RAW_LOCKED(fmt, ...) logger_raw(false, fmt, ##__VA_ARGS__)
 
 #else
 
-#define _LOGGER_LOG_WITH_LOCK(level, ...)
-#define _LOGGER_RAW_WITH_LOCK(fmt, ...)
+#define _OUT_LOG(level, ...)
+#define _OUT_RAW_WITH_LOCK(fmt, ...)
 
 #endif
 
@@ -81,105 +81,109 @@
 
 #ifdef __cplusplus
 
-template <typename T1, typename T2>
-struct _ULOG_IS_SAME_TYPE {
+template <typename T1, typename T2> struct _TYPE_IS_EQUAL_AUX {
   static const bool x = false;
 };
 
-template <typename T>
-struct _ULOG_IS_SAME_TYPE<T, T> {
+template <typename T> struct _TYPE_IS_EQUAL_AUX<T, T> {
   static const bool x = true;
 };
 
 // "decltype" implementation in C++ 11, But msvc can be used after the 2010
 // version, it is strange, but it can be used
 #if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER > 1600)
-#define _TYPE_CMP(var, type) _ULOG_IS_SAME_TYPE<decltype(var), type>::x
+#define _IS_SAME_TYPE(var, type) _TYPE_IS_EQUAL_AUX<decltype(var), type>::x
 
 // "typeof" implementation in GCC extension
 #elif defined(__GNUC__) || defined(__clang__)
-#define _TYPE_CMP(var, type) _ULOG_IS_SAME_TYPE<typeof(var), type>::x
+#define _IS_SAME_TYPE(var, type) _TYPE_IS_EQUAL_AUX<typeof(var), type>::x
 
 #else
-#pragma message( \
+#pragma message(                                                               \
     "LOG_TOKEN is not available, plese use c++11 or clang or gcc compiler.")
-#define _TYPE_CMP(var, type) false
-#endif  // __cplusplus >= 201103L
+#define _IS_SAME_TYPE(var, type) false
+#endif // __cplusplus >= 201103L
 
 // C version: implemented through GCC extensionn
 #elif defined(__GNUC__) || defined(__clang__)
-#define _TYPE_CMP(var, type) \
+#define _IS_SAME_TYPE(var, type)                                               \
   __builtin_types_compatible_p(typeof(var), typeof(type))
 #else
-#pragma message( \
+#pragma message(                                                               \
     "LOG_TOKEN is not available, plese use c++11 or clang or gcc compiler.")
-#define _TYPE_CMP(var, type) false
+#define _IS_SAME_TYPE(var, type) false
 #endif
 
-#define _LOG_TOKEN_FORMAT(prefix, suffix)                                      \
+#define _GEN_TOKEN_FORMAT(prefix, suffix)                                      \
   logger_color_is_enabled() ? STR_GREEN prefix STR_BLUE "%s " STR_RED          \
                                                         "=> " STR_GREEN suffix \
                             : prefix "%s => " suffix
 
-#define _LOG_DEBUG_NO_CHECK_WITH_LOCK(...)                                 \
-  logger_log(ULOG_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, true, true, \
-             ##__VA_ARGS__)
+#define _OUT_TOKEN_CB(...)                                                     \
+  logger_log(ULOG_LEVEL_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, true,     \
+             true, ##__VA_ARGS__)
 
-#define _LOG_TOKEN(token, output_cb, info_out)                                \
-  do {                                                                        \
-    if (_TYPE_CMP(token, float) || _TYPE_CMP(token, double)) {                \
-      (info_out)                                                              \
-          ? output_cb(_LOG_TOKEN_FORMAT("(float) ", "%f"), #token, token)     \
-          : output_cb(_LOG_TOKEN_FORMAT("", "%f"), #token, token);            \
-    } else if (_TYPE_CMP(token, bool)) {                                      \
-      (info_out) ? output_cb(_LOG_TOKEN_FORMAT("(bool) ", "%s"), #token,      \
-                             (token) ? "true" : "false")                      \
-                 : output_cb(_LOG_TOKEN_FORMAT("", "%s"), #token,             \
-                             (token) ? "true" : "false");                     \
-      /* Types with symbols below 64 bits */                                  \
-    } else if (_TYPE_CMP(token, char) || _TYPE_CMP(token, unsigned char) ||   \
-               _TYPE_CMP(token, short) || _TYPE_CMP(token, unsigned short) || \
-               _TYPE_CMP(token, int) || _TYPE_CMP(token, unsigned int) ||     \
-               _TYPE_CMP(token, long) || _TYPE_CMP(token, long long)) {       \
-      (info_out) ? output_cb(_LOG_TOKEN_FORMAT("(int) ", "%" PRId64), #token, \
-                             (int64_t)(token))                                \
-                 : output_cb(_LOG_TOKEN_FORMAT("", "%" PRId64), #token,       \
-                             (int64_t)(token));                               \
-      /* May be a 64-bit type */                                              \
-    } else if (_TYPE_CMP(token, unsigned long) ||                             \
-               _TYPE_CMP(token, unsigned long long)) {                        \
-      (info_out) ? output_cb(_LOG_TOKEN_FORMAT("(int) ", "%" PRIu64), #token, \
-                             (uint64_t)(token))                               \
-                 : output_cb(_LOG_TOKEN_FORMAT("", "%" PRIu64), #token,       \
-                             (uint64_t)(token));                              \
-    } else if (_TYPE_CMP(token, char *) || _TYPE_CMP(token, const char *) ||  \
-               _TYPE_CMP(token, unsigned char *) ||                           \
-               _TYPE_CMP(token, const unsigned char *) ||                     \
-               _TYPE_CMP(token, char[]) || _TYPE_CMP(token, const char[]) ||  \
-               _TYPE_CMP(token, unsigned char[]) ||                           \
-               _TYPE_CMP(token, const unsigned char[])) {                     \
-      const char *_ulog_value = (const char *)(uintptr_t)(token);             \
-      (info_out)                                                              \
-          ? output_cb(_LOG_TOKEN_FORMAT("(char *)[%" PRIu32 "] ", "%s"),      \
-                      (uint32_t)strlen(_ulog_value), #token, _ulog_value)     \
-          : output_cb(_LOG_TOKEN_FORMAT("", "%s"), #token, _ulog_value);      \
-    } else if (_TYPE_CMP(token, void *) || _TYPE_CMP(token, short *) ||       \
-               _TYPE_CMP(token, unsigned short *) ||                          \
-               _TYPE_CMP(token, int *) || _TYPE_CMP(token, unsigned int *) || \
-               _TYPE_CMP(token, long *) ||                                    \
-               _TYPE_CMP(token, unsigned long *) ||                           \
-               _TYPE_CMP(token, long long *) ||                               \
-               _TYPE_CMP(token, unsigned long long *) ||                      \
-               _TYPE_CMP(token, float *) || _TYPE_CMP(token, double *)) {     \
-      (info_out) ? output_cb(_LOG_TOKEN_FORMAT("(void *) ", "%" PRIx64),      \
-                             #token, (uint64_t)(token))                       \
-                 : output_cb(_LOG_TOKEN_FORMAT("", "%" PRIx64), #token,       \
-                             (uint64_t)(token));                              \
-    } else {                                                                  \
-      (info_out)                                                              \
-          ? output_cb(_LOG_TOKEN_FORMAT("(unknown) ", "(none)"), #token)      \
-          : output_cb(_LOG_TOKEN_FORMAT("", "(none)"), #token);               \
-    }                                                                         \
+#define _OUT_TOKEN(token, out_cb, info_out)                                    \
+  do {                                                                         \
+    if (_IS_SAME_TYPE(token, float) || _IS_SAME_TYPE(token, double)) {         \
+      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(float) ", "%f"), #token, token)  \
+                 : out_cb(_GEN_TOKEN_FORMAT("", "%f"), #token, token);         \
+    } else if (_IS_SAME_TYPE(token, bool)) {                                   \
+      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(bool) ", "%s"), #token,          \
+                          (token) ? "true" : "false")                          \
+                 : out_cb(_GEN_TOKEN_FORMAT("", "%s"), #token,                 \
+                          (token) ? "true" : "false");                         \
+      /* Types with symbols below 64 bits */                                   \
+    } else if (_IS_SAME_TYPE(token, char) ||                                   \
+               _IS_SAME_TYPE(token, unsigned char) ||                          \
+               _IS_SAME_TYPE(token, short) ||                                  \
+               _IS_SAME_TYPE(token, unsigned short) ||                         \
+               _IS_SAME_TYPE(token, int) ||                                    \
+               _IS_SAME_TYPE(token, unsigned int) ||                           \
+               _IS_SAME_TYPE(token, long) ||                                   \
+               _IS_SAME_TYPE(token, long long)) {                              \
+      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(int) ", "%" PRId64), #token,     \
+                          (int64_t)(token))                                    \
+                 : out_cb(_GEN_TOKEN_FORMAT("", "%" PRId64), #token,           \
+                          (int64_t)(token));                                   \
+      /* May be a 64-bit type */                                               \
+    } else if (_IS_SAME_TYPE(token, unsigned long) ||                          \
+               _IS_SAME_TYPE(token, unsigned long long)) {                     \
+      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(int) ", "%" PRIu64), #token,     \
+                          (uint64_t)(token))                                   \
+                 : out_cb(_GEN_TOKEN_FORMAT("", "%" PRIu64), #token,           \
+                          (uint64_t)(token));                                  \
+    } else if (_IS_SAME_TYPE(token, char *) ||                                 \
+               _IS_SAME_TYPE(token, const char *) ||                           \
+               _IS_SAME_TYPE(token, unsigned char *) ||                        \
+               _IS_SAME_TYPE(token, const unsigned char *) ||                  \
+               _IS_SAME_TYPE(token, char[]) ||                                 \
+               _IS_SAME_TYPE(token, const char[]) ||                           \
+               _IS_SAME_TYPE(token, unsigned char[]) ||                        \
+               _IS_SAME_TYPE(token, const unsigned char[])) {                  \
+      const char *_ulog_value = (const char *)(uintptr_t)(token);              \
+      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(char *)[%" PRIu32 "] ", "%s"),   \
+                          (uint32_t)strlen(_ulog_value), #token, _ulog_value)  \
+                 : out_cb(_GEN_TOKEN_FORMAT("", "%s"), #token, _ulog_value);   \
+    } else if (_IS_SAME_TYPE(token, void *) ||                                 \
+               _IS_SAME_TYPE(token, short *) ||                                \
+               _IS_SAME_TYPE(token, unsigned short *) ||                       \
+               _IS_SAME_TYPE(token, int *) ||                                  \
+               _IS_SAME_TYPE(token, unsigned int *) ||                         \
+               _IS_SAME_TYPE(token, long *) ||                                 \
+               _IS_SAME_TYPE(token, unsigned long *) ||                        \
+               _IS_SAME_TYPE(token, long long *) ||                            \
+               _IS_SAME_TYPE(token, unsigned long long *) ||                   \
+               _IS_SAME_TYPE(token, float *) ||                                \
+               _IS_SAME_TYPE(token, double *)) {                               \
+      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(void *) ", "%" PRIx64), #token,  \
+                          (uint64_t)(token))                                   \
+                 : out_cb(_GEN_TOKEN_FORMAT("", "%" PRIx64), #token,           \
+                          (uint64_t)(token));                                  \
+    } else {                                                                   \
+      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(unknown) ", "(none)"), #token)   \
+                 : out_cb(_GEN_TOKEN_FORMAT("", "(none)"), #token);            \
+    }                                                                          \
   } while (0)
 
 #define _EXPAND(...) __VA_ARGS__
@@ -187,11 +191,11 @@ struct _ULOG_IS_SAME_TYPE<T, T> {
 /**
  * Get the number of parameters of the function-like macro
  */
-#define _ARG_COUNT(...)                                                       \
-  _ARG_COUNT_PRIVATE(NULL EAT_COMMA(__VA_ARGS__), 64, 63, 62, 61, 60, 59, 58, \
-                     57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44,  \
-                     43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30,  \
-                     29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16,  \
+#define _ARG_COUNT(...)                                                        \
+  _ARG_COUNT_PRIVATE(NULL EAT_COMMA(__VA_ARGS__), 64, 63, 62, 61, 60, 59, 58,  \
+                     57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44,   \
+                     43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30,   \
+                     29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16,   \
                      15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 
 #define _ARG_COUNT_PRIVATE(...) _EXPAND(_ARG_COUNT_PRIVATE_MSVC(__VA_ARGS__))
@@ -209,131 +213,127 @@ struct _ULOG_IS_SAME_TYPE<T, T> {
 #define _MACRO_CONCAT_PRIVATE(l, r) l##r
 #define _MACRO_CONCAT(l, r) _MACRO_CONCAT_PRIVATE(l, r)
 
-#define _LOG_DEBUG_NO_NEWLINE_NO_LOCK(...)                                   \
-  logger_log(ULOG_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, false, false, \
-             ##__VA_ARGS__)
+#define _OUT_MULTI_TOKEN_CB(need_newline, ...)                                 \
+  logger_log(ULOG_LEVEL_DEBUG, __FILENAME__, __FUNCTION__, __LINE__,           \
+             need_newline, false, ##__VA_ARGS__)
 
-#define _LOG_DEBUG_NEWLINE_NO_LOCK(...)                                     \
-  logger_log(ULOG_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, true, false, \
-             ##__VA_ARGS__)
-
-#define _LOG_MULTI_TOKEN(...)                                                 \
-  do {                                                                        \
-    logger_output_lock();                                                     \
-    _LOG_DEBUG_NO_NEWLINE_NO_LOCK("");                                        \
-    _EXPAND(_MACRO_CONCAT(_TOKEN_AUX_, _ARG_COUNT(__VA_ARGS__))(__VA_ARGS__)) \
-    logger_output_unlock();                                                   \
+#define _OUT_MULTI_TOKEN(...)                                                  \
+  do {                                                                         \
+    logger_output_lock();                                                      \
+    _OUT_MULTI_TOKEN_CB(false, "");                                            \
+    _EXPAND(_MACRO_CONCAT(_TOKEN_AUX_, _ARG_COUNT(__VA_ARGS__))(__VA_ARGS__))  \
+    logger_output_unlock();                                                    \
   } while (0)
 
-#define _TOKEN_OUTPUT_WRAPPER_NO_LOCK(token, left)                        \
-  do {                                                                    \
-    _LOG_TOKEN(token, _LOGGER_RAW_NO_LOCK, false);                        \
-    if (left)                                                             \
-      logger_raw(false, logger_color_is_enabled() ? STR_RED ", " : ", "); \
+#define _OUT_TOKEN_WRAPPER_LOCKED(token, left)                                 \
+  do {                                                                         \
+    _OUT_TOKEN(token, _OUT_RAW_LOCKED, false);                                 \
+    if (left)                                                                  \
+      logger_raw(false, logger_color_is_enabled() ? STR_RED ", " : ", ");      \
   } while (0)
 
-#define _LOG_TOKEN_AUX(_1, ...)                               \
-  _TOKEN_OUTPUT_WRAPPER_NO_LOCK(_1, _ARG_COUNT(__VA_ARGS__)); \
+#define _LOG_TOKEN_AUX(_1, ...)                                                \
+  _OUT_TOKEN_WRAPPER_LOCKED(_1, _ARG_COUNT(__VA_ARGS__));                      \
   _MACRO_CONCAT(_TOKEN_AUX_, _ARG_COUNT(__VA_ARGS__))
 
 #define _TOKEN_AUX_0(...) logger_raw(false, "\r\n");
-#define _TOKEN_AUX_1(_1, ...) \
+#define _TOKEN_AUX_1(_1, ...)                                                  \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_2(_1, ...) \
+#define _TOKEN_AUX_2(_1, ...)                                                  \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_3(_1, ...) \
+#define _TOKEN_AUX_3(_1, ...)                                                  \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_4(_1, ...) \
+#define _TOKEN_AUX_4(_1, ...)                                                  \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_5(_1, ...) \
+#define _TOKEN_AUX_5(_1, ...)                                                  \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_6(_1, ...) \
+#define _TOKEN_AUX_6(_1, ...)                                                  \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_7(_1, ...) \
+#define _TOKEN_AUX_7(_1, ...)                                                  \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_8(_1, ...) \
+#define _TOKEN_AUX_8(_1, ...)                                                  \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_9(_1, ...) \
+#define _TOKEN_AUX_9(_1, ...)                                                  \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_10(_1, ...) \
+#define _TOKEN_AUX_10(_1, ...)                                                 \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_11(_1, ...) \
+#define _TOKEN_AUX_11(_1, ...)                                                 \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_12(_1, ...) \
+#define _TOKEN_AUX_12(_1, ...)                                                 \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_13(_1, ...) \
+#define _TOKEN_AUX_13(_1, ...)                                                 \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_14(_1, ...) \
+#define _TOKEN_AUX_14(_1, ...)                                                 \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_15(_1, ...) \
+#define _TOKEN_AUX_15(_1, ...)                                                 \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
-#define _TOKEN_AUX_16(_1, ...) \
+#define _TOKEN_AUX_16(_1, ...)                                                 \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
 
-#define _LOG_TIME_FUNCTION_LENGTH 50
-#define _LOG_TIME_FORMAT                                                    \
-  logger_color_is_enabled() ? STR_GREEN                                     \
-      "time " STR_RED "{ " STR_BLUE "%s%s " STR_RED "} => " STR_GREEN "%fs" \
+#define _FORMAT_FOR_TIME_CODE                                                  \
+  logger_color_is_enabled() ? STR_GREEN                                        \
+      "time " STR_RED "{ " STR_BLUE "%s%s " STR_RED "} => " STR_GREEN "%fs"    \
                             : "time { %s%s } => %fs"
 
-#define _LOG_TIME_CODE(...)                                                   \
-  do {                                                                        \
-    uint64_t _ulog_start_time_us = logger_get_time_us();                      \
-    __VA_ARGS__;                                                              \
-    uint64_t _ulog_end_time_us = logger_get_time_us();                        \
-    float _ulog_timediff =                                                    \
-        (_ulog_end_time_us - _ulog_start_time_us) / 1000.f / 1000.f;          \
-    char _ulog_function_str[_LOG_TIME_FUNCTION_LENGTH];                       \
-    memset(_ulog_function_str, 0, _LOG_TIME_FUNCTION_LENGTH);                 \
-    strncpy(_ulog_function_str, #__VA_ARGS__, _LOG_TIME_FUNCTION_LENGTH - 1); \
-    LOG_DEBUG(                                                                \
-        _LOG_TIME_FORMAT, _ulog_function_str,                                 \
-        strncmp(#__VA_ARGS__, _ulog_function_str, _LOG_TIME_FUNCTION_LENGTH)  \
-            ? "..."                                                           \
-            : "",                                                             \
-        _ulog_timediff);                                                      \
+#define _TIME_CODE(...)                                                        \
+  do {                                                                         \
+    const int _CODE_LENGTH_MAX = 50;                                           \
+    uint64_t _ulog_start_time_us = logger_get_time_us();                       \
+    __VA_ARGS__;                                                               \
+    uint64_t _ulog_end_time_us = logger_get_time_us();                         \
+    float _ulog_timediff =                                                     \
+        (_ulog_end_time_us - _ulog_start_time_us) / 1000.f / 1000.f;           \
+    char _ulog_function_str[_CODE_LENGTH_MAX];                                 \
+    memset(_ulog_function_str, 0, _CODE_LENGTH_MAX);                           \
+    strncpy(_ulog_function_str, #__VA_ARGS__, _CODE_LENGTH_MAX - 1);           \
+    LOG_DEBUG(_FORMAT_FOR_TIME_CODE, _ulog_function_str,                       \
+              strncmp(#__VA_ARGS__, _ulog_function_str, _CODE_LENGTH_MAX)      \
+                  ? "..."                                                      \
+                  : "",                                                        \
+              _ulog_timediff);                                                 \
   } while (0)
 
-#define _LOG_HEX_DUMP_COLOR(place1, place2, place3, place4) \
+#define _GEN_COLOR_FORMAT_FOR_HEX_DUMP(place1, place2, place3, place4)         \
   STR_RED place1 STR_GREEN place2 STR_RED place3 STR_BLUE place4
 
-#define _LOG_HEX_DUMP_FORMAT                                             \
-  logger_color_is_enabled()                                              \
-      ? STR_GREEN "hex_dump" _LOG_HEX_DUMP_COLOR("(", "data", ":", "%s") \
-            _LOG_HEX_DUMP_COLOR(", ", "length", ":", "%" PRIuMAX)        \
-                _LOG_HEX_DUMP_COLOR(", ", "width", ":",                  \
-                                    "%" PRIuMAX STR_RED ") =>")          \
-      : "hex_dump(data:%s, length:%" PRIuMAX ", width:%" PRIuMAX ")"
+#define _HEX_DUMP_FORMAT                                                       \
+  logger_color_is_enabled() ? STR_GREEN                                        \
+      "hex_dump" _GEN_COLOR_FORMAT_FOR_HEX_DUMP("(", "data", ":", "%s")        \
+          _GEN_COLOR_FORMAT_FOR_HEX_DUMP(", ", "length", ":", "%" PRIuMAX)     \
+              _GEN_COLOR_FORMAT_FOR_HEX_DUMP(", ", "width", ":",               \
+                                             "%" PRIuMAX STR_RED ") =>")       \
+                            : "hex_dump(data:%s, length:%" PRIuMAX             \
+                              ", width:%" PRIuMAX ")"
 
-#define _LOG_HEX_DUMP_WITH_LOCK(data, length, width)                      \
-  do {                                                                    \
-    logger_output_lock();                                                 \
-    _LOG_DEBUG_NEWLINE_NO_LOCK(_LOG_HEX_DUMP_FORMAT, #data,               \
-                               (uintmax_t)(length), (uintmax_t)(width));  \
-    logger_hex_dump(data, length, width, (uintptr_t)(data), true, false); \
-    logger_output_unlock();                                               \
+#define _HEX_DUMP(data, length, width)                                         \
+  do {                                                                         \
+    logger_output_lock();                                                      \
+    _OUT_MULTI_TOKEN_CB(true, _HEX_DUMP_FORMAT, #data, (uintmax_t)(length),    \
+                        (uintmax_t)(width));                                   \
+    logger_hex_dump(data, length, width, (uintptr_t)(data), true, false);      \
+    logger_output_unlock();                                                    \
   } while (0)
 
 #else
 
-#define _LOG_TOKEN(...)
-#define _LOG_TIME_CODE(...) __VA_ARGS__;
-#define _LOG_HEX_DUMP_WITH_LOCK(...)
-#define _LOG_MULTI_TOKEN(...)
+#define _OUT_TOKEN(...)
+#define _TIME_CODE(...) __VA_ARGS__;
+#define _HEX_DUMP(...)
+#define _OUT_MULTI_TOKEN(...)
 
-#endif  // !defined(ULOG_DISABLE)
+#endif // !defined(ULOG_DISABLE)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef enum {
-  ULOG_TRACE = 0,
-  ULOG_DEBUG,
-  ULOG_INFO,
-  ULOG_WARN,
-  ULOG_ERROR,
-  ULOG_FATAL,
+  ULOG_LEVEL_TRACE = 0,
+  ULOG_LEVEL_DEBUG,
+  ULOG_LEVEL_INFO,
+  ULOG_LEVEL_WARN,
+  ULOG_LEVEL_ERROR,
+  ULOG_LEVEL_FATAL,
   ULOG_LEVEL_NUMBER
 } LogLevel;
 
@@ -398,4 +398,4 @@ void logger_log(LogLevel level, const char *file, const char *func,
 }
 #endif
 
-#endif  // _ULOG_COMMON_H
+#endif // _ULOG_COMMON_H
