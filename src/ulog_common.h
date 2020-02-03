@@ -79,6 +79,13 @@
 
 #if !defined(ULOG_DISABLE)
 
+#define DO_PRAGMA(x) _Pragma(#x)
+#define TODO(x) DO_PRAGMA(message("TODO - " #x))
+#define _IGNORE_POINTER_ARITH_WARN                                             \
+  DO_PRAGMA(GCC diagnostic ignored "-Wpointer-arith")
+#define _GCC_DIAGNOSTIC_PUSH DO_PRAGMA(GCC diagnostic push)
+#define _GCC_DIAGNOSTIC_POP DO_PRAGMA(GCC diagnostic pop)
+
 #ifdef __cplusplus
 
 template <typename T1, typename T2> struct _TYPE_IS_EQUAL_AUX {
@@ -92,11 +99,12 @@ template <typename T> struct _TYPE_IS_EQUAL_AUX<T, T> {
 // "decltype" implementation in C++ 11, But msvc can be used after the 2010
 // version, it is strange, but it can be used
 #if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER > 1600)
-#define _IS_SAME_TYPE(var, type) _TYPE_IS_EQUAL_AUX<decltype(var), type>::x
+#define _IS_SAME_TYPE(var, type)                                               \
+  _TYPE_IS_EQUAL_AUX<decltype((var) + 1), type>::x
 
 // "typeof" implementation in GCC extension
 #elif defined(__GNUC__) || defined(__clang__)
-#define _IS_SAME_TYPE(var, type) _TYPE_IS_EQUAL_AUX<typeof(var), type>::x
+#define _IS_SAME_TYPE(var, type) _TYPE_IS_EQUAL_AUX<typeof((var) + 1), type>::x
 
 #else
 #pragma message(                                                               \
@@ -107,7 +115,7 @@ template <typename T> struct _TYPE_IS_EQUAL_AUX<T, T> {
 // C version: implemented through GCC extensionn
 #elif defined(__GNUC__) || defined(__clang__)
 #define _IS_SAME_TYPE(var, type)                                               \
-  __builtin_types_compatible_p(typeof(var), typeof(type))
+  __builtin_types_compatible_p(typeof((var) + 1), typeof(type))
 #else
 #pragma message(                                                               \
     "LOG_TOKEN is not available, plese use c++11 or clang or gcc compiler.")
@@ -127,6 +135,8 @@ template <typename T> struct _TYPE_IS_EQUAL_AUX<T, T> {
 
 #define _OUT_TOKEN(token, out_cb, info_out)                                    \
   do {                                                                         \
+    _GCC_DIAGNOSTIC_PUSH                                                       \
+    _IGNORE_POINTER_ARITH_WARN                                                 \
     if (_IS_SAME_TYPE(token, float) || _IS_SAME_TYPE(token, double)) {         \
       (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(float) ", "%f"), #token, token)  \
                  : out_cb(_GEN_TOKEN_FORMAT("", "%f"), #token, token);         \
@@ -195,6 +205,7 @@ template <typename T> struct _TYPE_IS_EQUAL_AUX<T, T> {
       (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(unknown) ", "(none)"), #token)   \
                  : out_cb(_GEN_TOKEN_FORMAT("", "(none)"), #token);            \
     }                                                                          \
+    _GCC_DIAGNOSTIC_POP                                                        \
   } while (0)
 
 #define _EXPAND(...) __VA_ARGS__

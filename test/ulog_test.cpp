@@ -45,6 +45,7 @@ int main() {
   LOG_TOKEN(pi);
   LOG_TOKEN(50 * pi / 180);
   LOG_TOKEN(&pi); // print address of pi
+  LOG_TOKEN((void *) &pi);
 
   char *text = (char *)"Ulog is a micro log library.";
   LOG_TOKEN((char *)text);
