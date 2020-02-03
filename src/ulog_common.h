@@ -123,6 +123,8 @@ template <typename T> struct _TYPE_IS_EQUAL_AUX<T, T> {
   logger_log(ULOG_LEVEL_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, true,     \
              true, ##__VA_ARGS__)
 
+#define _GEN_STRING_TOKEN_FORMAT(color) STR_RED "\"" color "%s" STR_RED "\""
+
 #define _OUT_TOKEN(token, out_cb, info_out)                                    \
   do {                                                                         \
     if (_IS_SAME_TYPE(token, float) || _IS_SAME_TYPE(token, double)) {         \
@@ -161,10 +163,19 @@ template <typename T> struct _TYPE_IS_EQUAL_AUX<T, T> {
                _IS_SAME_TYPE(token, const char[]) ||                           \
                _IS_SAME_TYPE(token, unsigned char[]) ||                        \
                _IS_SAME_TYPE(token, const unsigned char[])) {                  \
+      /* Arrays can be changed to pointer types by (var) +1, but this is not   \
+       * compatible with (void *) types */                                     \
       const char *_ulog_value = (const char *)(uintptr_t)(token);              \
-      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(char *)[%" PRIu32 "] ", "%s"),   \
-                          (uint32_t)strlen(_ulog_value), #token, _ulog_value)  \
-                 : out_cb(_GEN_TOKEN_FORMAT("", "%s"), #token, _ulog_value);   \
+      if (!_ulog_value) {                                                      \
+        out_cb(_GEN_TOKEN_FORMAT("(char *) ", "nullptr"), #token);             \
+      } else if (info_out) {                                                   \
+        out_cb(_GEN_TOKEN_FORMAT("(char *)[%" PRIu32 "] ",                     \
+                                 _GEN_STRING_TOKEN_FORMAT(STR_GREEN)),         \
+               (uint32_t)strlen(_ulog_value), #token, _ulog_value);            \
+      } else {                                                                 \
+        out_cb(_GEN_TOKEN_FORMAT("", _GEN_STRING_TOKEN_FORMAT(STR_GREEN)),     \
+               #token, _ulog_value);                                           \
+      }                                                                        \
     } else if (_IS_SAME_TYPE(token, void *) ||                                 \
                _IS_SAME_TYPE(token, short *) ||                                \
                _IS_SAME_TYPE(token, unsigned short *) ||                       \
