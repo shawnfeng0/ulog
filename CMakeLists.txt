@@ -20,6 +20,10 @@ add_library(ulog src/ulog.c)
 add_executable(ulog_test test/ulog_test.cpp)
 target_link_libraries(ulog_test ulog)
 
+set_property(TARGET ulog PROPERTY PUBLIC_HEADER src/ulog.h src/ulog_common.h)
+
+install(TARGETS ulog
+        PUBLIC_HEADER DESTINATION ulog)
 
 enable_testing()
 add_test(test ulog_test)
