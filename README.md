@@ -111,6 +111,16 @@ int main() {
 
 ![example](doc/figures/example.png)
 
+## Install (Optional, Only in Unix)
+
+If you want to install this library system-wide, you can do so via
+
+```bash
+mkdir build && cd build
+cmake ../
+sudo make install
+```
+
 ## How to use
 
 Detailed documentation is described in ulog.h
