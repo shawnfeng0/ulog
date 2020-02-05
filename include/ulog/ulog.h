@@ -44,7 +44,7 @@
 #define LOG_RAW(fmt, ...) _OUT_RAW_WITH_LOCK(fmt, ##__VA_ARGS__)
 
 /**
- * Output various tokens
+ * Output various tokens (Requires C++ 11 or GNU extension)
  * example:
  *  double pi = 3.14;
  *  LOG_TOKEN(pi);
@@ -60,7 +60,7 @@
 #define LOG_TOKEN(token) _OUT_TOKEN(token, _OUT_TOKEN_CB, true)
 
 /**
- * Output multiple tokens to one line
+ * Output multiple tokens to one line (Requires C++ 11 or GNU extension)
  * example:
  *  time_t now = 1577232000; // 2019-12-25 00:00:00
  *  struct tm* lt = localtime(&now);

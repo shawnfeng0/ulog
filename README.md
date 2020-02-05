@@ -6,7 +6,9 @@ A library written in C/C ++ for printing logs of lightweight embedded devices.
 
 ## Platforms and Dependent
 
-Any C/C++ language environment, only need C standard library support
+* Any C/C++ language environment, only need C standard library support.
+
+* LOG_TOKEN and LOG_MULTI_TOKEN requires C++11 or GCC extension support, but other functions are not needed.
 
 ## Features
 
@@ -189,7 +191,7 @@ LOG_RAW("PI = %.3f\r\n", pi);
 */
 ```
 
-#### 2.2 Print variable
+#### 2.2 Print variable (Requires C++ 11 or GNU extension)
 
 Output various tokens, the function will automatically recognize the type of token and print.
 
