@@ -20,6 +20,18 @@ A library written in C/C ++ for printing logs of lightweight embedded devices.
 
 ## Quick Demo
 
+### Integration into the project
+
+```bash
+git submodule add https://github.com/ShawnFeng0/ulog.git
+```
+
+1. As a submodule or [Download](https://github.com/ShawnFeng0/ulog/archive/master.zip) the entire project.
+
+2. Add **ulog/include** to the include path of your project
+
+3. Add ulog / src / ulog.c to the project's source file list
+
 ### Code
 
 ```C++
