@@ -15,6 +15,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 #ADD_DEFINITIONS(-DULOG_DISABLE)
 ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
 
+include_directories(include)
+
 add_library(ulog src/ulog.c)
 
 add_executable(ulog_test test/ulog_test.cpp)

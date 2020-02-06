@@ -47,6 +47,6 @@ matrix:
 script:
   - cd ${TRAVIS_BUILD_DIR}
   - mkdir build && cd build
-  - cmake ../ && cmake --build ./ && ls -al
+  - cmake ../ && cmake --build ./ --target ulog_test && ls -al
   - if [ "$TRAVIS_OS_NAME" != "windows" ]; then ./ulog_test; fi
   - if [ "$TRAVIS_OS_NAME" = "windows" ]; then ./Debug/ulog_test.exe; fi
