@@ -183,7 +183,7 @@ static int put_str(const char *str) {
 
 int main(int argc, char *argv[]) {
   logger_init(put_str);
-  ...
+  // ...
 }
 ```
 
@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
 
 #### 2.1 Normal log
 
-After initialization, you can use the same format as **printf**.
+Same format as **printf**.
 
 ```C
 double pi = 3.14159265;
