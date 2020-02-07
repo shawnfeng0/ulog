@@ -5,7 +5,7 @@
 #include <time.h>
 #include <unistd.h>
 
-char fifo_buffer[256];
+static char fifo_buffer[256];
 static FifoPowerOfTwo fifo(fifo_buffer, sizeof(fifo_buffer));
 
 static uint64_t get_time_us() {

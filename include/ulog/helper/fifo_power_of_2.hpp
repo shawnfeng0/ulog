@@ -105,6 +105,9 @@ public:
     out_ = in_;
   }
 
+  bool IsFull() { return Used() - mask_; }
+  bool IsEmpty() { return in_ == out_; }
+
   /**
    * Check if the fifo is initialized
    * Return %true if fifo is initialized, otherwise %false.
@@ -155,7 +158,7 @@ private:
 
   class LockGuard {
   public:
-    LockGuard(Mutex m) : m_(m) { m.Lock(); }
+    explicit LockGuard(Mutex &m) : m_(m) { m.Lock(); }
     ~LockGuard() { m_.Unlock(); }
 
   private:
