@@ -22,6 +22,9 @@ add_library(ulog src/ulog.c)
 add_executable(ulog_test test/ulog_test.cpp)
 target_link_libraries(ulog_test ulog)
 
+add_executable(ulog_example_asyn example/ulog_example_asyn.cpp)
+target_link_libraries(ulog_example_asyn ulog pthread)
+
 set_property(TARGET ulog PROPERTY PUBLIC_HEADER include/ulog/ulog.h include/ulog/ulog_common.h)
 
 install(TARGETS ulog
