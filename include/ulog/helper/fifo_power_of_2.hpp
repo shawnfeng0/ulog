@@ -220,13 +220,11 @@ private:
   }
 
   // fls: find last bit set.
-  static inline int fls(uint64_t x) { return 64 - clz(x); }
-  static inline int fls(uint32_t x) { return 32 - clz(x); }
+  static inline int fls(uint64_t x) { return 64 - clz64(x); }
 
   // Returns the number of leading 0-bits in x, starting at the most significant
   // bit position. If x is 0, the result is undefined.
-  static inline int clz(uint32_t x) { return clz((uint64_t)x) - 32; }
-  static inline int clz(uint64_t x) {
+  static inline int clz64(uint64_t x) {
     int r = 0;
     if (!(x & 0xFFFFFFFF00000000))
       r += 32, x <<= 32U;
