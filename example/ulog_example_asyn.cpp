@@ -1,4 +1,4 @@
-#include "ulog/helper/fifo_power_of_2.hpp"
+#include "ulog/helper/fifo_power_of_two.hpp"
 #include "ulog/ulog.h"
 
 #include <stdio.h>

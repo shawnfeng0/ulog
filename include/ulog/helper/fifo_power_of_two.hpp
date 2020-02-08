@@ -105,8 +105,8 @@ public:
     out_ = in_;
   }
 
-  bool IsFull() { return Used() - mask_; }
-  bool IsEmpty() { return in_ == out_; }
+  bool IsFull() const { return Used() - mask_; }
+  bool IsEmpty() const { return in_ == out_; }
 
   /**
    * Check if the fifo is initialized
