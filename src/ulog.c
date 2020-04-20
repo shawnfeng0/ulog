@@ -27,7 +27,7 @@ static uint32_t log_evt_num_ = 1;
 // Log mutex lock and time
 #if defined(_LOG_UNIX_LIKE_PLATFORM)
 #include <pthread.h>
-#include <stdlib.h> // For abort()
+#include <stdlib.h>  // For abort()
 static int printf_wrapper(const char *str) { return printf("%s", str); }
 static LogOutput output_cb_ = printf_wrapper;
 static pthread_mutex_t log_pthread_mutex_ = PTHREAD_MUTEX_INITIALIZER;
@@ -79,15 +79,15 @@ enum {
 };
 
 static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
-    {(char *)STR_BOLD_WHITE, (char *)STR_WHITE, (char *)"T"},   // TRACE
-    {(char *)STR_BOLD_BLUE, (char *)STR_BLUE, (char *)"D"},     // DEBUG
-    {(char *)STR_BOLD_GREEN, (char *)STR_GREEN, (char *)"I"},   // INFO
-    {(char *)STR_BOLD_YELLOW, (char *)STR_YELLOW, (char *)"W"}, // WARN
-    {(char *)STR_BOLD_RED, (char *)STR_RED, (char *)"E"},       // ERROR
-    {(char *)STR_BOLD_PURPLE, (char *)STR_PURPLE, (char *)"F"}, // FATAL
+    {(char *)STR_BOLD_WHITE, (char *)STR_WHITE, (char *)"T"},    // TRACE
+    {(char *)STR_BOLD_BLUE, (char *)STR_BLUE, (char *)"D"},      // DEBUG
+    {(char *)STR_BOLD_GREEN, (char *)STR_GREEN, (char *)"I"},    // INFO
+    {(char *)STR_BOLD_YELLOW, (char *)STR_YELLOW, (char *)"W"},  // WARN
+    {(char *)STR_BOLD_RED, (char *)STR_RED, (char *)"E"},        // ERROR
+    {(char *)STR_BOLD_PURPLE, (char *)STR_PURPLE, (char *)"F"},  // FATAL
 };
 
-#endif // !ULOG_DISABLE
+#endif  // !ULOG_DISABLE
 
 #if defined(_LOG_UNIX_LIKE_PLATFORM)
 #include <unistd.h>
@@ -95,15 +95,15 @@ static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
 #if defined(__APPLE__)
 #include <pthread.h>
 #define GET_TID() pthread_mach_thread_np(pthread_self())
-#else // defined(__APPLE__)
+#else  // defined(__APPLE__)
 #include <sys/syscall.h>
 #define GET_TID() syscall(SYS_gettid)
-#endif // defined(__APPLE__)
+#endif  // defined(__APPLE__)
 
-#else // defined(_LOG_UNIX_LIKE_PLATFORM)
+#else  // defined(_LOG_UNIX_LIKE_PLATFORM)
 #define GET_PID() 0
 #define GET_TID() 0
-#endif // defined(_LOG_UNIX_LIKE_PLATFORM)
+#endif  // defined(_LOG_UNIX_LIKE_PLATFORM)
 
 void logger_enable_output(bool enable) {
 #if !defined(ULOG_DISABLE)
@@ -192,8 +192,7 @@ void logger_set_time_format(LogTimeFormat time_format) {
 
 void logger_assert_handler(void) {
 #if !defined(ULOG_DISABLE)
-  if (assert_handler_cb_)
-    assert_handler_cb_();
+  if (assert_handler_cb_) assert_handler_cb_();
 #endif
 }
 
@@ -208,9 +207,8 @@ void logger_init(LogOutput output_cb) {
   output_cb_ = output_cb;
 
 #if defined(ULOG_CLS)
-  char clear_str[3] = {'\033', 'c', '\0'}; // clean screen
-  if (output_cb)
-    output_cb(clear_str);
+  char clear_str[3] = {'\033', 'c', '\0'};  // clean screen
+  if (output_cb) output_cb(clear_str);
 #endif
 #endif
 }
@@ -245,8 +243,7 @@ uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
                           uintptr_t base_address, bool tail_addr_out,
                           bool need_lock) {
 #if !defined(ULOG_DISABLE)
-  if (!data || width == 0 || !output_cb_ || !log_output_enabled_)
-    return 0;
+  if (!data || width == 0 || !output_cb_ || !log_output_enabled_) return 0;
 
   const uint8_t *data_raw = data;
   const uint8_t *data_cur = data;
@@ -254,15 +251,14 @@ uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
   // The last two characters are '\r', '\n'
   char *buf_end_ptr = log_out_buf_ + sizeof(log_out_buf_) - 2;
 
-#define SNPRINTF_WRAPPER(fmt, ...)                                             \
-  do {                                                                         \
-    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__);            \
-    buf_ptr = log_out_buf_ + strlen(log_out_buf_);                             \
+#define SNPRINTF_WRAPPER(fmt, ...)                                  \
+  do {                                                              \
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
+    buf_ptr = log_out_buf_ + strlen(log_out_buf_);                  \
   } while (0)
 
   // Lock the log mutex
-  if (need_lock)
-    logger_output_lock();
+  if (need_lock) logger_output_lock();
 
   while (length) {
     SNPRINTF_WRAPPER("%08" PRIxPTR "  ", data_cur - data_raw + base_address);
@@ -291,8 +287,7 @@ uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
     SNPRINTF_WRAPPER("%08" PRIxPTR "\r\n", data_cur - data_raw + base_address);
     output_cb_(log_out_buf_);
   }
-  if (need_lock)
-    logger_output_unlock();
+  if (need_lock) logger_output_unlock();
   return data_cur - data_raw + base_address;
 #undef SNPRINTF_WRAPPER
 #endif
@@ -300,14 +295,12 @@ uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
 
 void logger_raw(bool need_lock, const char *fmt, ...) {
 #if !defined(ULOG_DISABLE)
-  if (!output_cb_ || !fmt || !log_output_enabled_)
-    return;
+  if (!output_cb_ || !fmt || !log_output_enabled_) return;
 
   char *buf_ptr = log_out_buf_;
   char *buf_end_ptr = log_out_buf_ + sizeof(log_out_buf_);
 
-  if (need_lock)
-    logger_output_lock();
+  if (need_lock) logger_output_lock();
 
   va_list ap;
   va_start(ap, fmt);
@@ -315,8 +308,7 @@ void logger_raw(bool need_lock, const char *fmt, ...) {
   va_end(ap);
   output_cb_(log_out_buf_);
 
-  if (need_lock)
-    logger_output_unlock();
+  if (need_lock) logger_output_unlock();
 #endif
 }
 
@@ -325,28 +317,26 @@ void logger_log(LogLevel level, const char *file, const char *func,
                 ...) {
 #if !defined(ULOG_DISABLE)
 
-  if (!output_cb_ || !fmt || level < log_level_ || !log_output_enabled_)
-    return;
+  if (!output_cb_ || !fmt || level < log_level_ || !log_output_enabled_) return;
 
   char *buf_ptr = log_out_buf_;
 
   // The last two characters are '\r', '\n'
   char *buf_end_ptr = log_out_buf_ + sizeof(log_out_buf_) - 2;
 
-#define SNPRINTF_WRAPPER(fmt, ...)                                             \
-  do {                                                                         \
-    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__);            \
-    buf_ptr = log_out_buf_ + strlen(log_out_buf_);                             \
+#define SNPRINTF_WRAPPER(fmt, ...)                                  \
+  do {                                                              \
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
+    buf_ptr = log_out_buf_ + strlen(log_out_buf_);                  \
   } while (0)
 
-#define VSNPRINTF_WRAPPER(fmt, ...)                                            \
-  do {                                                                         \
-    vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__);           \
-    buf_ptr = log_out_buf_ + strlen(log_out_buf_);                             \
+#define VSNPRINTF_WRAPPER(fmt, ...)                                  \
+  do {                                                               \
+    vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
+    buf_ptr = log_out_buf_ + strlen(log_out_buf_);                   \
   } while (0)
 
-  if (need_lock)
-    logger_output_lock();
+  if (need_lock) logger_output_lock();
 
   // Color
   if (log_number_enabled_ || log_time_enabled_ || log_level_enabled_)
@@ -355,8 +345,7 @@ void logger_log(LogLevel level, const char *file, const char *func,
                                : "");
 
   // Print serial number
-  if (log_number_enabled_)
-    SNPRINTF_WRAPPER("#%06" PRIu32 " ", log_evt_num_++);
+  if (log_number_enabled_) SNPRINTF_WRAPPER("#%06" PRIu32 " ", log_evt_num_++);
 
   // Print time
   if (log_time_enabled_) {
@@ -387,24 +376,20 @@ void logger_log(LogLevel level, const char *file, const char *func,
     SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_GRAY : "");
 
   // Print '/'
-  if (log_level_enabled_)
-    SNPRINTF_WRAPPER("/");
+  if (log_level_enabled_) SNPRINTF_WRAPPER("/");
 
   // Print '('
-  if (log_file_line_enabled_ || log_function_enabled_)
-    SNPRINTF_WRAPPER("(");
+  if (log_file_line_enabled_ || log_function_enabled_) SNPRINTF_WRAPPER("(");
 
   // Print file and line
-  if (log_file_line_enabled_)
-    SNPRINTF_WRAPPER("%s:%" PRIu32, file, line);
+  if (log_file_line_enabled_) SNPRINTF_WRAPPER("%s:%" PRIu32, file, line);
 
   // Print function
   if (log_function_enabled_)
     SNPRINTF_WRAPPER("%s%s", log_file_line_enabled_ ? " " : "", func);
 
   // Print ')'
-  if (log_file_line_enabled_ || log_function_enabled_)
-    SNPRINTF_WRAPPER(")");
+  if (log_file_line_enabled_ || log_function_enabled_) SNPRINTF_WRAPPER(")");
 
   // Print ' '
   if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_)
@@ -428,13 +413,11 @@ void logger_log(LogLevel level, const char *file, const char *func,
 
   SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_RESET : "");
 
-  if (newline)
-    strncpy(buf_ptr, "\r\n", 3);
+  if (newline) strncpy(buf_ptr, "\r\n", 3);
 
   output_cb_(log_out_buf_);
 
-  if (need_lock)
-    logger_output_unlock();
+  if (need_lock) logger_output_unlock();
 
 #undef SNPRINTF_WRAPPER
 #undef VSNPRINTF_WRAPPER

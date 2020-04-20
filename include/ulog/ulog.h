@@ -26,10 +26,10 @@
 #undef ABORT
 #endif
 
-#define ABORT(fmt, ...)                                                        \
-  do {                                                                         \
-    LOG_FATAL(fmt, ##__VA_ARGS__);                                             \
-    logger_assert_handler();                                                   \
+#define ABORT(fmt, ...)            \
+  do {                             \
+    LOG_FATAL(fmt, ##__VA_ARGS__); \
+    logger_assert_handler();       \
   } while (0)
 
 // Prevent redefinition
@@ -37,9 +37,8 @@
 #undef ASSERT
 #endif
 
-#define ASSERT(exp)                                                            \
-  if (!(exp))                                                                  \
-  ABORT("Assertion '%s' failed.", #exp)
+#define ASSERT(exp) \
+  if (!(exp)) ABORT("Assertion '%s' failed.", #exp)
 
 #define LOG_RAW(fmt, ...) _OUT_RAW_WITH_LOCK(fmt, ##__VA_ARGS__)
 
@@ -239,4 +238,4 @@ uint64_t logger_get_time_us(void);
 }
 #endif
 
-#endif //__ULOG_H__
+#endif  //__ULOG_H__

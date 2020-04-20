@@ -1,9 +1,9 @@
-#include "ulog/helper/fifo_power_of_two.hpp"
-#include "ulog/ulog.h"
-
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
+
+#include "ulog/helper/fifo_power_of_two.hpp"
+#include "ulog/ulog.h"
 
 static char fifo_buffer[260];
 static FifoPowerOfTwo fifo(fifo_buffer, sizeof(fifo_buffer));
@@ -54,7 +54,7 @@ int main() {
     // Output debugging expression
     LOG_TOKEN(pi);
     LOG_TOKEN(50 * pi / 180);
-    LOG_TOKEN(&pi); // print address of pi
+    LOG_TOKEN(&pi);  // print address of pi
 
     char *text = (char *)"Ulog is a micro log library.";
     LOG_TOKEN((char *)text);
@@ -79,7 +79,7 @@ int main() {
 
   LOG_MULTI_TOKEN(fifo.GetNumDropped(), fifo.GetPeak(), fifo.GetSize());
 
-  LOG_TOKEN((void *) new char [0]);
+  LOG_TOKEN((void *)new char[0]);
 
   pthread_exit(nullptr);
 }

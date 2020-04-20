@@ -11,11 +11,14 @@
 
 class FifoPowerOfTwo {
 #define _is_power_of_2(x) ((x) != 0 && (((x) & ((x)-1)) == 0))
-public:
+ public:
   FifoPowerOfTwo(void *buffer, unsigned int buf_size,
                  unsigned int element_size = 1)
-      : data_((unsigned char *)buffer), element_size_(element_size), in_(0),
-        out_(0), need_delete_(false) {
+      : data_((unsigned char *)buffer),
+        element_size_(element_size),
+        in_(0),
+        out_(0),
+        need_delete_(false) {
     if (element_size == 0) {
       mask_ = 0;
       data_ = nullptr;
@@ -59,8 +62,7 @@ public:
   }
 
   ~FifoPowerOfTwo() {
-    if (need_delete_ && data_)
-      delete data_;
+    if (need_delete_ && data_) delete data_;
   }
 
   // A packet is entered, either completely written or discarded.
@@ -133,35 +135,35 @@ public:
     return num_elements;
   }
 
-private:
-  unsigned int in_{};   // data is added at offset (in % size)
-  unsigned int out_{};  // data is extracted from off. (out % size)
-  unsigned char *data_; // the buffer holding the data
-  bool need_delete_;    // Need to release data memory space according to the
-                        // initialization method
+ private:
+  unsigned int in_{};    // data is added at offset (in % size)
+  unsigned int out_{};   // data is extracted from off. (out % size)
+  unsigned char *data_;  // the buffer holding the data
+  bool need_delete_;     // Need to release data memory space according to the
+                         // initialization method
   unsigned int
-      mask_; // (Constant) Mask used to match the correct in / out pointer
-  const unsigned int element_size_; // the size of the element
-  unsigned int num_dropped_{};      // Number of dropped elements
-  unsigned int peak_{};             // fifo peak
+      mask_;  // (Constant) Mask used to match the correct in / out pointer
+  const unsigned int element_size_;  // the size of the element
+  unsigned int num_dropped_{};       // Number of dropped elements
+  unsigned int peak_{};              // fifo peak
   class Mutex {
-  public:
+   public:
     Mutex() { pthread_mutex_init(&mutex_, nullptr); }
     ~Mutex() { pthread_mutex_destroy(&mutex_); }
     void Lock() { pthread_mutex_lock(&mutex_); }
     void Unlock() { pthread_mutex_unlock(&mutex_); }
 
-  private:
+   private:
     pthread_mutex_t mutex_{};
-  } mutex_; // TODO: If there is only one input and one output thread, then
-            // locks are not necessary
+  } mutex_;  // TODO: If there is only one input and one output thread, then
+             // locks are not necessary
 
   class LockGuard {
-  public:
+   public:
     explicit LockGuard(Mutex &m) : m_(m) { m.Lock(); }
     ~LockGuard() { m_.Unlock(); }
 
-  private:
+   private:
     Mutex &m_;
   };
 
@@ -226,20 +228,14 @@ private:
   // bit position. If x is 0, the result is undefined.
   static inline int clz64(uint64_t x) {
     int r = 0;
-    if (!(x & 0xFFFFFFFF00000000))
-      r += 32, x <<= 32U;
-    if (!(x & 0xFFFF000000000000))
-      r += 16, x <<= 16U;
-    if (!(x & 0xFF00000000000000))
-      r += 8, x <<= 8U;
-    if (!(x & 0xF000000000000000))
-      r += 4, x <<= 4U;
-    if (!(x & 0xC000000000000000))
-      r += 2, x <<= 2U;
-    if (!(x & 0x8000000000000000))
-      r += 1;
+    if (!(x & 0xFFFFFFFF00000000)) r += 32, x <<= 32U;
+    if (!(x & 0xFFFF000000000000)) r += 16, x <<= 16U;
+    if (!(x & 0xFF00000000000000)) r += 8, x <<= 8U;
+    if (!(x & 0xF000000000000000)) r += 4, x <<= 4U;
+    if (!(x & 0xC000000000000000)) r += 2, x <<= 2U;
+    if (!(x & 0x8000000000000000)) r += 1;
     return r;
   }
 };
 
-#endif // ULOG_INCLUDE_ULOG_FIFOPOWEROF2_H_
+#endif  // ULOG_INCLUDE_ULOG_FIFOPOWEROF2_H_
