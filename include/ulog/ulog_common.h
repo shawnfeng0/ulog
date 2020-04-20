@@ -283,27 +283,27 @@ struct _TYPE_IS_EQUAL_AUX<T, T> {
 #define _TOKEN_AUX_16(_1, ...) \
   _EXPAND(_LOG_TOKEN_AUX(_1, __VA_ARGS__)(__VA_ARGS__))
 
-#define _FORMAT_FOR_TIME_CODE                                               \
-  logger_color_is_enabled() ? STR_GREEN                                     \
-      "time " STR_RED "{ " STR_BLUE "%s%s " STR_RED "} => " STR_GREEN "%fs" \
-                            : "time { %s%s } => %fs"
+#define _FORMAT_FOR_TIME_CODE(format, unit)                               \
+  logger_color_is_enabled() ? STR_GREEN "time " STR_RED "{ " STR_BLUE     \
+                                        "%s%s " STR_RED "} => " STR_GREEN \
+                                        "%" format unit                   \
+                            : "time { %s%s } => %" format unit
 
-#define _TIME_CODE(...)                                                   \
-  do {                                                                    \
-    const int _CODE_LENGTH_MAX = 50;                                      \
-    uint64_t _ulog_start_time_us = logger_get_time_us();                  \
-    __VA_ARGS__;                                                          \
-    uint64_t _ulog_end_time_us = logger_get_time_us();                    \
-    float _ulog_timediff =                                                \
-        (_ulog_end_time_us - _ulog_start_time_us) / 1000.f / 1000.f;      \
-    char _ulog_function_str[_CODE_LENGTH_MAX];                            \
-    memset(_ulog_function_str, 0, _CODE_LENGTH_MAX);                      \
-    strncpy(_ulog_function_str, #__VA_ARGS__, _CODE_LENGTH_MAX - 1);      \
-    LOG_DEBUG(_FORMAT_FOR_TIME_CODE, _ulog_function_str,                  \
-              strncmp(#__VA_ARGS__, _ulog_function_str, _CODE_LENGTH_MAX) \
-                  ? "..."                                                 \
-                  : "",                                                   \
-              _ulog_timediff);                                            \
+#define _TIME_CODE(...)                                                        \
+  do {                                                                         \
+    const int _CODE_LENGTH_MAX = 50;                                           \
+    uint64_t _ulog_start_time_us = logger_get_time_us();                       \
+    __VA_ARGS__;                                                               \
+    uint64_t _ulog_end_time_us = logger_get_time_us();                         \
+    uint32_t _ulog_timediff_us = (_ulog_end_time_us - _ulog_start_time_us);    \
+    char _ulog_function_str[_CODE_LENGTH_MAX];                                 \
+    memset(_ulog_function_str, 0, _CODE_LENGTH_MAX);                           \
+    strncpy(_ulog_function_str, #__VA_ARGS__, _CODE_LENGTH_MAX - 1);           \
+    LOG_DEBUG(_FORMAT_FOR_TIME_CODE(PRIu32, STR_RED "us"), _ulog_function_str, \
+              strncmp(#__VA_ARGS__, _ulog_function_str, _CODE_LENGTH_MAX)      \
+                  ? "..."                                                      \
+                  : "",                                                        \
+              _ulog_timediff_us);                                              \
   } while (0)
 
 #define _GEN_COLOR_FORMAT_FOR_HEX_DUMP(place1, place2, place3, place4) \

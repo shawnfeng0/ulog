@@ -81,7 +81,7 @@
  *
  * );
  * output:
- * time { uint32_t n = 1000 * 1000; while (n--); } => 0.001315s
+ * time { uint32_t n = 1000 * 1000; while (n--); } => 1315us
  */
 #define LOG_TIME_CODE(...) _TIME_CODE(__VA_ARGS__)
 
