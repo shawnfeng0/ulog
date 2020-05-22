@@ -22,6 +22,8 @@
 #if !defined(ULOG_DISABLE)
 
 static char log_out_buf_[ULOG_OUTBUF_LEN];
+static char *const kLogBufferStartIndex_ = log_out_buf_;
+static char *const kLogBufferEndIndex_ = log_out_buf_ + sizeof(log_out_buf_);
 static uint32_t log_evt_num_ = 1;
 
 // Log mutex lock and time
@@ -247,14 +249,14 @@ uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
 
   const uint8_t *data_raw = data;
   const uint8_t *data_cur = data;
-  char *buf_ptr = log_out_buf_;
+  char *buf_ptr = kLogBufferStartIndex_;
   // The last two characters are '\r', '\n'
-  char *buf_end_ptr = log_out_buf_ + sizeof(log_out_buf_) - 2;
+  char *buf_end_ptr = kLogBufferEndIndex_ - 2;
 
-#define SNPRINTF_WRAPPER(fmt, ...)                                  \
-  do {                                                              \
-    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
-    buf_ptr = log_out_buf_ + strlen(log_out_buf_);                  \
+#define SNPRINTF_WRAPPER(fmt, ...)                                   \
+  do {                                                               \
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__);  \
+    buf_ptr = kLogBufferStartIndex_ + strlen(kLogBufferStartIndex_); \
   } while (0)
 
   // Lock the log mutex
@@ -277,7 +279,7 @@ uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
     strncpy(buf_ptr, "\r\n", 3);
 
     output_cb_(log_out_buf_);
-    buf_ptr = log_out_buf_;
+    buf_ptr = kLogBufferStartIndex_;
 
     data_cur += length < width ? length : width;
     length -= length < width ? length : width;
@@ -297,8 +299,8 @@ void logger_raw(bool need_lock, const char *fmt, ...) {
 #if !defined(ULOG_DISABLE)
   if (!output_cb_ || !fmt || !log_output_enabled_) return;
 
-  char *buf_ptr = log_out_buf_;
-  char *buf_end_ptr = log_out_buf_ + sizeof(log_out_buf_);
+  char *buf_ptr = kLogBufferStartIndex_;
+  char *buf_end_ptr = kLogBufferEndIndex_;
 
   if (need_lock) logger_output_lock();
 
@@ -319,21 +321,21 @@ void logger_log(LogLevel level, const char *file, const char *func,
 
   if (!output_cb_ || !fmt || level < log_level_ || !log_output_enabled_) return;
 
-  char *buf_ptr = log_out_buf_;
+  char *buf_ptr = kLogBufferStartIndex_;
 
   // The last two characters are '\r', '\n'
-  char *buf_end_ptr = log_out_buf_ + sizeof(log_out_buf_) - 2;
+  char *buf_end_ptr = kLogBufferEndIndex_ - 2;
 
-#define SNPRINTF_WRAPPER(fmt, ...)                                  \
-  do {                                                              \
-    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
-    buf_ptr = log_out_buf_ + strlen(log_out_buf_);                  \
+#define SNPRINTF_WRAPPER(fmt, ...)                                   \
+  do {                                                               \
+    snprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__);  \
+    buf_ptr = kLogBufferStartIndex_ + strlen(kLogBufferStartIndex_); \
   } while (0)
 
 #define VSNPRINTF_WRAPPER(fmt, ...)                                  \
   do {                                                               \
     vsnprintf(buf_ptr, (buf_end_ptr - buf_ptr), fmt, ##__VA_ARGS__); \
-    buf_ptr = log_out_buf_ + strlen(log_out_buf_);                   \
+    buf_ptr = kLogBufferStartIndex_ + strlen(kLogBufferStartIndex_); \
   } while (0)
 
   if (need_lock) logger_output_lock();
@@ -409,7 +411,7 @@ void logger_log(LogLevel level, const char *file, const char *func,
 
   if (newline) strncpy(buf_ptr, "\r\n", 3);
 
-  output_cb_(log_out_buf_);
+  output_cb_(kLogBufferStartIndex_);
 
   if (need_lock) logger_output_unlock();
 
