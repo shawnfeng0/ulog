@@ -395,12 +395,6 @@ void logger_log(LogLevel level, const char *file, const char *func,
   if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_)
     SNPRINTF_WRAPPER(" ");
 
-  // Reset output pointer if auxiliary information is output
-  if (buf_ptr != log_out_buf_) {
-    output_cb_(log_out_buf_);
-    buf_ptr = log_out_buf_;
-  }
-
   // Print log info
   SNPRINTF_WRAPPER("%s", log_color_enabled_
                              ? level_infos[level][INDEX_SECONDARY_COLOR]
