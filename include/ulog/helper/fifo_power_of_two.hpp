@@ -18,7 +18,7 @@ class FifoPowerOfTwo {
         element_size_(element_size),
         in_(0),
         out_(0),
-        need_delete_(false) {
+        is_allocated_memory_(false) {
     if (element_size == 0) {
       mask_ = 0;
       data_ = nullptr;
@@ -41,7 +41,10 @@ class FifoPowerOfTwo {
 
   explicit FifoPowerOfTwo(unsigned int num_elements,
                           unsigned int element_size = 1)
-      : element_size_(element_size), in_(0), out_(0), need_delete_(true) {
+      : element_size_(element_size),
+        in_(0),
+        out_(0),
+        is_allocated_memory_(true) {
     // round up to the next power of 2, since our 'let the indices wrap'
     // technique works only in this case.
     num_elements = RoundupPowOfTwo(num_elements);
@@ -62,7 +65,7 @@ class FifoPowerOfTwo {
   }
 
   ~FifoPowerOfTwo() {
-    if (need_delete_ && data_) delete data_;
+    if (is_allocated_memory_ && data_) delete data_;
   }
 
   // A packet is entered, either completely written or discarded.
@@ -136,11 +139,11 @@ class FifoPowerOfTwo {
   }
 
  private:
-  unsigned int in_{};    // data is added at offset (in % size)
-  unsigned int out_{};   // data is extracted from off. (out % size)
-  unsigned char *data_;  // the buffer holding the data
-  bool need_delete_;     // Need to release data memory space according to the
-                         // initialization method
+  unsigned int in_{};         // data is added at offset (in % size)
+  unsigned int out_{};        // data is extracted from off. (out % size)
+  unsigned char *data_;       // the buffer holding the data
+  bool is_allocated_memory_;  //  Used to identify whether the internal buffer
+                              //  is allocated internally
   unsigned int
       mask_;  // (Constant) Mask used to match the correct in / out pointer
   const unsigned int element_size_;  // the size of the element
@@ -198,10 +201,7 @@ class FifoPowerOfTwo {
     memcpy((unsigned char *)dst + l, data_, len - l);
   }
 
-  unsigned int Unused() const {
-    unsigned int unused = mask_ + 1 - (in_ - out_);
-    return unused;
-  }
+  unsigned int Unused() const { return mask_ + 1 - (in_ - out_); }
   unsigned int Used() const { return in_ - out_; }
 
   static inline unsigned int Min(unsigned int x, unsigned int y) {
