@@ -6,8 +6,8 @@
 #define ULOG_INCLUDE_ULOG_FIFOPOWEROF2_H_
 
 #include <pthread.h>
-#include <stdint.h>
-#include <string.h>
+#include <cstdint>
+#include <cstring>
 
 class FifoPowerOfTwo {
 #define _is_power_of_2(x) ((x) != 0 && (((x) & ((x)-1)) == 0))
@@ -65,7 +65,7 @@ class FifoPowerOfTwo {
   }
 
   ~FifoPowerOfTwo() {
-    if (is_allocated_memory_ && data_) delete data_;
+    if (is_allocated_memory_ && data_) delete[] data_;
   }
 
   // A packet is entered, either completely written or discarded.
@@ -75,26 +75,32 @@ class FifoPowerOfTwo {
 
     if (unused < num_elements) {
       num_dropped_ += num_elements;
-      peak_ = mask_ + 1;
+      peak_ = size();
       return 0;
     }
 
-    peak_ = Max(peak_, mask_ + 1 - unused);
+    peak_ = Max(peak_, Used());
 
     CopyInLocked(buf, num_elements, in_);
     in_ += num_elements;
+
+    cond_.Sign();
     return num_elements;
   }
 
   unsigned int In(const void *buf, unsigned int num_elements) {
     LockGuard lg(mutex_);
+
+    peak_ = Max(peak_, Used());
+
     unsigned int unused = Unused();
-    peak_ = Max(peak_, mask_ + 1 - unused);
     num_elements = Min(num_elements, unused);
 
     CopyInLocked(buf, num_elements, in_);
     in_ += num_elements;
     num_dropped_ += unused - num_elements;
+
+    cond_.Sign();
     return num_elements;
   }
 
@@ -110,7 +116,7 @@ class FifoPowerOfTwo {
     out_ = in_;
   }
 
-  bool IsFull() const { return Used() - mask_; }
+  bool IsFull() const { return Used() == size(); }
   bool IsEmpty() const { return in_ == out_; }
 
   /**
@@ -119,21 +125,38 @@ class FifoPowerOfTwo {
    * Assumes the fifo was 0 before.
    */
   bool Initialized() const { return mask_ != 0; };
-  unsigned int GetNumDropped() const { return num_dropped_; }
-  unsigned int GetPeak() const { return peak_; }
-  unsigned int GetSize() const { return mask_ + 1; }
+  unsigned int num_dropped() const { return num_dropped_; }
+  unsigned int peak() const { return peak_; }
+  unsigned int size() const { return mask_ + 1; }
 
-  unsigned int OutPeek(void *buf, unsigned int num_elements) {
+  unsigned int OutPeek(void *out_buf, unsigned int num_elements) {
     LockGuard lg(mutex_);
     num_elements = Min(num_elements, Used());
-    CopyOutLocked(buf, num_elements, out_);
+    CopyOutLocked(out_buf, num_elements, out_);
     return num_elements;
   }
 
-  unsigned int Out(void *buf, unsigned int num_elements) {
+  unsigned int OutWaitIfEmpty(void *out_buf, unsigned int num_elements,
+                              int32_t time_ms = -1) {
+    LockGuard lg(mutex_);
+
+    if (-1 == time_ms) {
+      while (IsEmpty()) cond_.Wait(mutex_.get());
+    } else if (IsEmpty()) {
+      cond_.WaitFor(mutex_.get(), time_ms);
+      if (IsEmpty()) return 0;
+    }
+
+    num_elements = Min(num_elements, Used());
+    CopyOutLocked(out_buf, num_elements, out_);
+    out_ += num_elements;
+    return num_elements;
+  }
+
+  unsigned int Out(void *out_buf, unsigned int num_elements) {
     LockGuard lg(mutex_);
     num_elements = Min(num_elements, Used());
-    CopyOutLocked(buf, num_elements, out_);
+    CopyOutLocked(out_buf, num_elements, out_);
     out_ += num_elements;
     return num_elements;
   }
@@ -155,11 +178,47 @@ class FifoPowerOfTwo {
     ~Mutex() { pthread_mutex_destroy(&mutex_); }
     void Lock() { pthread_mutex_lock(&mutex_); }
     void Unlock() { pthread_mutex_unlock(&mutex_); }
+    pthread_mutex_t &get() { return mutex_; }
 
    private:
     pthread_mutex_t mutex_{};
   } mutex_;  // TODO: If there is only one input and one output thread, then
              // locks are not necessary
+
+  class Condition {
+   public:
+    Condition() {
+      pthread_condattr_t attr;
+      pthread_condattr_init(&attr);
+      pthread_condattr_setclock(&attr, clockid_);
+      pthread_cond_init(&cond_, &attr);
+      pthread_condattr_destroy(&attr);
+    }
+    ~Condition() { pthread_cond_destroy(&cond_); }
+    bool Wait(pthread_mutex_t &mutex) {
+      return 0 == pthread_cond_wait(&cond_, &mutex);
+    }
+    bool WaitFor(pthread_mutex_t &mutex, uint64_t time_ms) {
+      struct timespec atime {};
+      GenerateFutureTime(clockid_, time_ms, atime);
+      return 0 == pthread_cond_timedwait(&cond_, &mutex, &atime);
+    }
+    void Sign() { pthread_cond_signal(&cond_); }
+
+   private:
+    // Increase time_ms time based on the current clockid time
+    static inline void GenerateFutureTime(clockid_t clockid, uint64_t time_ms,
+                                          struct timespec &out) {
+      // Calculate an absolute time in the future
+      const decltype(out.tv_nsec) kSec2Nsec = 1000 * 1000 * 1000;
+      clock_gettime(clockid, &out);
+      uint64_t nano_secs = out.tv_nsec + time_ms * 1000 * 1000;
+      out.tv_nsec = nano_secs % kSec2Nsec;
+      out.tv_sec += nano_secs / kSec2Nsec;
+    }
+    pthread_cond_t cond_{};
+    static constexpr clockid_t clockid_ = CLOCK_REALTIME;
+  } cond_;
 
   class LockGuard {
    public:
@@ -171,7 +230,7 @@ class FifoPowerOfTwo {
   };
 
   void CopyInLocked(const void *src, unsigned int len, unsigned int off) const {
-    unsigned int size = mask_ + 1;
+    unsigned int size = this->size();
 
     off &= mask_;
     if (element_size_ != 1) {
@@ -186,7 +245,7 @@ class FifoPowerOfTwo {
   }
 
   void CopyOutLocked(void *dst, unsigned int len, unsigned int off) const {
-    unsigned int size = mask_ + 1;
+    unsigned int size = this->size();
     unsigned int l;
 
     off &= mask_;
@@ -201,13 +260,15 @@ class FifoPowerOfTwo {
     memcpy((unsigned char *)dst + l, data_, len - l);
   }
 
-  unsigned int Unused() const { return mask_ + 1 - (in_ - out_); }
+  unsigned int Unused() const { return size() - Used(); }
   unsigned int Used() const { return in_ - out_; }
 
-  static inline unsigned int Min(unsigned int x, unsigned int y) {
+  template <typename T>
+  static inline T Min(T x, T y) {
     return x < y ? x : y;
   }
-  static inline unsigned int Max(unsigned int x, unsigned int y) {
+  template <typename T>
+  static inline T Max(T x, T y) {
     return x > y ? x : y;
   }
 
