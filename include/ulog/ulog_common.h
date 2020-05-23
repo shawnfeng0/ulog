@@ -226,15 +226,16 @@ struct _TYPE_IS_EQUAL_AUX<T, T> {
 #define _MACRO_CONCAT_PRIVATE(l, r) l##r
 #define _MACRO_CONCAT(l, r) _MACRO_CONCAT_PRIVATE(l, r)
 
-#define _OUT_MULTI_TOKEN_CB(need_newline, ...)                       \
+#define _OUT_DEBUG_NOLOCK(need_newline, ...)                         \
   logger_log(ULOG_LEVEL_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, \
              need_newline, false, ##__VA_ARGS__)
 
 #define _OUT_MULTI_TOKEN(...)                                                 \
   do {                                                                        \
     logger_output_lock();                                                     \
-    _OUT_MULTI_TOKEN_CB(false, "");                                           \
+    _OUT_DEBUG_NOLOCK(false, "");                                             \
     _EXPAND(_MACRO_CONCAT(_TOKEN_AUX_, _ARG_COUNT(__VA_ARGS__))(__VA_ARGS__)) \
+    logger_nolock_flush();                                                    \
     logger_output_unlock();                                                   \
   } while (0)
 
@@ -318,13 +319,14 @@ struct _TYPE_IS_EQUAL_AUX<T, T> {
                             : "hex_dump(data:%s, length:%" PRIuMAX         \
                               ", width:%" PRIuMAX ")"
 
-#define _HEX_DUMP(data, length, width)                                      \
-  do {                                                                      \
-    logger_output_lock();                                                   \
-    _OUT_MULTI_TOKEN_CB(true, _HEX_DUMP_FORMAT, #data, (uintmax_t)(length), \
-                        (uintmax_t)(width));                                \
-    logger_hex_dump(data, length, width, (uintptr_t)(data), true, false);   \
-    logger_output_unlock();                                                 \
+#define _HEX_DUMP(data, length, width)                                    \
+  do {                                                                    \
+    logger_output_lock();                                                 \
+    _OUT_DEBUG_NOLOCK(true, _HEX_DUMP_FORMAT, #data, (uintmax_t)(length), \
+                      (uintmax_t)(width));                                \
+    logger_nolock_flush();                                                \
+    logger_hex_dump(data, length, width, (uintptr_t)(data), true, false); \
+    logger_output_unlock();                                               \
   } while (0)
 
 #else
@@ -383,11 +385,11 @@ uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
 /**
  * Raw data output, similar to printf
  * @param fmt Format of the format string
- * @param need_lock Whether the output needs to be locked during output, it is
- * recommended to lock
+ * @param lock_and_flush Whether the output needs to be locked during output, it
+ * is recommended to lock
  * @param ... Parameters in the format
  */
-void logger_raw(bool need_lock, const char *fmt, ...);
+void logger_raw(bool lock_and_flush, const char *fmt, ...);
 
 /**
  * Print log
@@ -398,14 +400,20 @@ void logger_raw(bool need_lock, const char *fmt, ...);
  * @param func Function name
  * @param line Line number of the file
  * @param newline Whether to output a new line at the end
- * @param need_lock Whether the output needs to be locked during output, it is
- * recommended to lock
+ * @param lock_and_flush Whether the output needs to be locked during output, it
+ * is recommended to lock
  * @param fmt Format string, consistent with printf series functions
  * @param ...
  */
 void logger_log(LogLevel level, const char *file, const char *func,
-                uint32_t line, bool newline, bool need_lock, const char *fmt,
-                ...);
+                uint32_t line, bool newline, bool lock_and_flush,
+                const char *fmt, ...);
+
+/**
+ * Flush log buffer
+ * @note: Internal function, please do not call.
+ */
+int logger_nolock_flush(void);
 
 #ifdef __cplusplus
 }

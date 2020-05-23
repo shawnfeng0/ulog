@@ -1,12 +1,12 @@
+#include <unistd.h>
+
 #include <cstdio>
 #include <ctime>
-#include <unistd.h>
 
 #include "ulog/helper/fifo_power_of_two.hpp"
 #include "ulog/ulog.h"
 
-static char fifo_buffer[65536];
-static FifoPowerOfTwo fifo(fifo_buffer, sizeof(fifo_buffer));
+static FifoPowerOfTwo fifo{65536};
 
 static uint64_t get_time_us() {
   struct timespec tp = {0, 0};
@@ -39,7 +39,7 @@ int main() {
   pthread_t tid;
   pthread_create(&tid, nullptr, ulog_asyn_thread, nullptr);
 
-  uint32_t num_threads = 100;
+  uint32_t num_threads = 200;
   while (num_threads--) {
     pthread_t tid_output;
     pthread_create(
