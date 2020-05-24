@@ -95,25 +95,15 @@ static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
 
 static bool is_logger_valid() { return output_cb_ && log_output_enabled_; }
 
-void logger_enable_output(bool enable) {
-  log_output_enabled_ = enable;
-}
+void logger_enable_output(bool enable) { log_output_enabled_ = enable; }
 
-void logger_enable_color(bool enable) {
-  log_color_enabled_ = enable;
-}
+void logger_enable_color(bool enable) { log_color_enabled_ = enable; }
 
-bool logger_color_is_enabled(void) {
-  return log_color_enabled_;
-}
+bool logger_color_is_enabled(void) { return log_color_enabled_; }
 
-void logger_enable_number_output(bool enable) {
-  log_number_enabled_ = enable;
-}
+void logger_enable_number_output(bool enable) { log_number_enabled_ = enable; }
 
-void logger_enable_time_output(bool enable) {
-  log_time_enabled_ = enable;
-}
+void logger_enable_time_output(bool enable) { log_time_enabled_ = enable; }
 
 #if defined(_LOG_UNIX_LIKE_PLATFORM)
 void logger_enable_process_id_output(bool enable) {
@@ -121,9 +111,7 @@ void logger_enable_process_id_output(bool enable) {
 }
 #endif
 
-void logger_enable_level_output(bool enable) {
-  log_level_enabled_ = enable;
-}
+void logger_enable_level_output(bool enable) { log_level_enabled_ = enable; }
 
 void logger_enable_file_line_output(bool enable) {
   log_file_line_enabled_ = enable;
@@ -133,9 +121,7 @@ void logger_enable_function_output(bool enable) {
   log_function_enabled_ = enable;
 }
 
-void logger_set_output_level(LogLevel level) {
-  log_level_ = level;
-}
+void logger_set_output_level(LogLevel level) { log_level_ = level; }
 
 void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
                            LogMutexUnlock mutex_unlock_cb) {
@@ -160,14 +146,7 @@ void logger_set_assert_callback(LogAssertHandlerCb assert_handler_cb) {
   assert_handler_cb_ = assert_handler_cb;
 }
 
-void logger_init(LogOutput output_cb) {
-  output_cb_ = output_cb;
-
-#if defined(ULOG_CLS)
-  char clear_str[3] = {'\033', 'c', '\0'};  // clean screen
-  if (output_cb) output_cb(clear_str);
-#endif
-}
+void logger_init(LogOutput output_cb) { output_cb_ = output_cb; }
 
 uint64_t logger_get_time_us(void) {
   return get_time_us_cb_ ? get_time_us_cb_() : 0;
