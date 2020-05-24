@@ -15,12 +15,6 @@
 #pragma message("ULOG_OUTBUF_LEN is recommended to be greater than 64")
 #endif
 
-#if !defined(ULOG_DEFAULT_LEVEL)
-#define ULOG_DEFAULT_LEVEL ULOG_LEVEL_TRACE
-#endif
-
-#if !defined(ULOG_DISABLE)
-
 static char log_out_buf_[ULOG_OUTBUF_LEN];
 static char *const kLogBufferStartIndex_ = log_out_buf_;
 static char *const kLogBufferEndIndex_ = log_out_buf_ + sizeof(log_out_buf_);
@@ -57,22 +51,15 @@ static bool log_process_id_enabled_ = false;
 LogTimeFormat time_format_ = LOG_LOCAL_TIME_SUPPORT ? LOG_TIME_FORMAT_LOCAL_TIME
                                                     : LOG_TIME_FORMAT_TIMESTAMP;
 
-// Logger configuration
+// Logger default configuration
 static bool log_output_enabled_ = true;
-
-#if !defined(ULOG_DISABLE_COLOR)
 static bool log_color_enabled_ = true;
-#else
-static bool log_color_enabled_ = false;
-#endif
-
 static bool log_number_enabled_ = false;
 static bool log_time_enabled_ = true;
 static bool log_level_enabled_ = true;
 static bool log_file_line_enabled_ = true;
 static bool log_function_enabled_ = true;
-
-static LogLevel log_level_ = ULOG_DEFAULT_LEVEL;
+static LogLevel log_level_ = ULOG_LEVEL_TRACE;
 
 enum {
   INDEX_PRIMARY_COLOR = 0,
@@ -89,8 +76,6 @@ static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
     {(char *)STR_BOLD_RED, (char *)STR_RED, (char *)"E"},        // ERROR
     {(char *)STR_BOLD_PURPLE, (char *)STR_PURPLE, (char *)"F"},  // FATAL
 };
-
-#endif  // !ULOG_DISABLE
 
 #if defined(_LOG_UNIX_LIKE_PLATFORM)
 #include <unistd.h>
@@ -111,143 +96,96 @@ static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
 static bool is_logger_valid() { return output_cb_ && log_output_enabled_; }
 
 void logger_enable_output(bool enable) {
-#if !defined(ULOG_DISABLE)
   log_output_enabled_ = enable;
-#endif
 }
 
 void logger_enable_color(bool enable) {
-#if !defined(ULOG_DISABLE)
   log_color_enabled_ = enable;
-#endif
 }
 
 bool logger_color_is_enabled(void) {
-#if !defined(ULOG_DISABLE)
   return log_color_enabled_;
-#else
-  return false;
-#endif
 }
 
 void logger_enable_number_output(bool enable) {
-#if !defined(ULOG_DISABLE)
   log_number_enabled_ = enable;
-#endif
 }
 
 void logger_enable_time_output(bool enable) {
-#if !defined(ULOG_DISABLE)
   log_time_enabled_ = enable;
-#endif
 }
 
 #if defined(_LOG_UNIX_LIKE_PLATFORM)
 void logger_enable_process_id_output(bool enable) {
-#if !defined(ULOG_DISABLE)
   log_process_id_enabled_ = enable;
-#endif
 }
 #endif
 
 void logger_enable_level_output(bool enable) {
-#if !defined(ULOG_DISABLE)
   log_level_enabled_ = enable;
-#endif
 }
 
 void logger_enable_file_line_output(bool enable) {
-#if !defined(ULOG_DISABLE)
   log_file_line_enabled_ = enable;
-#endif
 }
 
 void logger_enable_function_output(bool enable) {
-#if !defined(ULOG_DISABLE)
   log_function_enabled_ = enable;
-#endif
 }
 
 void logger_set_output_level(LogLevel level) {
-#if !defined(ULOG_DISABLE)
   log_level_ = level;
-#endif
 }
 
 void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
                            LogMutexUnlock mutex_unlock_cb) {
-#if !defined(ULOG_DISABLE)
   mutex_ = mutex;
   mutex_lock_cb_ = mutex_lock_cb;
   mutex_unlock_cb_ = mutex_unlock_cb;
-#endif
 }
 
 void logger_set_time_callback(LogGetTimeUs get_time_us_cb) {
-#if !defined(ULOG_DISABLE)
   get_time_us_cb_ = get_time_us_cb;
-#endif
 }
 
 void logger_set_time_format(LogTimeFormat time_format) {
-#if !defined(ULOG_DISABLE)
   time_format_ = time_format;
-#endif
 }
 
 void logger_assert_handler(void) {
-#if !defined(ULOG_DISABLE)
   if (assert_handler_cb_) assert_handler_cb_();
-#endif
 }
 
 void logger_set_assert_callback(LogAssertHandlerCb assert_handler_cb) {
-#if !defined(ULOG_DISABLE)
   assert_handler_cb_ = assert_handler_cb;
-#endif
 }
 
 void logger_init(LogOutput output_cb) {
-#if !defined(ULOG_DISABLE)
   output_cb_ = output_cb;
 
 #if defined(ULOG_CLS)
   char clear_str[3] = {'\033', 'c', '\0'};  // clean screen
   if (output_cb) output_cb(clear_str);
 #endif
-#endif
 }
 
 uint64_t logger_get_time_us(void) {
-#if !defined(ULOG_DISABLE)
   return get_time_us_cb_ ? get_time_us_cb_() : 0;
-#else
-  return 0;
-#endif
 }
 
 // Lock the log mutex
 int logger_output_lock(void) {
-#if !defined(ULOG_DISABLE)
   return (mutex_lock_cb_ && mutex_) ? mutex_lock_cb_(mutex_) : 0;
-#else
-  return 0;
-#endif
 }
 
 // Unlock the log mutex
 int logger_output_unlock(void) {
-#if !defined(ULOG_DISABLE)
   return (mutex_unlock_cb_ && mutex_) ? mutex_unlock_cb_(mutex_) : 0;
-#else
-  return 0;
-#endif
 }
 
 uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
                           uintptr_t base_address, bool tail_addr_out,
                           bool need_lock) {
-#if !defined(ULOG_DISABLE)
   if (!data || width == 0 || !is_logger_valid()) return 0;
 
   const uint8_t *data_raw = data;
@@ -300,11 +238,9 @@ uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
   if (need_lock) logger_output_unlock();
   return data_cur - data_raw + base_address;
 #undef SNPRINTF_WRAPPER
-#endif
 }
 
 void logger_raw(bool lock_and_flush, const char *fmt, ...) {
-#if !defined(ULOG_DISABLE)
   if (!is_logger_valid() || !fmt) return;
 
   const char *const buf_end_ptr = kLogBufferEndIndex_;
@@ -320,7 +256,6 @@ void logger_raw(bool lock_and_flush, const char *fmt, ...) {
     logger_nolock_flush();
     logger_output_unlock();
   }
-#endif
 }
 
 int logger_nolock_flush(void) {
@@ -333,8 +268,6 @@ int logger_nolock_flush(void) {
 void logger_log(LogLevel level, const char *file, const char *func,
                 uint32_t line, bool newline, bool lock_and_flush,
                 const char *fmt, ...) {
-#if !defined(ULOG_DISABLE)
-
   if (!is_logger_valid() || !fmt || level < log_level_) return;
 
   // The last two characters are '\r', '\n'
@@ -432,5 +365,4 @@ void logger_log(LogLevel level, const char *file, const char *func,
 
 #undef SNPRINTF_WRAPPER
 #undef VSNPRINTF_WRAPPER
-#endif
 }

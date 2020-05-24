@@ -54,7 +54,6 @@
     snprintf(&_ulog_c##__LINE__, 0, __VA_ARGS__);                \
   } while (0)
 
-#if !defined(ULOG_DISABLE)
 #define _OUT_LOG(level, ...)                                            \
   do {                                                                  \
     _CHECK_LOG_FORMAT(__VA_ARGS__);                                     \
@@ -69,15 +68,6 @@
   } while (0)
 
 #define _OUT_RAW_LOCKED(fmt, ...) logger_raw(false, fmt, ##__VA_ARGS__)
-
-#else
-
-#define _OUT_LOG(level, ...)
-#define _OUT_RAW_WITH_LOCK(fmt, ...)
-
-#endif
-
-#if !defined(ULOG_DISABLE)
 
 #ifdef __cplusplus
 
@@ -328,15 +318,6 @@ struct _TYPE_IS_EQUAL_AUX<T, T> {
     logger_hex_dump(data, length, width, (uintptr_t)(data), true, false); \
     logger_output_unlock();                                               \
   } while (0)
-
-#else
-
-#define _OUT_TOKEN(...)
-#define _TIME_CODE(...) __VA_ARGS__;
-#define _HEX_DUMP(...)
-#define _OUT_MULTI_TOKEN(...)
-
-#endif  // !defined(ULOG_DISABLE)
 
 #ifdef __cplusplus
 extern "C" {
