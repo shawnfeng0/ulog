@@ -6,14 +6,16 @@
 #define ULOG_INCLUDE_ULOG_FIFOPOWEROF2_H_
 
 #include <pthread.h>
+
 #include <cstdint>
 #include <cstring>
+
+namespace ulog {
 
 class FifoPowerOfTwo {
 #define _is_power_of_2(x) ((x) != 0 && (((x) & ((x)-1)) == 0))
  public:
-  FifoPowerOfTwo(void *buffer, unsigned int buf_size,
-                 unsigned int element_size = 1)
+  FifoPowerOfTwo(void *buffer, size_t buf_size, size_t element_size = 1)
       : data_((unsigned char *)buffer),
         element_size_(element_size),
         in_(0),
@@ -24,7 +26,7 @@ class FifoPowerOfTwo {
       data_ = nullptr;
       return;
     }
-    unsigned int num_elements = buf_size / element_size;
+    size_t num_elements = buf_size / element_size;
 
     // round down to the next power of 2, since our 'let the indices wrap'
     // technique works only in this case.
@@ -39,8 +41,7 @@ class FifoPowerOfTwo {
     mask_ = num_elements - 1;
   }
 
-  explicit FifoPowerOfTwo(unsigned int num_elements,
-                          unsigned int element_size = 1)
+  explicit FifoPowerOfTwo(size_t num_elements, size_t element_size = 1)
       : element_size_(element_size),
         in_(0),
         out_(0),
@@ -63,15 +64,17 @@ class FifoPowerOfTwo {
     }
     mask_ = num_elements - 1;
   }
+  FifoPowerOfTwo(const FifoPowerOfTwo &) = delete;
+  FifoPowerOfTwo &operator=(const FifoPowerOfTwo &) = delete;
 
   ~FifoPowerOfTwo() {
     if (is_allocated_memory_ && data_) delete[] data_;
   }
 
   // A packet is entered, either completely written or discarded.
-  unsigned int InPacket(const void *buf, unsigned int num_elements) {
+  size_t InPacket(const void *buf, size_t num_elements) {
     LockGuard lg(mutex_);
-    unsigned int unused = Unused();
+    size_t unused = Unused();
 
     if (unused < num_elements) {
       num_dropped_ += num_elements;
@@ -88,12 +91,12 @@ class FifoPowerOfTwo {
     return num_elements;
   }
 
-  unsigned int In(const void *buf, unsigned int num_elements) {
+  size_t In(const void *buf, size_t num_elements) {
     LockGuard lg(mutex_);
 
     peak_ = Max(peak_, Used());
 
-    unsigned int unused = Unused();
+    size_t unused = Unused();
     num_elements = Min(num_elements, unused);
 
     CopyInLocked(buf, num_elements, in_);
@@ -125,19 +128,19 @@ class FifoPowerOfTwo {
    * Assumes the fifo was 0 before.
    */
   bool Initialized() const { return mask_ != 0; };
-  unsigned int num_dropped() const { return num_dropped_; }
-  unsigned int peak() const { return peak_; }
-  unsigned int size() const { return mask_ + 1; }
+  size_t num_dropped() const { return num_dropped_; }
+  size_t peak() const { return peak_; }
+  size_t size() const { return mask_ + 1; }
 
-  unsigned int OutPeek(void *out_buf, unsigned int num_elements) {
+  size_t OutPeek(void *out_buf, size_t num_elements) {
     LockGuard lg(mutex_);
     num_elements = Min(num_elements, Used());
     CopyOutLocked(out_buf, num_elements, out_);
     return num_elements;
   }
 
-  unsigned int OutWaitIfEmpty(void *out_buf, unsigned int num_elements,
-                              int32_t time_ms = -1) {
+  size_t OutWaitIfEmpty(void *out_buf, size_t num_elements,
+                        int32_t time_ms = -1) {
     LockGuard lg(mutex_);
 
     if (-1 == time_ms) {
@@ -153,7 +156,7 @@ class FifoPowerOfTwo {
     return num_elements;
   }
 
-  unsigned int Out(void *out_buf, unsigned int num_elements) {
+  size_t Out(void *out_buf, size_t num_elements) {
     LockGuard lg(mutex_);
     num_elements = Min(num_elements, Used());
     CopyOutLocked(out_buf, num_elements, out_);
@@ -162,16 +165,15 @@ class FifoPowerOfTwo {
   }
 
  private:
-  unsigned int in_{};         // data is added at offset (in % size)
-  unsigned int out_{};        // data is extracted from off. (out % size)
+  size_t in_{};               // data is added at offset (in % size)
+  size_t out_{};              // data is extracted from off. (out % size)
   unsigned char *data_;       // the buffer holding the data
   bool is_allocated_memory_;  //  Used to identify whether the internal buffer
                               //  is allocated internally
-  unsigned int
-      mask_;  // (Constant) Mask used to match the correct in / out pointer
-  const unsigned int element_size_;  // the size of the element
-  unsigned int num_dropped_{};       // Number of dropped elements
-  unsigned int peak_{};              // fifo peak
+  size_t mask_;  // (Constant) Mask used to match the correct in / out pointer
+  const size_t element_size_;  // the size of the element
+  size_t num_dropped_{};       // Number of dropped elements
+  size_t peak_{};              // fifo peak
   class Mutex {
    public:
     Mutex() { pthread_mutex_init(&mutex_, nullptr); }
@@ -229,8 +231,8 @@ class FifoPowerOfTwo {
     Mutex &m_;
   };
 
-  void CopyInLocked(const void *src, unsigned int len, unsigned int off) const {
-    unsigned int size = this->size();
+  void CopyInLocked(const void *src, size_t len, size_t off) const {
+    size_t size = this->size();
 
     off &= mask_;
     if (element_size_ != 1) {
@@ -238,15 +240,15 @@ class FifoPowerOfTwo {
       size *= element_size_;
       len *= element_size_;
     }
-    unsigned int l = Min(len, size - off);
+    size_t l = Min(len, size - off);
 
     memcpy(data_ + off, src, l);
     memcpy(data_, (unsigned char *)src + l, len - l);
   }
 
-  void CopyOutLocked(void *dst, unsigned int len, unsigned int off) const {
-    unsigned int size = this->size();
-    unsigned int l;
+  void CopyOutLocked(void *dst, size_t len, size_t off) const {
+    size_t size = this->size();
+    size_t l;
 
     off &= mask_;
     if (element_size_ != 1) {
@@ -260,8 +262,8 @@ class FifoPowerOfTwo {
     memcpy((unsigned char *)dst + l, data_, len - l);
   }
 
-  unsigned int Unused() const { return size() - Used(); }
-  unsigned int Used() const { return in_ - out_; }
+  size_t Unused() const { return size() - Used(); }
+  size_t Used() const { return in_ - out_; }
 
   template <typename T>
   static inline T Min(T x, T y) {
@@ -298,5 +300,7 @@ class FifoPowerOfTwo {
     return r;
   }
 };
+
+};  // namespace ulog
 
 #endif  // ULOG_INCLUDE_ULOG_FIFOPOWEROF2_H_

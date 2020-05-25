@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <ctime>
 
-#include "ulog/helper/fifo_power_of_two.hpp"
+#include "ulog/helper/fifo_power_of_two.h"
 #include "ulog/ulog.h"
 
 static uint64_t get_time_us() {
@@ -13,7 +13,7 @@ static uint64_t get_time_us() {
 }
 
 void *ulog_asyn_thread(void *arg) {
-  auto &fifo = *(FifoPowerOfTwo *)(arg);
+  auto &fifo = *(ulog::FifoPowerOfTwo *)(arg);
 
   uint64_t start_us = get_time_us();
   uint64_t time_out_us = start_us + 10 * 1000 * 1000;
@@ -29,11 +29,11 @@ void *ulog_asyn_thread(void *arg) {
 }
 
 int main() {
-  auto &fifo = *new FifoPowerOfTwo{32768};
+  auto &fifo = *new ulog::FifoPowerOfTwo{32768};
 
   // Initial logger
   logger_init(&fifo, [](void *private_data_unused, const char *str) {
-    auto &fifo = *(FifoPowerOfTwo *)(private_data_unused);
+    auto &fifo = *(ulog::FifoPowerOfTwo *)(private_data_unused);
     return (int)fifo.InPacket(str, strlen(str));
   });
 
