@@ -6,15 +6,15 @@
 #include "ulog/helper/fifo_power_of_two.hpp"
 #include "ulog/ulog.h"
 
-static FifoPowerOfTwo fifo{65536};
-
 static uint64_t get_time_us() {
   struct timespec tp = {0, 0};
   clock_gettime(CLOCK_REALTIME, &tp);
   return static_cast<uint64_t>(tp.tv_sec) * 1000 * 1000 + tp.tv_nsec / 1000;
 }
 
-void *ulog_asyn_thread(void *) {
+void *ulog_asyn_thread(void *arg) {
+  auto &fifo = *(FifoPowerOfTwo *)(arg);
+
   uint64_t start_us = get_time_us();
   uint64_t time_out_us = start_us + 10 * 1000 * 1000;
   char str[500];
@@ -29,18 +29,18 @@ void *ulog_asyn_thread(void *) {
 }
 
 int main() {
+  auto &fifo = *new FifoPowerOfTwo{32768};
+
   // Initial logger
-  logger_set_time_callback(get_time_us);
-  logger_init(nullptr, [](void *private_data_unused, const char *str) {
+  logger_init(&fifo, [](void *private_data_unused, const char *str) {
+    auto &fifo = *(FifoPowerOfTwo *)(private_data_unused);
     return (int)fifo.InPacket(str, strlen(str));
   });
 
-  LOG_MULTI_TOKEN(fifo.num_dropped(), fifo.peak(), fifo.size());
-
   pthread_t tid;
-  pthread_create(&tid, nullptr, ulog_asyn_thread, nullptr);
+  pthread_create(&tid, nullptr, ulog_asyn_thread, &fifo);
 
-  uint32_t num_threads = 200;
+  uint32_t num_threads = 20;
   while (num_threads--) {
     pthread_t tid_output;
     pthread_create(
