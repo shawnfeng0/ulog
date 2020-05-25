@@ -31,8 +31,9 @@ void *ulog_asyn_thread(void *) {
 int main() {
   // Initial logger
   logger_set_time_callback(get_time_us);
-  logger_init(
-      [](const char *str) { return (int)fifo.InPacket(str, strlen(str)); });
+  logger_init(nullptr, [](void *private_data_unused, const char *str) {
+    return (int)fifo.InPacket(str, strlen(str));
+  });
 
   LOG_MULTI_TOKEN(fifo.num_dropped(), fifo.peak(), fifo.size());
 

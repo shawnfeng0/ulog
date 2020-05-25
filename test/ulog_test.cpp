@@ -11,14 +11,15 @@ static uint64_t get_time_us() {
 #elif defined(__unix__) || defined(__APPLE__)
   struct timespec tp = {0, 0};
   clock_gettime(CLOCK_REALTIME, &tp);
-  return static_cast<uint64_t>(tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000);
+  return static_cast<uint64_t>(tp.tv_sec) * 1000 * 1000 + tp.tv_nsec / 1000;
 #else
   // Need to implement a function to get time
   return 0;
 #endif
 }
 
-static int put_str(const char *str) {
+static int put_str(void *private_data, const char *str) {
+  private_data = private_data; // unused
 #if defined(WIN32) || defined(__unix__) || defined(__APPLE__)
   return printf("%s", str);
 #else
@@ -29,7 +30,7 @@ static int put_str(const char *str) {
 int main() {
   // Initial logger
   logger_set_time_callback(get_time_us);
-  logger_init(put_str);
+  logger_init(nullptr, put_str);
 
   double pi = 3.14159265;
   // Different log levels

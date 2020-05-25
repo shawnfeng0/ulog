@@ -39,8 +39,8 @@ static uint32_t log_evt_num_ = 1;
 #if defined(_LOG_UNIX_LIKE_PLATFORM)
 #include <pthread.h>
 #include <stdlib.h>  // For abort()
-static int printf_wrapper(const char *str) { return printf("%s", str); }
-static LogOutput output_cb_ = printf_wrapper;
+static int print(void *unused, const char *str) { return printf("%s", str); }
+static LogOutput output_cb_ = print;
 static pthread_mutex_t log_pthread_mutex_ = PTHREAD_MUTEX_INITIALIZER;
 static void *mutex_ = &log_pthread_mutex_;
 static LogMutexLock mutex_lock_cb_ = (LogMutexLock)pthread_mutex_lock;
@@ -62,6 +62,9 @@ LogGetTimeUs get_time_us_cb_ = NULL;
 LogAssertHandlerCb assert_handler_cb_ = NULL;
 static bool log_process_id_enabled_ = false;
 #endif
+// The private data set by the user will be passed to the output function
+static void *external_private_data_ = NULL;
+
 LogTimeFormat time_format_ = LOG_LOCAL_TIME_SUPPORT ? LOG_TIME_FORMAT_LOCAL_TIME
                                                     : LOG_TIME_FORMAT_TIMESTAMP;
 
@@ -160,18 +163,19 @@ void logger_set_assert_callback(LogAssertHandlerCb assert_handler_cb) {
   assert_handler_cb_ = assert_handler_cb;
 }
 
-void logger_init(LogOutput output_cb) { output_cb_ = output_cb; }
+void logger_init(void *private_data, LogOutput output_cb) {
+  output_cb_ = output_cb;
+  external_private_data_ = private_data;
+}
 
 uint64_t logger_get_time_us(void) {
   return get_time_us_cb_ ? get_time_us_cb_() : 0;
 }
 
-// Lock the log mutex
 int logger_output_lock(void) {
   return (mutex_lock_cb_ && mutex_) ? mutex_lock_cb_(mutex_) : 0;
 }
 
-// Unlock the log mutex
 int logger_output_unlock(void) {
   return (mutex_unlock_cb_ && mutex_) ? mutex_unlock_cb_(mutex_) : 0;
 }
@@ -186,7 +190,6 @@ uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
 
   bool out_break = false;
 
-  // Lock the log mutex
   if (need_lock) logger_output_lock();
 
   while (length) {
@@ -241,7 +244,7 @@ void logger_raw(bool lock_and_flush, const char *fmt, ...) {
 }
 
 int logger_nolock_flush(void) {
-  int ret = output_cb_(kLogBufferStartIndex_);
+  int ret = output_cb_(external_private_data_, kLogBufferStartIndex_);
   cur_buf_ptr_ = kLogBufferStartIndex_;
   kLogBufferStartIndex_[0] = '\0';  // TODO: Not necessary
   return ret;

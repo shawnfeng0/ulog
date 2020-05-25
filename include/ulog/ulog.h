@@ -104,7 +104,7 @@
  */
 #define LOG_HEX_DUMP(data, length, width) _HEX_DUMP(data, length, width)
 
-typedef int (*LogOutput)(const char *ptr);
+typedef int (*LogOutput)(void *private_data, const char *ptr);
 typedef int (*LogMutexUnlock)(void *mutex);
 typedef int (*LogMutexLock)(void *mutex);
 typedef uint64_t (*LogGetTimeUs)(void);
@@ -223,9 +223,11 @@ void logger_set_assert_callback(LogAssertHandlerCb assert_handler_cb);
 /**
  * Initialize the logger and set the string output callback function. The
  * simplest configuration is just to configure the output callback.
+ * @param private_data Set by the user, each output will be passed to output_cb,
+ * output can be more flexible.
  * @param output_cb Callback function to output string
  */
-void logger_init(LogOutput output_cb);
+void logger_init(void *private_data, LogOutput output_cb);
 
 /**
  * Call time callback function to get time

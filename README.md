@@ -36,25 +36,27 @@ git submodule add https://github.com/ShawnFeng0/ulog.git
 
 ```C++
 #include "ulog/ulog.h"
+
 #include <stdio.h>
 #include <time.h>
 
 static uint64_t get_time_us() {
 #if defined(WIN32)
   struct timespec tp = {0, 0};
-  timespec_get(&tp, TIME_UTC);
+  (void)timespec_get(&tp, TIME_UTC);
   return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
 #elif defined(__unix__) || defined(__APPLE__)
   struct timespec tp = {0, 0};
   clock_gettime(CLOCK_REALTIME, &tp);
-  return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
+  return static_cast<uint64_t>(tp.tv_sec) * 1000 * 1000 + tp.tv_nsec / 1000;
 #else
   // Need to implement a function to get time
   return 0;
 #endif
 }
 
-static int put_str(const char *str) {
+static int put_str(void *private_data, const char *str) {
+  private_data = private_data; // unused
 #if defined(WIN32) || defined(__unix__) || defined(__APPLE__)
   return printf("%s", str);
 #else
@@ -65,7 +67,7 @@ static int put_str(const char *str) {
 int main() {
   // Initial logger
   logger_set_time_callback(get_time_us);
-  logger_init(put_str);
+  logger_init(nullptr, put_str);
 
   double pi = 3.14159265;
   // Different log levels
@@ -173,16 +175,18 @@ int main(int argc, char *argv[]) {
 
 The simplest configuration is just to configure the output callback.
 
+private_data: Set by the user, each output will be passed to output_cb, output can be more flexible.
+ 
 ```C
-void logger_init(LogOutput output_cb);
+void logger_init(void *private_data, LogOutput output_cb);
 
 // Sample
-static int put_str(const char *str) {
+static int put_str(void *private_data, const char *str) {
+  private_data = private_data;
   return printf("%s", str);
 }
-
 int main(int argc, char *argv[]) {
-  logger_init(put_str);
+  logger_init(NULL, put_str);
   // ...
 }
 ```
