@@ -71,24 +71,28 @@
 
 #ifdef __cplusplus
 
+namespace ulog {
+
 template <typename T1, typename T2>
-struct _TYPE_IS_EQUAL_AUX {
+struct TYPE_IS_EQUAL {
   static const bool x = false;
 };
 
 template <typename T>
-struct _TYPE_IS_EQUAL_AUX<T, T> {
+struct TYPE_IS_EQUAL<T, T> {
   static const bool x = true;
 };
+
+};  // namespace ulog
 
 // "decltype" implementation in C++ 11, But msvc can be used after the 2010
 // version, it is strange, but it can be used
 #if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER > 1600)
-#define _IS_SAME_TYPE(var, type) _TYPE_IS_EQUAL_AUX<decltype(var), type>::x
+#define _IS_SAME_TYPE(var, type) ulog::TYPE_IS_EQUAL<decltype(var), type>::x
 
 // "typeof" implementation in GCC extension
 #elif defined(__GNUC__) || defined(__clang__)
-#define _IS_SAME_TYPE(var, type) _TYPE_IS_EQUAL_AUX<typeof(var), type>::x
+#define _IS_SAME_TYPE(var, type) ulog::TYPE_IS_EQUAL<typeof(var), type>::x
 
 #else
 #pragma message( \
