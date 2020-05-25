@@ -313,14 +313,14 @@ struct TYPE_IS_EQUAL<T, T> {
                             : "hex_dump(data:%s, length:%" PRIuMAX         \
                               ", width:%" PRIuMAX ")"
 
-#define _HEX_DUMP(data, length, width)                                    \
-  do {                                                                    \
-    logger_output_lock();                                                 \
-    _OUT_DEBUG_NOLOCK(true, _HEX_DUMP_FORMAT, #data, (uintmax_t)(length), \
-                      (uintmax_t)(width));                                \
-    logger_nolock_flush();                                                \
-    logger_hex_dump(data, length, width, (uintptr_t)(data), true, false); \
-    logger_output_unlock();                                               \
+#define _HEX_DUMP(data, length, width)                                      \
+  do {                                                                      \
+    logger_output_lock();                                                   \
+    _OUT_DEBUG_NOLOCK(true, _HEX_DUMP_FORMAT, #data, (uintmax_t)(length),   \
+                      (uintmax_t)(width));                                  \
+    if (logger_nolock_flush() > 0)                                          \
+      logger_hex_dump(data, length, width, (uintptr_t)(data), true, false); \
+    logger_output_unlock();                                                 \
   } while (0)
 
 #ifdef __cplusplus
