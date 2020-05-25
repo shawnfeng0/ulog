@@ -238,6 +238,8 @@ struct TYPE_IS_EQUAL<T, T> {
     _OUT_TOKEN(token, _OUT_RAW_LOCKED, false);                            \
     if (left)                                                             \
       logger_raw(false, logger_color_is_enabled() ? STR_RED ", " : ", "); \
+    else if (logger_color_is_enabled())                                   \
+      logger_raw(false, STR_RESET);                                       \
   } while (0)
 
 #define _LOG_TOKEN_AUX(_1, ...)                           \
