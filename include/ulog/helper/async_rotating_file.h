@@ -24,7 +24,7 @@ class AsyncRotatingFile {
             new RotatingFile(std::move(filename), max_file_size, max_files)),
         async_thread_([&]() {
           uint8_t data[1024];
-          while (!should_exit()) {
+          while (!should_exit_) {
             int len = fifo_->OutWaitIfEmpty(data, sizeof(data) - 1, 1000);
             if (len > 0) {
               rotating_file_->SinkIt(data, len);
@@ -59,7 +59,6 @@ class AsyncRotatingFile {
   const bool should_print_;
 
   bool should_exit_ = false;
-  bool should_exit() const { return should_exit_; }
 };
 
 }  // namespace ulog
