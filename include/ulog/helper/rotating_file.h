@@ -55,7 +55,7 @@ class RotatingFile {
   void Rotate() {
     file_writer_.Close();
 
-    for (auto i = max_files_; i > 0; --i) {
+    for (auto i = max_files_; i > 1; --i) {
       filename_t src = CalcFilename(base_filename_, i - 1);
       if (!file::path_exists(src)) {
         continue;
@@ -63,6 +63,11 @@ class RotatingFile {
       filename_t target = CalcFilename(base_filename_, i);
       RenameFile(src, target);
     }
+
+    // In order to use tail -f to read files in real time, need to use copy
+    // instead of rename
+    CopyFile(base_filename_, CalcFilename(base_filename_, 1));
+
     file_writer_.Reopen(true);
   }
 
@@ -75,6 +80,17 @@ class RotatingFile {
     filename_t basename, ext;
     std::tie(basename, ext) = FileWriter::SplitByExtension(filename);
     return basename + "." + std::to_string(index) + ext;
+  }
+
+  // Copy file
+  static void CopyFile(const std::string &src, const std::string &dst) {
+    // try to delete the target file in case it already exists.
+    (void)std::remove(dst.c_str());
+
+    std::ifstream src_in(src, std::ios::binary);
+    std::ofstream dst_out(dst, std::ios::binary);
+
+    dst_out << src_in.rdbuf();
   }
 
   // delete the target if exists, and rename the src file  to target
