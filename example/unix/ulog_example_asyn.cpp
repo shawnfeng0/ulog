@@ -23,7 +23,7 @@ void *ulog_asyn_thread(void *arg) {
     if (fifo.OutWaitIfEmpty(str, sizeof(str) - 1, 1000) > 0) printf("%s", str);
   }
 
-  printf("fifo.num_dropped():%d, fifo.peak():%d, fifo.size():%d",
+  printf("fifo.num_dropped():%zu, fifo.peak():%zu, fifo.size():%zu",
          fifo.num_dropped(), fifo.peak(), fifo.size());
   return nullptr;
 }

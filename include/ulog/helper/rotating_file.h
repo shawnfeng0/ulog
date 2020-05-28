@@ -83,10 +83,9 @@ class RotatingFile {
   }
 
   // Copy file
+  // Reference:
+  // https://stackoverflow.com/questions/10195343/copy-a-file-in-a-sane-safe-and-efficient-way
   static void CopyFile(const std::string &src, const std::string &dst) {
-    // try to delete the target file in case it already exists.
-    (void)std::remove(dst.c_str());
-
     std::ifstream src_in(src, std::ios::binary);
     std::ofstream dst_out(dst, std::ios::binary);
 
