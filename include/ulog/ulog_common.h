@@ -315,14 +315,13 @@ struct TYPE_IS_EQUAL<T, T> {
                             : "hex_dump(data:%s, length:%" PRIuMAX         \
                               ", width:%" PRIuMAX ")"
 
-#define _HEX_DUMP(data, length, width)                                      \
-  do {                                                                      \
-    logger_output_lock();                                                   \
-    _OUT_DEBUG_NOLOCK(true, _HEX_DUMP_FORMAT, #data, (uintmax_t)(length),   \
-                      (uintmax_t)(width));                                  \
-    if (logger_nolock_flush() > 0)                                          \
-      logger_hex_dump(data, length, width, (uintptr_t)(data), true, false); \
-    logger_output_unlock();                                                 \
+#define _HEX_DUMP(data, length, width)                                    \
+  do {                                                                    \
+    logger_output_lock();                                                 \
+    _OUT_DEBUG_NOLOCK(true, _HEX_DUMP_FORMAT, #data, (uintmax_t)(length), \
+                      (uintmax_t)(width));                                \
+    logger_nolock_hex_dump(data, length, width, (uintptr_t)(data), true); \
+    logger_output_unlock();                                               \
   } while (0)
 
 #ifdef __cplusplus
@@ -361,13 +360,10 @@ int logger_output_unlock(void);
  * value
  * @param tail_addr_out Tail address output, whether to output the last address
  * after output
- * @param need_lock Whether the output needs to be locked during output, it is
- * recommended to lock
  * @return Last output address
  */
-uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
-                          uintptr_t base_address, bool tail_addr_out,
-                          bool need_lock);
+uintptr_t logger_nolock_hex_dump(const void *data, size_t length, size_t width,
+                                 uintptr_t base_address, bool tail_addr_out);
 
 /**
  * Raw data output, similar to printf

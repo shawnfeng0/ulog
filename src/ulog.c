@@ -163,8 +163,12 @@ void logger_set_assert_callback(LogAssertHandlerCb assert_handler_cb) {
 }
 
 void logger_init(void *private_data, LogOutput output_cb) {
+  logger_output_lock();
+
   output_cb_ = output_cb;
   external_private_data_ = private_data;
+
+  logger_output_unlock();
 }
 
 uint64_t logger_get_time_us(void) {
@@ -187,18 +191,20 @@ int logger_output_unlock(void) {
 #endif
 }
 
-uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
-                          uintptr_t base_address, bool tail_addr_out,
-                          bool need_lock) {
+uintptr_t logger_nolock_hex_dump(const void *data, size_t length, size_t width,
+                                 uintptr_t base_address, bool tail_addr_out) {
   if (!data || width == 0 || !is_logger_valid()) return 0;
 
   const uint8_t *data_raw = data;
   const uint8_t *data_cur = data;
 
+  // The output fails, in order to avoid output confusion, the rest will not
+  // be output
+  if (logger_nolock_flush() <= 0) {
+    return 0;
+  }
+
   bool out_break = false;
-
-  if (need_lock) logger_output_lock();
-
   while (length) {
     SNPRINTF_WRAPPER("%08" PRIxPTR "  ", data_cur - data_raw + base_address);
     for (size_t i = 0; i < width; i++) {
@@ -230,7 +236,6 @@ uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,
     SNPRINTF_WRAPPER("%08" PRIxPTR "\r\n", data_cur - data_raw + base_address);
   }
   logger_nolock_flush();
-  if (need_lock) logger_output_unlock();
   return data_cur - data_raw + base_address;
 }
 
@@ -251,9 +256,11 @@ void logger_raw(bool lock_and_flush, const char *fmt, ...) {
 }
 
 int logger_nolock_flush(void) {
-  int ret = output_cb_(external_private_data_, kLogBufferStartIndex_);
-  cur_buf_ptr_ = kLogBufferStartIndex_;
-  kLogBufferStartIndex_[0] = '\0';  // TODO: Not necessary
+  int ret = 0;
+  if (cur_buf_ptr_ != kLogBufferStartIndex_) {
+    ret = output_cb_(external_private_data_, kLogBufferStartIndex_);
+    cur_buf_ptr_ = kLogBufferStartIndex_;
+  }
   return ret;
 }
 
