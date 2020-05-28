@@ -42,9 +42,6 @@ static uint32_t log_evt_num_ = 1;
 static int print(void *unused, const char *str) { return printf("%s", str); }
 static LogOutput output_cb_ = print;
 static pthread_mutex_t log_pthread_mutex_ = PTHREAD_MUTEX_INITIALIZER;
-static void *mutex_ = &log_pthread_mutex_;
-static LogMutexLock mutex_lock_cb_ = (LogMutexLock)pthread_mutex_lock;
-static LogMutexUnlock mutex_unlock_cb_ = (LogMutexUnlock)pthread_mutex_unlock;
 static uint64_t clock_gettime_wrapper(void) {
   struct timespec tp;
   clock_gettime(CLOCK_REALTIME, &tp);
@@ -140,12 +137,14 @@ void logger_enable_function_output(bool enable) {
 
 void logger_set_output_level(LogLevel level) { log_level_ = level; }
 
+#if !defined(_LOG_UNIX_LIKE_PLATFORM)
 void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
                            LogMutexUnlock mutex_unlock_cb) {
   mutex_ = mutex;
   mutex_lock_cb_ = mutex_lock_cb;
   mutex_unlock_cb_ = mutex_unlock_cb;
 }
+#endif
 
 void logger_set_time_callback(LogGetTimeUs get_time_us_cb) {
   get_time_us_cb_ = get_time_us_cb;
@@ -173,11 +172,19 @@ uint64_t logger_get_time_us(void) {
 }
 
 int logger_output_lock(void) {
+#if !defined(_LOG_UNIX_LIKE_PLATFORM)
   return (mutex_lock_cb_ && mutex_) ? mutex_lock_cb_(mutex_) : 0;
+#else
+  return pthread_mutex_lock(&log_pthread_mutex_);
+#endif
 }
 
 int logger_output_unlock(void) {
+#if !defined(_LOG_UNIX_LIKE_PLATFORM)
   return (mutex_unlock_cb_ && mutex_) ? mutex_unlock_cb_(mutex_) : 0;
+#else
+  return pthread_mutex_unlock(&log_pthread_mutex_);
+#endif
 }
 
 uintptr_t logger_hex_dump(const void *data, size_t length, size_t width,

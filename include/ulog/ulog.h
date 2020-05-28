@@ -182,6 +182,7 @@ void logger_enable_function_output(bool enable);
  */
 void logger_set_output_level(LogLevel level);
 
+#if !defined(_LOG_UNIX_LIKE_PLATFORM)
 /**
  * Set the log mutex. The log library uses the same buffer and log number
  * variable, so be sure to set this if you use it in different threads. It
@@ -192,6 +193,7 @@ void logger_set_output_level(LogLevel level);
  */
 void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
                            LogMutexUnlock mutex_unlock_cb);
+#endif
 
 /**
  * Set the callback to get the time. Generally, the system startup time is used

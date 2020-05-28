@@ -133,6 +133,8 @@ Unix platform has default configuration, you can use it directly without configu
 
 #### 1.1 Set the log mutex (Can only be called before using the print function)
 
+Note: **Unix-like platforms have default settings, so this function cannot be called.**
+
 The log library uses the same buffer and log number variable, so be sure to set this if you use it in different threads. It should be set before the log library is used.
 
 ```C
