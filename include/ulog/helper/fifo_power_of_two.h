@@ -119,8 +119,8 @@ class FifoPowerOfTwo {
     out_ = in_;
   }
 
-  bool IsFull() const { return Used() == size(); }
-  bool IsEmpty() const { return in_ == out_; }
+  bool full() const { return Used() == size(); }
+  bool empty() const { return in_ == out_; }
 
   /**
    * Check if the fifo is initialized
@@ -144,10 +144,10 @@ class FifoPowerOfTwo {
     LockGuard lg(mutex_);
 
     if (-1 == time_ms) {
-      while (IsEmpty()) cond_.Wait(mutex_.get());
-    } else if (IsEmpty()) {
+      while (empty()) cond_.Wait(mutex_.get());
+    } else if (empty()) {
       cond_.WaitFor(mutex_.get(), time_ms);
-      if (IsEmpty()) return 0;
+      if (empty()) return 0;
     }
 
     num_elements = Min(num_elements, Used());
