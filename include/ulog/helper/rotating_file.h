@@ -6,6 +6,7 @@
 #define ULOG_INCLUDE_ULOG_HELPER_ROTATING_FILE_H_
 
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -71,6 +72,13 @@ class RotatingFile {
     file_writer_.Reopen(true);
   }
 
+  template <typename T>
+  static std::string to_string(const T &n) {
+    std::ostringstream stm;
+    stm << n;
+    return stm.str();
+  }
+
   static std::string CalcFilename(const std::string &filename,
                                   std::size_t index) {
     if (index == 0u) {
@@ -79,7 +87,7 @@ class RotatingFile {
 
     filename_t basename, ext;
     std::tie(basename, ext) = FileWriter::SplitByExtension(filename);
-    return basename + "." + std::to_string(index) + ext;
+    return basename + "." + to_string(index) + ext;
   }
 
   // Copy file

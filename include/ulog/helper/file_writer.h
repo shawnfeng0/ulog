@@ -46,11 +46,11 @@ class FileWriter {
     fd_ = nullptr;
   }
 
-  bool Write(const void *data, size_t len) {
+  bool Write(const void *data, std::size_t len) {
     return fd_ ? (std::fwrite(data, 1, len, fd_) == len) : false;
   }
 
-  ssize_t size() const { return fd_ ? file::filesize(fd_) : -1; }
+  std::size_t size() const { return fd_ ? file::filesize(fd_) : 0; }
 
   const std::string &filename() const { return filename_; }
 

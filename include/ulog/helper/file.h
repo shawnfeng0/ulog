@@ -16,9 +16,9 @@ bool path_exists(const std::string &filename) {
 }
 
 // Return file size according to open FILE* object
-ssize_t filesize(FILE *f) {
+std::size_t filesize(FILE *f) {
   if (f == nullptr) {
-    return -1;
+    return 0;
   }
 
   int fd = ::fileno(f);
@@ -27,15 +27,15 @@ ssize_t filesize(FILE *f) {
     (defined(__LP64__) || defined(_LP64))
   struct stat64 st {};
   if (::fstat64(fd, &st) == 0) {
-    return static_cast<size_t>(st.st_size);
+    return static_cast<std::size_t>(st.st_size);
   }
 #else  // other unix or linux 32 bits or cygwin
   struct stat st {};
   if (::fstat(fd, &st) == 0) {
-    return static_cast<size_t>(st.st_size);
+    return static_cast<std::size_t>(st.st_size);
   }
 #endif
-  return -1;
+  return 0;
 }
 
 // return true on success
