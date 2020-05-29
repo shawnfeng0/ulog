@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "ulog_common.h"
+#include "ulog_private.h"
 
 /**
  * Different levels of log output

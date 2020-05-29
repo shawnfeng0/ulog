@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(ulog)
+project(ulog_project)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 11)
@@ -30,7 +30,7 @@ target_link_libraries(ulog_example_asyn ulog pthread)
 add_executable(ulog_example_rotate_file example/unix/ulog_example_rotate_file.cpp)
 target_link_libraries(ulog_example_rotate_file ulog pthread)
 
-set_property(TARGET ulog PROPERTY PUBLIC_HEADER include/ulog/ulog.h include/ulog/ulog_common.h)
+set_property(TARGET ulog PROPERTY PUBLIC_HEADER include/ulog/ulog.h include/ulog/ulog_private.h)
 
 install(TARGETS ulog
         ARCHIVE DESTINATION lib
