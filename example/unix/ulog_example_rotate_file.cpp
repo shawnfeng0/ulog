@@ -38,7 +38,7 @@ static void OutputFunc() {
 
 int main(int argc, char *argv[]) {
   auto &async_rotate = *new ulog::AsyncRotatingFile(
-      65536 * 2, "/tmp/ulog/test.txt", 100 * 1024, 5, true);
+      65536 * 2, "/tmp/ulog/test.txt", 100 * 1024, 5, 1, true);
 
   // Initial logger
   logger_init(&async_rotate, [](void *private_data_unused, const char *str) {
