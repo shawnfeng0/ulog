@@ -8,7 +8,7 @@ A library written in C/C ++ for printing logs of lightweight embedded devices.
 
 * Any C/C++ language environment, only need C standard library support.
 
-* LOG_TOKEN and LOG_MULTI_TOKEN requires C++11 or GCC extension support, but other functions are not needed.
+* LOGGER_TOKEN and LOGGER_MULTI_TOKEN requires C++11 or GCC extension support, but other functions are not needed.
 
 ## Features
 
@@ -71,34 +71,34 @@ int main() {
 
   double pi = 3.14159265;
   // Different log levels
-  LOG_TRACE("PI = %.3f", pi);
-  LOG_DEBUG("PI = %.3f", pi);
-  LOG_INFO("PI = %.3f", pi);
-  LOG_WARN("PI = %.3f", pi);
-  LOG_ERROR("PI = %.3f", pi);
-  LOG_FATAL("PI = %.3f", pi);
-  LOG_RAW("PI = %.3f\r\n", pi);
+  LOGGER_TRACE("PI = %.3f", pi);
+  LOGGER_DEBUG("PI = %.3f", pi);
+  LOGGER_INFO("PI = %.3f", pi);
+  LOGGER_WARN("PI = %.3f", pi);
+  LOGGER_ERROR("PI = %.3f", pi);
+  LOGGER_FATAL("PI = %.3f", pi);
+  LOGGER_RAW("PI = %.3f\r\n", pi);
 
   // Output debugging expression
-  LOG_TOKEN(pi);
-  LOG_TOKEN(50 * pi / 180);
-  LOG_TOKEN(&pi);  // print address of pi
+  LOGGER_TOKEN(pi);
+  LOGGER_TOKEN(50 * pi / 180);
+  LOGGER_TOKEN(&pi);  // print address of pi
 
   char *text = (char *)"Ulog is a micro log library.";
-  LOG_TOKEN((char *)text);
+  LOGGER_TOKEN((char *)text);
 
   // Hex dump
-  LOG_HEX_DUMP(text, 45, 16);
+  LOGGER_HEX_DUMP(text, 45, 16);
 
   // Output multiple tokens to one line
   time_t now = 1577259816;
   struct tm lt = *localtime(&now);
 
-  LOG_MULTI_TOKEN(lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday);
-  LOG_MULTI_TOKEN(lt.tm_wday, lt.tm_hour, lt.tm_min, lt.tm_sec);
+  LOGGER_MULTI_TOKEN(lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday);
+  LOGGER_MULTI_TOKEN(lt.tm_wday, lt.tm_hour, lt.tm_min, lt.tm_sec);
 
   // Output execution time of some statements
-  LOG_TIME_CODE(
+  LOGGER_TIME_CODE(
 
       uint32_t n = 1000 * 1000; while (n--);
 
@@ -201,13 +201,13 @@ Same format as **printf**.
 
 ```C
 double pi = 3.14159265;
-LOG_TRACE("PI = %.3f", pi);
-LOG_DEBUG("PI = %.3f", pi);
-LOG_INFO("PI = %.3f", pi);
-LOG_WARN("PI = %.3f", pi);
-LOG_ERROR("PI = %.3f", pi);
-LOG_FATAL("PI = %.3f", pi);
-LOG_RAW("PI = %.3f\r\n", pi);
+LOGGER_TRACE("PI = %.3f", pi);
+LOGGER_DEBUG("PI = %.3f", pi);
+LOGGER_INFO("PI = %.3f", pi);
+LOGGER_WARN("PI = %.3f", pi);
+LOGGER_ERROR("PI = %.3f", pi);
+LOGGER_FATAL("PI = %.3f", pi);
+LOGGER_RAW("PI = %.3f\r\n", pi);
 
 /* Output: ---------------------------------------------------------------
 [2020-02-05 18:48:55.111] 14890-14890 T/(ulog_test.cpp:47 main) PI = 3.142
@@ -227,30 +227,30 @@ Output various tokens, the function will automatically recognize the type of tok
 /*
   @param token Can be float, double, [unsigned / signed] char / short / int / long / long long and pointers of the above type
  */
-#define LOG_TOKEN(token) ...
+#define LOGGER_TOKEN(token) ...
 ```
 
 Output multiple tokens to one line, each parameter can be a different type
 
 ```C
 /**
- * @param token Same definition as LOG_TOKEN parameter, but can output up to 16
+ * @param token Same definition as LOGGER_TOKEN parameter, but can output up to 16
  * tokens at the same time
  */
-#define LOG_MULTI_TOKEN(...) ...
+#define LOGGER_MULTI_TOKEN(...) ...
 ```
 
 Example:
 
 ```C
 double pi = 3.14;
-LOG_TOKEN(pi);
-LOG_TOKEN(pi * 50.f / 180.f);
-LOG_TOKEN(&pi);  // print address of pi
+LOGGER_TOKEN(pi);
+LOGGER_TOKEN(pi * 50.f / 180.f);
+LOGGER_TOKEN(&pi);  // print address of pi
 
 time_t now = 1577232000; // 2019-12-25 00:00:00
 struct tm* lt = localtime(&now);
-LOG_MULTI_TOKEN(lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday);
+LOGGER_MULTI_TOKEN(lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday);
 
 /* Output: ---------------------------------------------------------
 (float) pi => 3.140000
@@ -270,7 +270,7 @@ Display contents in hexadecimal and ascii. Same format as "hexdump -C filename"
  * @param length Display length starting from "data"
  * @param width How many bytes of data are displayed in each line
  */
-#define LOG_HEX_DUMP(data, length, width) ...
+#define LOGGER_HEX_DUMP(data, length, width) ...
 ```
 
 Example:
@@ -278,7 +278,7 @@ Example:
 ```C
 char str1[5] = "test";
 char str2[10] = "1234";
-LOG_HEX_DUMP(&str1, 20, 16);
+LOGGER_HEX_DUMP(&str1, 20, 16);
 
 /* Output: ---------------------------------------
 hex_dump(data:&str1, length:20, width:8) =>
@@ -292,13 +292,13 @@ hex_dump(data:&str1, length:20, width:8) =>
 #### 2.4 Statistics code running time
 
 ```C
-#define LOG_TIME_CODE(...) ...
+#define LOGGER_TIME_CODE(...) ...
 ```
 
 Example:
 
 ```C
-LOG_TIME_CODE(
+LOGGER_TIME_CODE(
 
 uint32_t n = 1000 * 1000;
 while (n--);

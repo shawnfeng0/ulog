@@ -2,7 +2,6 @@
 
 #include <cstdio>
 #include <ctime>
-#include <iostream>
 #include <vector>
 
 #include "ulog/helper/async_rotating_file.h"
@@ -12,27 +11,27 @@
 
 static void OutputFunc() {
   int i = 10;
-  LOG_TIME_CODE(while (i--) {
+  LOGGER_TIME_CODE(while (i--) {
     double pi = 3.14159265;
-    LOG_DEBUG("PI = %.3f", pi);
+    LOGGER_DEBUG("PI = %.3f", pi);
 
     // Output debugging expression
-    LOG_TOKEN(pi);
-    LOG_TOKEN(50 * pi / 180);
-    LOG_TOKEN(&pi);  // print address of pi
+    LOGGER_TOKEN(pi);
+    LOGGER_TOKEN(50 * pi / 180);
+    LOGGER_TOKEN(&pi);  // print address of pi
 
     char *text = (char *)"Ulog is a micro log library.";
-    LOG_TOKEN((char *)text);
+    LOGGER_TOKEN((char *)text);
 
     // Hex dump
-    LOG_HEX_DUMP(text, 45, 16);
+    LOGGER_HEX_DUMP(text, 45, 16);
 
     // Output multiple tokens to one line
     time_t now = 1577259816;
     struct tm lt = *localtime(&now);
 
-    LOG_MULTI_TOKEN(lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday);
-    LOG_MULTI_TOKEN(lt.tm_wday, lt.tm_hour, lt.tm_min, lt.tm_sec);
+    LOGGER_MULTI_TOKEN(lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday);
+    LOGGER_MULTI_TOKEN(lt.tm_wday, lt.tm_hour, lt.tm_min, lt.tm_sec);
   });
 }
 

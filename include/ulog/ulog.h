@@ -14,22 +14,22 @@
  * @param fmt Format of the format string
  * @param ... Parameters in the format
  */
-#define LOG_TRACE(fmt, ...) _OUT_LOG(ULOG_LEVEL_TRACE, fmt, ##__VA_ARGS__)
-#define LOG_DEBUG(fmt, ...) _OUT_LOG(ULOG_LEVEL_DEBUG, fmt, ##__VA_ARGS__)
-#define LOG_INFO(fmt, ...) _OUT_LOG(ULOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
-#define LOG_WARN(fmt, ...) _OUT_LOG(ULOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
-#define LOG_ERROR(fmt, ...) _OUT_LOG(ULOG_LEVEL_ERROR, fmt, ##__VA_ARGS__)
-#define LOG_FATAL(fmt, ...) _OUT_LOG(ULOG_LEVEL_FATAL, fmt, ##__VA_ARGS__)
+#define LOGGER_TRACE(fmt, ...) _OUT_LOG(ULOG_LEVEL_TRACE, fmt, ##__VA_ARGS__)
+#define LOGGER_DEBUG(fmt, ...) _OUT_LOG(ULOG_LEVEL_DEBUG, fmt, ##__VA_ARGS__)
+#define LOGGER_INFO(fmt, ...) _OUT_LOG(ULOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
+#define LOGGER_WARN(fmt, ...) _OUT_LOG(ULOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
+#define LOGGER_ERROR(fmt, ...) _OUT_LOG(ULOG_LEVEL_ERROR, fmt, ##__VA_ARGS__)
+#define LOGGER_FATAL(fmt, ...) _OUT_LOG(ULOG_LEVEL_FATAL, fmt, ##__VA_ARGS__)
 
 // Prevent redefinition
 #if defined(ABORT)
 #undef ABORT
 #endif
 
-#define ABORT(fmt, ...)            \
-  do {                             \
-    LOG_FATAL(fmt, ##__VA_ARGS__); \
-    logger_assert_handler();       \
+#define ABORT(fmt, ...)               \
+  do {                                \
+    LOGGER_FATAL(fmt, ##__VA_ARGS__); \
+    logger_assert_handler();          \
   } while (0)
 
 // Prevent redefinition
@@ -40,7 +40,7 @@
 #define ASSERT(exp) \
   if (!(exp)) ABORT("Assertion '%s' failed.", #exp)
 
-#define LOG_RAW(fmt, ...) _OUT_RAW_WITH_LOCK(fmt, ##__VA_ARGS__)
+#define LOGGER_RAW(fmt, ...) _OUT_RAW_WITH_LOCK(fmt, ##__VA_ARGS__)
 
 /**
  * Output various tokens (Requires C++ 11 or GNU extension)
@@ -56,7 +56,7 @@
  * @param token Can be float, double, [unsigned / signed] char / short / int /
  * long / long long and pointers of the above type
  */
-#define LOG_TOKEN(token) _OUT_TOKEN(token, _OUT_TOKEN_CB, true)
+#define LOGGER_TOKEN(token) _OUT_TOKEN(token, _OUT_TOKEN_CB, true)
 
 /**
  * Output multiple tokens to one line (Requires C++ 11 or GNU extension)
@@ -69,7 +69,7 @@
  * @param token Same definition as LOG_TOKEN parameter, but can output up to 16
  * tokens at the same time
  */
-#define LOG_MULTI_TOKEN(...) _OUT_MULTI_TOKEN(__VA_ARGS__)
+#define LOGGER_MULTI_TOKEN(...) _OUT_MULTI_TOKEN(__VA_ARGS__)
 
 /**
  * Statistics code running time,
@@ -83,7 +83,7 @@
  * output:
  * time { uint32_t n = 1000 * 1000; while (n--); } => 1315us
  */
-#define LOG_TIME_CODE(...) _TIME_CODE(__VA_ARGS__)
+#define LOGGER_TIME_CODE(...) _TIME_CODE(__VA_ARGS__)
 
 /**
  * Display contents in hexadecimal and ascii.
@@ -102,7 +102,7 @@
  * @param length Display length starting from "data"
  * @param width How many bytes of data are displayed in each line
  */
-#define LOG_HEX_DUMP(data, length, width) _HEX_DUMP(data, length, width)
+#define LOGGER_HEX_DUMP(data, length, width) _HEX_DUMP(data, length, width)
 
 typedef int (*LogOutput)(void *private_data, const char *ptr);
 typedef int (*LogMutexUnlock)(void *mutex);
@@ -237,6 +237,24 @@ void logger_init(void *private_data, LogOutput output_cb);
  * function is configured, the return value is 0.
  */
 uint64_t logger_get_time_us(void);
+
+#ifdef ULOG_V1_COMPATIBLE
+#define LOG_TRACE LOGGER_TRACE
+#define LOG_DEBUG LOGGER_DEBUG
+#define LOG_INFO LOGGER_INFO
+#define LOG_WARN LOGGER_WARN
+#define LOG_ERROR LOGGER_ERROR
+#define LOG_FATAL LOGGER_FATAL
+
+#define LOG_RAW LOGGER_RAW
+
+#define LOG_TOKEN LOGGER_TOKEN
+#define LOG_MULTI_TOKEN LOGGER_MULTI_TOKEN
+
+#define LOG_TIME_CODE LOGGER_TIME_CODE
+
+#define LOG_HEX_DUMP LOGGER_HEX_DUMP
+#endif
 
 #ifdef __cplusplus
 }
