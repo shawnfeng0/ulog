@@ -20,27 +20,7 @@
 #define LOGGER_WARN(fmt, ...) _OUT_LOG(ULOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
 #define LOGGER_ERROR(fmt, ...) _OUT_LOG(ULOG_LEVEL_ERROR, fmt, ##__VA_ARGS__)
 #define LOGGER_FATAL(fmt, ...) _OUT_LOG(ULOG_LEVEL_FATAL, fmt, ##__VA_ARGS__)
-
-// Prevent redefinition
-#if defined(ABORT)
-#undef ABORT
-#endif
-
-#define ABORT(fmt, ...)               \
-  do {                                \
-    LOGGER_FATAL(fmt, ##__VA_ARGS__); \
-    logger_assert_handler();          \
-  } while (0)
-
-// Prevent redefinition
-#if defined(ASSERT)
-#undef ASSERT
-#endif
-
-#define ASSERT(exp) \
-  if (!(exp)) ABORT("Assertion '%s' failed.", #exp)
-
-#define LOGGER_RAW(fmt, ...) _OUT_RAW_WITH_LOCK(fmt, ##__VA_ARGS__)
+#define LOGGER_RAW(fmt, ...) _OUT_RAW(fmt, ##__VA_ARGS__)
 
 /**
  * Output various tokens (Requires C++ 11 or GNU extension)
@@ -209,18 +189,6 @@ void logger_set_time_callback(LogGetTimeUs get_time_us_cb);
  * LOG_TIME_FORMAT_LOCAL_TIME: Output like this: 2019-01-01 17:45:22.564
  */
 void logger_set_time_format(LogTimeFormat time_format);
-
-/**
- * Assertion failure handler function, call the function set by
- * logger_set_assert_callback
- */
-void logger_assert_handler(void);
-
-/**
- * Set assertion failure handler function
- * @param assert_handler_cb assert handler function
- */
-void logger_set_assert_callback(LogAssertHandlerCb assert_handler_cb);
 
 /**
  * Initialize the logger and set the string output callback function. The

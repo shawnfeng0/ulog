@@ -61,7 +61,7 @@
                ##__VA_ARGS__);                                          \
   } while (0)
 
-#define _OUT_RAW_WITH_LOCK(fmt, ...)       \
+#define _OUT_RAW(fmt, ...)       \
   do {                                     \
     _CHECK_LOG_FORMAT(fmt, ##__VA_ARGS__); \
     logger_raw(true, fmt, ##__VA_ARGS__);  \

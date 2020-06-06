@@ -38,7 +38,6 @@ static uint32_t log_evt_num_ = 1;
 // Log mutex lock and time
 #if defined(_LOG_UNIX_LIKE_PLATFORM)
 #include <pthread.h>
-#include <stdlib.h>  // For abort()
 static int print(void *unused, const char *str) { return printf("%s", str); }
 static LogOutput output_cb_ = print;
 static pthread_mutex_t log_pthread_mutex_ = PTHREAD_MUTEX_INITIALIZER;
@@ -48,22 +47,21 @@ static uint64_t clock_gettime_wrapper(void) {
   return (uint64_t)(tp.tv_sec) * 1000 * 1000 + tp.tv_nsec / 1000;
 }
 static LogGetTimeUs get_time_us_cb_ = clock_gettime_wrapper;
-static LogAssertHandlerCb assert_handler_cb_ = abort;
 static bool log_process_id_enabled_ = true;
 #else
 static LogOutput output_cb_ = NULL;
 static void *mutex_ = NULL;
 static LogMutexLock mutex_lock_cb_ = NULL;
 static LogMutexUnlock mutex_unlock_cb_ = NULL;
-LogGetTimeUs get_time_us_cb_ = NULL;
-LogAssertHandlerCb assert_handler_cb_ = NULL;
+static LogGetTimeUs get_time_us_cb_ = NULL;
 static bool log_process_id_enabled_ = false;
 #endif
 // The private data set by the user will be passed to the output function
 static void *external_private_data_ = NULL;
 
-LogTimeFormat time_format_ = LOG_LOCAL_TIME_SUPPORT ? LOG_TIME_FORMAT_LOCAL_TIME
-                                                    : LOG_TIME_FORMAT_TIMESTAMP;
+static LogTimeFormat time_format_ = LOG_LOCAL_TIME_SUPPORT
+                                        ? LOG_TIME_FORMAT_LOCAL_TIME
+                                        : LOG_TIME_FORMAT_TIMESTAMP;
 
 // Logger default configuration
 static bool log_output_enabled_ = true;
@@ -152,14 +150,6 @@ void logger_set_time_callback(LogGetTimeUs get_time_us_cb) {
 
 void logger_set_time_format(LogTimeFormat time_format) {
   time_format_ = time_format;
-}
-
-void logger_assert_handler(void) {
-  if (assert_handler_cb_) assert_handler_cb_();
-}
-
-void logger_set_assert_callback(LogAssertHandlerCb assert_handler_cb) {
-  assert_handler_cb_ = assert_handler_cb;
 }
 
 void logger_init(void *private_data, LogOutput output_cb) {
