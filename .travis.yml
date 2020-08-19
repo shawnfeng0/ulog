@@ -1,7 +1,7 @@
 language: cpp
 
 before_install:
-- |-
+  - |-
     case $TRAVIS_OS_NAME in
       windows)
         [[ ! -f C:/tools/msys64/msys2_shell.cmd ]] && rm -rf C:/tools/msys64
@@ -21,7 +21,7 @@ before_install:
     esac
 
 before_cache:
-- |-
+  - |-
     case $TRAVIS_OS_NAME in
       windows)
         # https://unix.stackexchange.com/a/137322/107554
@@ -30,7 +30,7 @@ before_cache:
     esac
 
 cache:
-    directories:
+  directories:
     - $HOME/AppData/Local/Temp/chocolatey
     - /C/tools/msys64
 
@@ -47,6 +47,6 @@ matrix:
 script:
   - cd ${TRAVIS_BUILD_DIR}
   - mkdir build && cd build
-  - cmake ../ && cmake --build ./ --target ulog_test && ls -al
-  - if [ "$TRAVIS_OS_NAME" != "windows" ]; then ./ulog_test; fi
-  - if [ "$TRAVIS_OS_NAME" = "windows" ]; then ./Debug/ulog_test.exe; fi
+  - cmake -DULOG_BUILD_TESTS=ON ../ && cmake --build ./ --target ulog_test && ls -al
+  - if [ "$TRAVIS_OS_NAME" != "windows" ]; then ./tests/ulog_test; fi
+  - if [ "$TRAVIS_OS_NAME" = "windows" ]; then ./tests/Debug/ulog_test.exe; fi
