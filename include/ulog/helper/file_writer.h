@@ -47,7 +47,7 @@ class FileWriter {
   }
 
   bool Write(const void *data, std::size_t len) {
-    return fd_ ? (std::fwrite(data, 1, len, fd_) == len) : false;
+    return fd_ != nullptr && (std::fwrite(data, 1, len, fd_) == len);
   }
 
   std::size_t size() const { return fd_ ? file::filesize(fd_) : 0; }
