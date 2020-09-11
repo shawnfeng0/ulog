@@ -41,33 +41,31 @@
 
 // Precompiler define to get only filename;
 #if !defined(__FILENAME__)
-#define __FILENAME__                \
-  (strrchr(__FILE__, '/')           \
-       ? strrchr(__FILE__, '/') + 1 \
-       : strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+#define __FILENAME__                                       \
+  (strrchr(__FILE__, '/')    ? strrchr(__FILE__, '/') + 1  \
+   : strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 \
+                             : __FILE__)
 #endif
 
-#define _CHECK_LOG_FORMAT(...)                                   \
-  do {                                                           \
-    /* Causes the compiler to automatically check the format. */ \
-    char _ulog_c##__LINE__;                                      \
-    snprintf(&_ulog_c##__LINE__, 0, __VA_ARGS__);                \
-  } while (0)
+#if defined(__GNUC__) || defined(__clang__)
+#define _ATTRIBUTE_CHECK_FORMAT(m, n) __attribute__((format(printf, m, n)))
+#else
+#define _ATTRIBUTE_CHECK_FORMAT(m, n)
+#endif
 
 #define _OUT_LOG(level, ...)                                            \
   do {                                                                  \
-    _CHECK_LOG_FORMAT(__VA_ARGS__);                                     \
     logger_log(level, __FILENAME__, __FUNCTION__, __LINE__, true, true, \
                ##__VA_ARGS__);                                          \
   } while (0)
 
-#define _OUT_RAW(fmt, ...)       \
-  do {                                     \
-    _CHECK_LOG_FORMAT(fmt, ##__VA_ARGS__); \
-    logger_raw(true, fmt, ##__VA_ARGS__);  \
+#define _OUT_RAW(fmt, ...)                \
+  do {                                    \
+    logger_raw(true, fmt, ##__VA_ARGS__); \
   } while (0)
 
-#define _OUT_RAW_LOCKED(fmt, ...) logger_raw(false, fmt, ##__VA_ARGS__)
+#define _OUT_RAW_LOCKED(fmt, ...) \
+  logger_raw_no_format_check(false, fmt, ##__VA_ARGS__)
 
 #ifdef __cplusplus
 
@@ -116,8 +114,8 @@ struct TYPE_IS_EQUAL<T, T> {
                             : prefix "%s => " suffix
 
 #define _OUT_TOKEN_CB(...)                                                 \
-  logger_log(ULOG_LEVEL_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, true, \
-             true, ##__VA_ARGS__)
+  logger_log_no_format_check(ULOG_LEVEL_DEBUG, __FILENAME__, __FUNCTION__, \
+                             __LINE__, true, true, ##__VA_ARGS__)
 
 #define _GEN_STRING_TOKEN_FORMAT(color) STR_RED "\"" color "%s" STR_RED "\""
 
@@ -220,9 +218,9 @@ struct TYPE_IS_EQUAL<T, T> {
 #define _MACRO_CONCAT_PRIVATE(l, r) l##r
 #define _MACRO_CONCAT(l, r) _MACRO_CONCAT_PRIVATE(l, r)
 
-#define _OUT_DEBUG_NOLOCK(need_newline, ...)                         \
-  logger_log(ULOG_LEVEL_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, \
-             need_newline, false, ##__VA_ARGS__)
+#define _OUT_DEBUG_NOLOCK(need_newline, ...)                               \
+  logger_log_no_format_check(ULOG_LEVEL_DEBUG, __FILENAME__, __FUNCTION__, \
+                             __LINE__, need_newline, false, ##__VA_ARGS__)
 
 #define _OUT_MULTI_TOKEN(...)                                                 \
   do {                                                                        \
@@ -233,13 +231,14 @@ struct TYPE_IS_EQUAL<T, T> {
     logger_output_unlock();                                                   \
   } while (0)
 
-#define _OUT_TOKEN_WRAPPER_LOCKED(token, left)                            \
-  do {                                                                    \
-    _OUT_TOKEN(token, _OUT_RAW_LOCKED, false);                            \
-    if (left)                                                             \
-      logger_raw(false, logger_color_is_enabled() ? STR_RED ", " : ", "); \
-    else if (logger_color_is_enabled())                                   \
-      logger_raw(false, STR_RESET);                                       \
+#define _OUT_TOKEN_WRAPPER_LOCKED(token, left)                     \
+  do {                                                             \
+    _OUT_TOKEN(token, _OUT_RAW_LOCKED, false);                     \
+    if (left)                                                      \
+      logger_raw_no_format_check(                                  \
+          false, logger_color_is_enabled() ? STR_RED ", " : ", "); \
+    else if (logger_color_is_enabled())                            \
+      logger_raw_no_format_check(false, STR_RESET);                \
   } while (0)
 
 #define _LOG_TOKEN_AUX(_1, ...)                           \
@@ -372,7 +371,9 @@ uintptr_t logger_nolock_hex_dump(const void *data, size_t length, size_t width,
  * is recommended to lock
  * @param ... Parameters in the format
  */
+_ATTRIBUTE_CHECK_FORMAT(2, 3)
 void logger_raw(bool lock_and_flush, const char *fmt, ...);
+void logger_raw_no_format_check(bool lock_and_flush, const char *fmt, ...);
 
 /**
  * Print log
@@ -388,9 +389,13 @@ void logger_raw(bool lock_and_flush, const char *fmt, ...);
  * @param fmt Format string, consistent with printf series functions
  * @param ...
  */
+_ATTRIBUTE_CHECK_FORMAT(7, 8)
 void logger_log(LogLevel level, const char *file, const char *func,
                 uint32_t line, bool newline, bool lock_and_flush,
                 const char *fmt, ...);
+void logger_log_no_format_check(LogLevel level, const char *file,
+                                const char *func, uint32_t line, bool newline,
+                                bool lock_and_flush, const char *fmt, ...);
 
 /**
  * Flush log buffer

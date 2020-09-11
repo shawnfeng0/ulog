@@ -229,20 +229,32 @@ uintptr_t logger_nolock_hex_dump(const void *data, size_t length, size_t width,
   return data_cur - data_raw + base_address;
 }
 
-void logger_raw(bool lock_and_flush, const char *fmt, ...) {
+static void logger_raw_internal(bool lock_and_flush, const char *fmt,
+                                va_list ap) {
   if (!is_logger_valid() || !fmt) return;
 
   if (lock_and_flush) logger_output_lock();
 
-  va_list ap;
-  va_start(ap, fmt);
   VSNPRINTF_WRAPPER(fmt, ap);
-  va_end(ap);
 
   if (lock_and_flush) {
     logger_nolock_flush();
     logger_output_unlock();
   }
+}
+
+void logger_raw(bool lock_and_flush, const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  logger_raw_internal(lock_and_flush, fmt, ap);
+  va_end(ap);
+}
+
+void logger_raw_no_format_check(bool lock_and_flush, const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  logger_raw_internal(lock_and_flush, fmt, ap);
+  va_end(ap);
 }
 
 int logger_nolock_flush(void) {
@@ -254,9 +266,10 @@ int logger_nolock_flush(void) {
   return ret;
 }
 
-void logger_log(LogLevel level, const char *file, const char *func,
-                uint32_t line, bool newline, bool lock_and_flush,
-                const char *fmt, ...) {
+static void logger_log_internal(LogLevel level, const char *file,
+                                const char *func, uint32_t line, bool newline,
+                                bool lock_and_flush, const char *fmt,
+                                va_list ap) {
   if (!is_logger_valid() || !fmt || level < log_level_) return;
 
   if (lock_and_flush) logger_output_lock();
@@ -323,10 +336,7 @@ void logger_log(LogLevel level, const char *file, const char *func,
                              ? level_infos[level][INDEX_SECONDARY_COLOR]
                              : "");
 
-  va_list ap;
-  va_start(ap, fmt);
   VSNPRINTF_WRAPPER(fmt, ap);
-  va_end(ap);
 
   SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_RESET : "");
 
@@ -336,4 +346,24 @@ void logger_log(LogLevel level, const char *file, const char *func,
     logger_nolock_flush();
     logger_output_unlock();
   }
+}
+
+void logger_log_no_format_check(LogLevel level, const char *file,
+                                const char *func, uint32_t line, bool newline,
+                                bool lock_and_flush, const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  logger_log_internal(level, file, func, line, newline, lock_and_flush, fmt,
+                      ap);
+  va_end(ap);
+}
+
+void logger_log(LogLevel level, const char *file, const char *func,
+                uint32_t line, bool newline, bool lock_and_flush,
+                const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  logger_log_internal(level, file, func, line, newline, lock_and_flush, fmt,
+                      ap);
+  va_end(ap);
 }
