@@ -118,7 +118,9 @@ struct TYPE_IS_EQUAL<T, T> {
 
 #define _GEN_STRING_TOKEN_FORMAT(color) STR_RED "\"" color "%s" STR_RED "\""
 
-#define _OUT_TOKEN(token, out_cb)                                            \
+#define _OUT_TOKEN(token) _OUT_TOKEN_IMPLEMENT(token, _OUT_TOKEN_CB)
+
+#define _OUT_TOKEN_IMPLEMENT(token, out_cb)                                  \
   do {                                                                       \
     if (_IS_SAME_TYPE(token, float) || _IS_SAME_TYPE(token, double)) {       \
       out_cb(_GEN_TOKEN_FORMAT("%f"), #token, token);                        \
@@ -208,7 +210,7 @@ struct TYPE_IS_EQUAL<T, T> {
 
 #define _OUT_TOKEN_WRAPPER_LOCKED(token, left)                     \
   do {                                                             \
-    _OUT_TOKEN(token, _OUT_RAW_LOCKED);                            \
+    _OUT_TOKEN_IMPLEMENT(token, _OUT_RAW_LOCKED);                  \
     if (left)                                                      \
       logger_raw_no_format_check(                                  \
           false, logger_color_is_enabled() ? STR_RED ", " : ", "); \
