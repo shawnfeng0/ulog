@@ -36,7 +36,7 @@
  * @param token Can be float, double, [unsigned / signed] char / short / int /
  * long / long long and pointers of the above type
  */
-#define LOGGER_TOKEN(token) _OUT_TOKEN(token, _OUT_TOKEN_CB, true)
+#define LOGGER_TOKEN(token) _OUT_TOKEN(token, _OUT_TOKEN_CB)
 
 /**
  * Output multiple tokens to one line (Requires C++ 11 or GNU extension)

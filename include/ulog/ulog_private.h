@@ -108,10 +108,9 @@ struct TYPE_IS_EQUAL<T, T> {
 #define _IS_SAME_TYPE(var, type) false
 #endif
 
-#define _GEN_TOKEN_FORMAT(prefix, suffix)                                      \
-  logger_color_is_enabled() ? STR_GREEN prefix STR_BLUE "%s " STR_RED          \
-                                                        "=> " STR_GREEN suffix \
-                            : prefix "%s => " suffix
+#define _GEN_TOKEN_FORMAT(suffix)                                           \
+  logger_color_is_enabled() ? STR_BLUE "%s " STR_RED "=> " STR_GREEN suffix \
+                            : "%s => " suffix
 
 #define _OUT_TOKEN_CB(...)                                                 \
   logger_log_no_format_check(ULOG_LEVEL_DEBUG, __FILENAME__, __FUNCTION__, \
@@ -119,76 +118,52 @@ struct TYPE_IS_EQUAL<T, T> {
 
 #define _GEN_STRING_TOKEN_FORMAT(color) STR_RED "\"" color "%s" STR_RED "\""
 
-#define _OUT_TOKEN(token, out_cb, info_out)                                   \
-  do {                                                                        \
-    if (_IS_SAME_TYPE(token, float) || _IS_SAME_TYPE(token, double)) {        \
-      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(float) ", "%f"), #token, token) \
-                 : out_cb(_GEN_TOKEN_FORMAT("", "%f"), #token, token);        \
-    } else if (_IS_SAME_TYPE(token, bool)) {                                  \
-      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(bool) ", "%s"), #token,         \
-                          (token) ? "true" : "false")                         \
-                 : out_cb(_GEN_TOKEN_FORMAT("", "%s"), #token,                \
-                          (token) ? "true" : "false");                        \
-      /* Types with symbols below 64 bits */                                  \
-    } else if (_IS_SAME_TYPE(token, char) ||                                  \
-               _IS_SAME_TYPE(token, unsigned char) ||                         \
-               _IS_SAME_TYPE(token, short) ||                                 \
-               _IS_SAME_TYPE(token, unsigned short) ||                        \
-               _IS_SAME_TYPE(token, int) ||                                   \
-               _IS_SAME_TYPE(token, unsigned int) ||                          \
-               _IS_SAME_TYPE(token, long) ||                                  \
-               _IS_SAME_TYPE(token, long long)) {                             \
-      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(int) ", "%" PRId64), #token,    \
-                          (int64_t)(token))                                   \
-                 : out_cb(_GEN_TOKEN_FORMAT("", "%" PRId64), #token,          \
-                          (int64_t)(token));                                  \
-      /* May be a 64-bit type */                                              \
-    } else if (_IS_SAME_TYPE(token, unsigned long) ||                         \
-               _IS_SAME_TYPE(token, unsigned long long)) {                    \
-      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(int) ", "%" PRIu64), #token,    \
-                          (uint64_t)(token))                                  \
-                 : out_cb(_GEN_TOKEN_FORMAT("", "%" PRIu64), #token,          \
-                          (uint64_t)(token));                                 \
-    } else if (_IS_SAME_TYPE(token, char *) ||                                \
-               _IS_SAME_TYPE(token, const char *) ||                          \
-               _IS_SAME_TYPE(token, unsigned char *) ||                       \
-               _IS_SAME_TYPE(token, const unsigned char *) ||                 \
-               _IS_SAME_TYPE(token, char[]) ||                                \
-               _IS_SAME_TYPE(token, const char[]) ||                          \
-               _IS_SAME_TYPE(token, unsigned char[]) ||                       \
-               _IS_SAME_TYPE(token, const unsigned char[])) {                 \
-      /* Arrays can be changed to pointer types by (var) +1, but this is not  \
-       * compatible with (void *) types */                                    \
-      const char *_ulog_value = (const char *)(uintptr_t)(token);             \
-      if (!_ulog_value) {                                                     \
-        out_cb(_GEN_TOKEN_FORMAT("(char *) ", "nullptr"), #token);            \
-      } else if (info_out) {                                                  \
-        out_cb(_GEN_TOKEN_FORMAT("(char *)[%" PRIu32 "] ",                    \
-                                 _GEN_STRING_TOKEN_FORMAT(STR_GREEN)),        \
-               (uint32_t)strlen(_ulog_value), #token, _ulog_value);           \
-      } else {                                                                \
-        out_cb(_GEN_TOKEN_FORMAT("", _GEN_STRING_TOKEN_FORMAT(STR_GREEN)),    \
-               #token, _ulog_value);                                          \
-      }                                                                       \
-    } else if (_IS_SAME_TYPE(token, void *) ||                                \
-               _IS_SAME_TYPE(token, short *) ||                               \
-               _IS_SAME_TYPE(token, unsigned short *) ||                      \
-               _IS_SAME_TYPE(token, int *) ||                                 \
-               _IS_SAME_TYPE(token, unsigned int *) ||                        \
-               _IS_SAME_TYPE(token, long *) ||                                \
-               _IS_SAME_TYPE(token, unsigned long *) ||                       \
-               _IS_SAME_TYPE(token, long long *) ||                           \
-               _IS_SAME_TYPE(token, unsigned long long *) ||                  \
-               _IS_SAME_TYPE(token, float *) ||                               \
-               _IS_SAME_TYPE(token, double *)) {                              \
-      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(void *) ", "%" PRIx64), #token, \
-                          (uint64_t)(token))                                  \
-                 : out_cb(_GEN_TOKEN_FORMAT("", "%" PRIx64), #token,          \
-                          (uint64_t)(token));                                 \
-    } else {                                                                  \
-      (info_out) ? out_cb(_GEN_TOKEN_FORMAT("(unknown) ", "(none)"), #token)  \
-                 : out_cb(_GEN_TOKEN_FORMAT("", "(none)"), #token);           \
-    }                                                                         \
+#define _OUT_TOKEN(token, out_cb)                                            \
+  do {                                                                       \
+    if (_IS_SAME_TYPE(token, float) || _IS_SAME_TYPE(token, double)) {       \
+      out_cb(_GEN_TOKEN_FORMAT("%f"), #token, token);                        \
+    } else if (_IS_SAME_TYPE(token, bool)) {                                 \
+      out_cb(_GEN_TOKEN_FORMAT("%d"), #token, (token) ? 1 : 0);              \
+      /* Signed integer */                                                   \
+    } else if (_IS_SAME_TYPE(token, char) || _IS_SAME_TYPE(token, short) ||  \
+               _IS_SAME_TYPE(token, int) || _IS_SAME_TYPE(token, long) ||    \
+               _IS_SAME_TYPE(token, long long)) {                            \
+      out_cb(_GEN_TOKEN_FORMAT("%" PRId64), #token, (int64_t)(token));       \
+      /* Unsigned integer */                                                 \
+    } else if (_IS_SAME_TYPE(token, unsigned char) ||                        \
+               _IS_SAME_TYPE(token, unsigned short) ||                       \
+               _IS_SAME_TYPE(token, unsigned int) ||                         \
+               _IS_SAME_TYPE(token, unsigned long) ||                        \
+               _IS_SAME_TYPE(token, unsigned long long)) {                   \
+      out_cb(_GEN_TOKEN_FORMAT("%" PRIu64), #token, (uint64_t)(token));      \
+    } else if (_IS_SAME_TYPE(token, char *) ||                               \
+               _IS_SAME_TYPE(token, const char *) ||                         \
+               _IS_SAME_TYPE(token, unsigned char *) ||                      \
+               _IS_SAME_TYPE(token, const unsigned char *) ||                \
+               _IS_SAME_TYPE(token, char[]) ||                               \
+               _IS_SAME_TYPE(token, const char[]) ||                         \
+               _IS_SAME_TYPE(token, unsigned char[]) ||                      \
+               _IS_SAME_TYPE(token, const unsigned char[])) {                \
+      /* Arrays can be changed to pointer types by (var) +1, but this is not \
+       * compatible with (void *) types */                                   \
+      const char *_ulog_value = (const char *)(uintptr_t)(token);            \
+      out_cb(_GEN_TOKEN_FORMAT(_GEN_STRING_TOKEN_FORMAT(STR_GREEN)), #token, \
+             _ulog_value ? _ulog_value : "NULL");                            \
+    } else if (_IS_SAME_TYPE(token, void *) ||                               \
+               _IS_SAME_TYPE(token, short *) ||                              \
+               _IS_SAME_TYPE(token, unsigned short *) ||                     \
+               _IS_SAME_TYPE(token, int *) ||                                \
+               _IS_SAME_TYPE(token, unsigned int *) ||                       \
+               _IS_SAME_TYPE(token, long *) ||                               \
+               _IS_SAME_TYPE(token, unsigned long *) ||                      \
+               _IS_SAME_TYPE(token, long long *) ||                          \
+               _IS_SAME_TYPE(token, unsigned long long *) ||                 \
+               _IS_SAME_TYPE(token, float *) ||                              \
+               _IS_SAME_TYPE(token, double *)) {                             \
+      out_cb(_GEN_TOKEN_FORMAT("%p"), #token, token);                        \
+    } else {                                                                 \
+      out_cb(_GEN_TOKEN_FORMAT("(none)"), #token);                           \
+    }                                                                        \
   } while (0)
 
 #define _EXPAND(...) __VA_ARGS__
@@ -233,7 +208,7 @@ struct TYPE_IS_EQUAL<T, T> {
 
 #define _OUT_TOKEN_WRAPPER_LOCKED(token, left)                     \
   do {                                                             \
-    _OUT_TOKEN(token, _OUT_RAW_LOCKED, false);                     \
+    _OUT_TOKEN(token, _OUT_RAW_LOCKED);                            \
     if (left)                                                      \
       logger_raw_no_format_check(                                  \
           false, logger_color_is_enabled() ? STR_RED ", " : ", "); \
