@@ -1,5 +1,6 @@
-project(ulog_project)
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.5)
+
+project(ulog)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 11)
