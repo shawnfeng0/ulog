@@ -32,8 +32,8 @@ int main() {
   auto &fifo = *new ulog::FifoPowerOfTwo{32768};
 
   // Initial logger
-  logger_init(&fifo, [](void *private_data_unused, const char *str) {
-    auto &fifo = *(ulog::FifoPowerOfTwo *)(private_data_unused);
+  logger_init(&fifo, [](void *private_data, const char *str) {
+    auto &fifo = *(ulog::FifoPowerOfTwo *)(private_data);
     return (int)fifo.InPacket(str, strlen(str));
   });
 

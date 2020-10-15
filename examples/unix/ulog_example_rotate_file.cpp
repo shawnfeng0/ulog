@@ -40,8 +40,8 @@ int main(int argc, char *argv[]) {
       65536 * 2, "/tmp/ulog/test.txt", 100 * 1024, 5, 1, true);
 
   // Initial logger
-  logger_init(&async_rotate, [](void *private_data_unused, const char *str) {
-    auto &async = *(ulog::AsyncRotatingFile *)(private_data_unused);
+  logger_init(&async_rotate, [](void *private_data, const char *str) {
+    auto &async = *(ulog::AsyncRotatingFile *)(private_data);
     return (int)async.InPacket(str, strlen(str));
   });
 
