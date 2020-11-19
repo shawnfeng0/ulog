@@ -289,11 +289,11 @@ static void logger_log_internal(LogLevel level, const char *file,
     if (time_format_ == LOG_TIME_FORMAT_LOCAL_TIME) {
       time_t time_s = time_ms / 1000;
       struct tm lt = *localtime(&time_s);
-      SNPRINTF_WRAPPER("[%04d-%02d-%02d %02d:%02d:%02d.%03d] ",
+      SNPRINTF_WRAPPER("%04d-%02d-%02d %02d:%02d:%02d.%03d ",
                        lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday, lt.tm_hour,
                        lt.tm_min, lt.tm_sec, (int)(time_ms % 1000));
     } else {
-      SNPRINTF_WRAPPER("[%" PRId64 ".%03" PRId64 "] ", time_ms / 1000,
+      SNPRINTF_WRAPPER("%" PRId64 ".%03" PRId64 " ", time_ms / 1000,
                        time_ms % 1000);
     }
   }
