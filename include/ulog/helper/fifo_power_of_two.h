@@ -258,35 +258,35 @@ class FifoPowerOfTwo {
     return x > y ? x : y;
   }
 
-  // round up to nearest power of two
-  static inline uint64_t RoundUpPowOfTwo(uint64_t n) {
-    return (n == 0) ? 1 : (1UL << FindLastSet(n - 1U));
+  template <typename T>
+  static inline auto RoundPowOfTwo(T n) -> decltype(n) {
+    uint64_t value = n;
+
+    // Fill 1
+    value |= value >> 1U;
+    value |= value >> 2U;
+    value |= value >> 4U;
+    value |= value >> 8U;
+    value |= value >> 16U;
+    value |= value >> 32U;
+
+    // Unable to round-up, take the value of round-down
+    if (decltype(n)(value + 1) == 0) {
+      value >>= 1U;
+    }
+
+    return value + 1;
   }
 
-  // round down to nearest power of two
-  static inline uint64_t RoundDownPowOfTwo(uint64_t n) {
-    return (n == 0) ? 1 : (1UL << (FindLastSet(n) - 1U));
+  static inline auto RoundUpPowOfTwo(uint32_t n) -> decltype(n) {
+    if (n == 0) return 1;
+
+    // Avoid is already a power of 2
+    return RoundPowOfTwo<decltype(n)>(n - 1);
   }
 
-  // Contrary to __builtin_ffs, find the highest 1
-  // if x is zero, returns zero.
-  static inline unsigned FindLastSet(uint64_t x) {
-    return 64 - CountLeadingZero(x);
-  }
-
-  // Similar to __builtin_clz:
-  // Returns the number of leading 0-bits in x, starting at the most
-  // significant bit position.
-  static inline unsigned CountLeadingZero(uint64_t x) {
-    unsigned r = 0;
-    if (!(x & 0xFFFFFFFF00000000)) r += 32, x <<= 32U;
-    if (!(x & 0xFFFF000000000000)) r += 16, x <<= 16U;
-    if (!(x & 0xFF00000000000000)) r += 8, x <<= 8U;
-    if (!(x & 0xF000000000000000)) r += 4, x <<= 4U;
-    if (!(x & 0xC000000000000000)) r += 2, x <<= 2U;
-    if (!(x & 0x8000000000000000)) r += 1, x <<= 1U;
-    if (!(x & 0x8000000000000000)) r += 1;
-    return r;
+  static inline auto RoundDownPowOfTwo(uint32_t n) -> decltype(n) {
+    return RoundPowOfTwo<decltype(n)>(n >> 1U);
   }
 };
 
