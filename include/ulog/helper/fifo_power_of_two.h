@@ -12,6 +12,7 @@
 
 namespace ulog {
 
+// Reference from kfifo of linux
 class FifoPowerOfTwo {
 #define _is_power_of_2(x) ((x) != 0 && (((x) & ((x)-1)) == 0))
  public:
@@ -59,9 +60,13 @@ class FifoPowerOfTwo {
 
   // A packet is entered, either completely written or discarded.
   size_t InPacket(const void *buf, size_t num_elements) {
+    if (!buf) {
+      return 0;
+    }
+
     LockGuard lg(mutex_);
 
-    if (available() < num_elements) {
+    if (unused() < num_elements) {
       num_dropped_ += num_elements;
       peak_ = size();
       return 0;
@@ -77,11 +82,15 @@ class FifoPowerOfTwo {
   }
 
   size_t In(const void *buf, size_t num_elements) {
+    if (!buf) {
+      return 0;
+    }
+
     LockGuard lg(mutex_);
 
     peak_ = max(peak_, used());
 
-    const size_t len = min(num_elements, available());
+    const size_t len = min(num_elements, unused());
 
     CopyInLocked(buf, len, in_);
     in_ += len;
@@ -91,32 +100,11 @@ class FifoPowerOfTwo {
     return len;
   }
 
-  /**
-   * removes the entire fifo content
-   *
-   * Note: usage of Reset() is dangerous. It should be only called when the
-   * fifo is exclusived locked or when it is secured that no other thread is
-   * accessing the fifo.
-   */
-  void Reset() {
-    LockGuard lg(mutex_);
-    out_ = in_;
-  }
-
-  bool full() const { return used() == size(); }
-  bool empty() const { return in_ == out_; }
-
-  /**
-   * Check if the fifo is initialized
-   * Return %true if fifo is initialized, otherwise %false.
-   * Assumes the fifo was 0 before.
-   */
-  bool initialized() const { return mask_ != 0; };
-  size_t num_dropped() const { return num_dropped_; }
-  size_t peak() const { return peak_; }
-  size_t size() const { return mask_ + 1; }
-
   size_t OutPeek(void *out_buf, size_t num_elements) {
+    if (!out_buf) {
+      return 0;
+    }
+
     LockGuard lg(mutex_);
     num_elements = min(num_elements, used());
     CopyOutLocked(out_buf, num_elements, out_);
@@ -125,6 +113,10 @@ class FifoPowerOfTwo {
 
   size_t OutWaitIfEmpty(void *out_buf, size_t num_elements,
                         int32_t time_ms = -1) {
+    if (!out_buf) {
+      return 0;
+    }
+
     LockGuard lg(mutex_);
 
     if (-1 == time_ms) {
@@ -141,6 +133,10 @@ class FifoPowerOfTwo {
   }
 
   size_t Out(void *out_buf, size_t num_elements) {
+    if (!out_buf) {
+      return 0;
+    }
+
     LockGuard lg(mutex_);
     num_elements = min(num_elements, used());
     CopyOutLocked(out_buf, num_elements, out_);
@@ -148,12 +144,48 @@ class FifoPowerOfTwo {
     return num_elements;
   }
 
+  /**
+   * removes the entire fifo content
+   *
+   * Note: usage of Reset() is dangerous. It should be only called when the
+   * fifo is exclusived locked or when it is secured that no other thread is
+   * accessing the fifo.
+   */
+  void Reset() {
+    LockGuard lg(mutex_);
+    out_ = in_;
+  }
+
+  /**
+   * Check if the fifo is initialized
+   * Return %true if fifo is initialized, otherwise %false.
+   * Assumes the fifo was 0 before.
+   */
+  bool initialized() const { return mask_ != 0; };
+
+  /* returns the size of the fifo in elements */
+  size_t size() const { return mask_ + 1; }
+
+  /* returns the number of used elements in the fifo */
+  size_t used() const { return in_ - out_; }
+  bool empty() const { return used() == 0; }
+
+  /* returns the number of unused elements in the fifo */
+  size_t unused() const { return size() - used(); }
+
+  /* DEBUG: Used to count the number of new data discarded during use */
+  size_t num_dropped() const { return num_dropped_; }
+
+  /* DEBUG: Used to count the maximum peak value during use */
+  size_t peak() const { return peak_; }
+
  private:
-  size_t in_{};                      // data is added at offset (in % size)
-  size_t out_{};                     // data is extracted from off. (out % size)
-  unsigned char *data_{};            // the buffer holding the data
-  bool is_allocated_memory_{false};  // Used to identify whether the internal
-                                     // buffer is allocated internally
+  size_t in_{};            // data is added at offset (in % size)
+  size_t out_{};           // data is extracted from off. (out % size)
+  unsigned char *data_{};  // the buffer holding the data
+  const bool is_allocated_memory_{
+      false};      // Used to identify whether the internal
+                   // buffer is allocated internally
   size_t mask_{};  // (Constant) Mask used to match the correct in / out pointer
   const size_t element_size_;  // the size of the element
   size_t num_dropped_{};       // Number of dropped elements
@@ -245,9 +277,6 @@ class FifoPowerOfTwo {
     memcpy(dst, data_ + off, l);
     memcpy((unsigned char *)dst + l, data_, len - l);
   }
-
-  size_t available() const { return size() - used(); }
-  size_t used() const { return in_ - out_; }
 
   template <typename T>
   static inline T min(T x, T y) {
