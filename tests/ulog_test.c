@@ -3,21 +3,6 @@
 #include <stdio.h>
 #include <time.h>
 
-static uint64_t get_time_us() {
-#if defined(WIN32)
-  struct timespec tp = {0, 0};
-  (void)timespec_get(&tp, TIME_UTC);
-  return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
-#elif defined(__unix__) || defined(__APPLE__)
-  struct timespec tp = {0, 0};
-  clock_gettime(CLOCK_REALTIME, &tp);
-  return static_cast<uint64_t>(tp.tv_sec) * 1000 * 1000 + tp.tv_nsec / 1000;
-#else
-  // Need to implement a function to get time
-  return 0;
-#endif
-}
-
 static int put_str(void *private_data, const char *str) {
   private_data = private_data;  // unused
 #if defined(WIN32) || defined(__unix__) || defined(__APPLE__)
@@ -28,16 +13,23 @@ static int put_str(void *private_data, const char *str) {
 }
 
 int main() {
+  struct ulog_s *local_logger = logger_create(NULL, put_str);
   // Initial logger
-  logger_set_time_callback(get_time_us);
-  logger_init(nullptr, put_str);
+  logger_set_output_callback(ULOG_GLOBAL, NULL, put_str);
 
   // Different log levels
   double pi = 3.14159265;
 
   LOGGER_TRACE("PI = %.3f", pi);
+  LOGGER_LOCAL_TRACE(local_logger, "PI = %.3f", pi);
+
   LOGGER_DEBUG("PI = %.3f", pi);
+  LOGGER_LOCAL_DEBUG(local_logger, "PI = %.3f", pi);
+
   LOGGER_INFO("PI = %.3f", pi);
+  LOGGER_LOCAL_INFO(local_logger, "PI = %.3f", pi);
+
+  LOGGER_WARN("PI = %.3f", pi);
   LOGGER_WARN("PI = %.3f", pi);
   LOGGER_ERROR("PI = %.3f", pi);
   LOGGER_FATAL("PI = %.3f", pi);
@@ -67,5 +59,6 @@ int main() {
 
   );
 
+  logger_destroy(&local_logger);
   return 0;
 }

@@ -40,21 +40,6 @@ git submodule add https://github.com/ShawnFeng0/ulog.git
 #include <stdio.h>
 #include <time.h>
 
-static uint64_t get_time_us() {
-#if defined(WIN32)
-  struct timespec tp = {0, 0};
-  (void)timespec_get(&tp, TIME_UTC);
-  return tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000;
-#elif defined(__unix__) || defined(__APPLE__)
-  struct timespec tp = {0, 0};
-  clock_gettime(CLOCK_REALTIME, &tp);
-  return static_cast<uint64_t>(tp.tv_sec) * 1000 * 1000 + tp.tv_nsec / 1000;
-#else
-  // Need to implement a function to get time
-  return 0;
-#endif
-}
-
 static int put_str(void *private_data, const char *str) {
   private_data = private_data; // unused
 #if defined(WIN32) || defined(__unix__) || defined(__APPLE__)
@@ -66,8 +51,7 @@ static int put_str(void *private_data, const char *str) {
 
 int main() {
   // Initial logger
-  logger_set_time_callback(get_time_us);
-  logger_init(nullptr, put_str);
+  logger_set_output_callback(nullptr, put_str);
 
   double pi = 3.14159265;
   // Different log levels
@@ -155,32 +139,14 @@ int main(int argc, char *argv[]) {
 }
 ```
 
-#### 1.2 Set the callback to get the time
-
-```C
-void logger_set_time_callback(LogGetTimeUs get_time_us_cb);
-
-// Sample(unix)
-static uint64_t get_time_us() {
-  struct timespec tp = {0, 0};
-  clock_gettime(CLOCK_REALTIME, &tp);
-  return static_cast<uint64_t>(tp.tv_sec * 1000 * 1000 + tp.tv_nsec / 1000);
-}
-
-int main(int argc, char *argv[]) {
-  logger_set_time_callback(get_time_us);
-  // ...
-}
-```
-
-#### 1.3 Initialize the logger and set the string output callback function
+#### 1.2 Initialize the logger and set the string output callback function
 
 The simplest configuration is just to configure the output callback.
 
 private_data: Set by the user, each output will be passed to output_cb, output can be more flexible.
  
 ```C
-void logger_init(void *private_data, LogOutput output_cb);
+void logger_set_output_callback(void *private_data, LogOutput output_cb);
 
 // Sample
 static int put_str(void *private_data, const char *str) {
@@ -188,7 +154,7 @@ static int put_str(void *private_data, const char *str) {
   return printf("%s", str);
 }
 int main(int argc, char *argv[]) {
-  logger_init(NULL, put_str);
+  logger_set_output_callback(NULL, put_str);
   // ...
 }
 ```
@@ -364,12 +330,4 @@ void logger_enable_function_output(bool enable);
 // ULOG_LEVEL_ERROR
 // ULOG_LEVEL_FATAL
 void logger_set_output_level(LogLevel level);
-```
-
-```C
-// Set time output format
-// LOG_TIME_FORMAT_TIMESTAMP: Output like this: 1576886405.225
-// LOG_TIME_FORMAT_LOCAL_TIME: Output like this: 2019-01-01 17:45:22.564
-
-void logger_set_time_format(LogTimeFormat time_format);
 ```

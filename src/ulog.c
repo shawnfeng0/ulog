@@ -1,11 +1,14 @@
 #include "ulog/ulog.h"
 
 #include <ctype.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #ifndef ULOG_OUTBUF_LEN
 #define ULOG_OUTBUF_LEN 512 /* Size of buffer used for log printout */
@@ -14,64 +17,6 @@
 #if ULOG_OUTBUF_LEN < 64
 #pragma message("ULOG_OUTBUF_LEN is recommended to be greater than 64")
 #endif
-
-static char log_out_buf_[ULOG_OUTBUF_LEN];
-static char *const kLogBufferStartIndex_ = log_out_buf_;
-static char *const kLogBufferEndIndex_ = log_out_buf_ + sizeof(log_out_buf_);
-static char *cur_buf_ptr_ = log_out_buf_;
-static uint32_t log_evt_num_ = 1;
-
-#define SNPRINTF_WRAPPER(fmt, ...)                                        \
-  do {                                                                    \
-    snprintf(cur_buf_ptr_, (kLogBufferEndIndex_ - cur_buf_ptr_), fmt,     \
-             ##__VA_ARGS__);                                              \
-    cur_buf_ptr_ = kLogBufferStartIndex_ + strlen(kLogBufferStartIndex_); \
-  } while (0)
-
-#define VSNPRINTF_WRAPPER(fmt, arg_list)                                  \
-  do {                                                                    \
-    vsnprintf(cur_buf_ptr_, (kLogBufferEndIndex_ - cur_buf_ptr_), fmt,    \
-              arg_list);                                                  \
-    cur_buf_ptr_ = kLogBufferStartIndex_ + strlen(kLogBufferStartIndex_); \
-  } while (0)
-
-// Log mutex lock and time
-#if defined(_LOG_UNIX_LIKE_PLATFORM)
-#include <pthread.h>
-static int print(void *unused, const char *str) { return printf("%s", str); }
-static LogOutput output_cb_ = print;
-static pthread_mutex_t log_pthread_mutex_ = PTHREAD_MUTEX_INITIALIZER;
-static uint64_t clock_gettime_wrapper(void) {
-  struct timespec tp;
-  clock_gettime(CLOCK_REALTIME, &tp);
-  return (uint64_t)(tp.tv_sec) * 1000 * 1000 + tp.tv_nsec / 1000;
-}
-static LogGetTimeUs get_time_us_cb_ = clock_gettime_wrapper;
-static bool log_process_id_enabled_ = true;
-#else
-static LogOutput output_cb_ = NULL;
-static void *mutex_ = NULL;
-static LogMutexLock mutex_lock_cb_ = NULL;
-static LogMutexUnlock mutex_unlock_cb_ = NULL;
-static LogGetTimeUs get_time_us_cb_ = NULL;
-static bool log_process_id_enabled_ = false;
-#endif
-// The private data set by the user will be passed to the output function
-static void *external_private_data_ = NULL;
-
-static LogTimeFormat time_format_ = LOG_LOCAL_TIME_SUPPORT
-                                        ? LOG_TIME_FORMAT_LOCAL_TIME
-                                        : LOG_TIME_FORMAT_TIMESTAMP;
-
-// Logger default configuration
-static bool log_output_enabled_ = true;
-static bool log_color_enabled_ = true;
-static bool log_number_enabled_ = false;
-static bool log_time_enabled_ = true;
-static bool log_level_enabled_ = true;
-static bool log_file_line_enabled_ = true;
-static bool log_function_enabled_ = true;
-static LogLevel log_level_ = ULOG_LEVEL_TRACE;
 
 enum {
   INDEX_PRIMARY_COLOR = 0,
@@ -89,129 +34,236 @@ static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
     {(char *)STR_BOLD_PURPLE, (char *)STR_PURPLE, (char *)"F"},  // FATAL
 };
 
-#if defined(_LOG_UNIX_LIKE_PLATFORM)
-#include <unistd.h>
-#define GET_PID() getpid()
+static inline int logger_printf(void *x, const char *str) {
+  return printf("%s", str);
+}
+
+static inline int logger_get_pid() {
+  static int process_id = -1;
+  if (process_id == -1) {
+    process_id = getpid();
+  }
+  return process_id;
+}
+
+// Get and thread id
 #if defined(__APPLE__)
-#include <pthread.h>
-#define GET_TID() pthread_mach_thread_np(pthread_self())
+static inline long logger_get_tid() {
+  return pthread_mach_thread_np(pthread_self())
+}
 #else  // defined(__APPLE__)
 #include <sys/syscall.h>
-#define GET_TID() syscall(SYS_gettid)
+static inline long logger_get_tid() { return syscall(SYS_gettid); }
 #endif  // defined(__APPLE__)
 
-#else  // defined(_LOG_UNIX_LIKE_PLATFORM)
-#define GET_PID() 0
-#define GET_TID() 0
-#endif  // defined(_LOG_UNIX_LIKE_PLATFORM)
+struct ulog_s {
+  // Internal data
+  char log_out_buf_[ULOG_OUTBUF_LEN];
+  char *cur_buf_ptr_;
+  uint32_t log_evt_num_;
+  pthread_mutex_t mutex_;
 
-static bool is_logger_valid() { return output_cb_ && log_output_enabled_; }
+  // Private data set by the user will be passed to the output function
+  void *user_data_;
+  LogOutput output_cb_;
 
-void logger_enable_output(bool enable) { log_output_enabled_ = enable; }
+  // Format configuration
+  bool log_process_id_enabled_;
+  bool log_output_enabled_;
+  bool log_color_enabled_;
+  bool log_number_enabled_;
+  bool log_time_enabled_;
+  bool log_level_enabled_;
+  bool log_file_line_enabled_;
+  bool log_function_enabled_;
+  LogLevel log_level_;
+};
 
-void logger_enable_color(bool enable) { log_color_enabled_ = enable; }
+// Will be exported externally
+static struct ulog_s ulog_global_instance_ = {
+    .cur_buf_ptr_ = ulog_global_instance_.log_out_buf_,
+    .log_evt_num_ = 1,
+    .mutex_ = PTHREAD_MUTEX_INITIALIZER,
 
-bool logger_color_is_enabled(void) { return log_color_enabled_; }
+    // Logger default configuration
+    .user_data_ = NULL,
+    .output_cb_ = logger_printf,
+    .log_process_id_enabled_ = true,
+    .log_output_enabled_ = true,
+    .log_color_enabled_ = true,
+    .log_number_enabled_ = false,
+    .log_time_enabled_ = true,
+    .log_level_enabled_ = true,
+    .log_file_line_enabled_ = true,
+    .log_function_enabled_ = true,
+    .log_level_ = ULOG_LEVEL_TRACE,
+};
 
-void logger_enable_number_output(bool enable) { log_number_enabled_ = enable; }
+struct ulog_s *ulog_global_instance_ptr = &ulog_global_instance_;
 
-void logger_enable_time_output(bool enable) { log_time_enabled_ = enable; }
+#define SNPRINTF_WRAPPER(logger, fmt, ...)                          \
+  ({                                                                \
+    snprintf(logger->cur_buf_ptr_,                                  \
+             (logger->log_out_buf_ + sizeof(logger->log_out_buf_) - \
+              logger->cur_buf_ptr_),                                \
+             fmt, ##__VA_ARGS__);                                   \
+    logger->cur_buf_ptr_ =                                          \
+        logger->log_out_buf_ + strlen(logger->log_out_buf_);        \
+  })
 
-#if defined(_LOG_UNIX_LIKE_PLATFORM)
-void logger_enable_process_id_output(bool enable) {
-  log_process_id_enabled_ = enable;
-}
-#endif
+#define VSNPRINTF_WRAPPER(logger, fmt, arg_list)                     \
+  ({                                                                 \
+    vsnprintf(logger->cur_buf_ptr_,                                  \
+              (logger->log_out_buf_ + sizeof(logger->log_out_buf_) - \
+               logger->cur_buf_ptr_),                                \
+              fmt, arg_list);                                        \
+    logger->cur_buf_ptr_ =                                           \
+        logger->log_out_buf_ + strlen(logger->log_out_buf_);         \
+  })
 
-void logger_enable_level_output(bool enable) { log_level_enabled_ = enable; }
-
-void logger_enable_file_line_output(bool enable) {
-  log_file_line_enabled_ = enable;
-}
-
-void logger_enable_function_output(bool enable) {
-  log_function_enabled_ = enable;
-}
-
-void logger_set_output_level(LogLevel level) { log_level_ = level; }
-
-#if !defined(_LOG_UNIX_LIKE_PLATFORM)
-void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb,
-                           LogMutexUnlock mutex_unlock_cb) {
-  mutex_ = mutex;
-  mutex_lock_cb_ = mutex_lock_cb;
-  mutex_unlock_cb_ = mutex_unlock_cb;
-}
-#endif
-
-void logger_set_time_callback(LogGetTimeUs get_time_us_cb) {
-  get_time_us_cb_ = get_time_us_cb;
-}
-
-void logger_set_time_format(LogTimeFormat time_format) {
-  time_format_ = time_format;
-}
-
-void logger_init(void *private_data, LogOutput output_cb) {
-  logger_output_lock();
-
-  output_cb_ = output_cb;
-  external_private_data_ = private_data;
-
-  logger_output_unlock();
-}
-
-uint64_t logger_get_time_us(void) {
-  return get_time_us_cb_ ? get_time_us_cb_() : 0;
-}
-
-int logger_output_lock(void) {
-#if !defined(_LOG_UNIX_LIKE_PLATFORM)
-  return (mutex_lock_cb_ && mutex_) ? mutex_lock_cb_(mutex_) : 0;
-#else
-  return pthread_mutex_lock(&log_pthread_mutex_);
-#endif
+static inline bool is_logger_valid(struct ulog_s *logger) {
+  return logger && logger->output_cb_ && logger->log_output_enabled_;
 }
 
-int logger_output_unlock(void) {
-#if !defined(_LOG_UNIX_LIKE_PLATFORM)
-  return (mutex_unlock_cb_ && mutex_) ? mutex_unlock_cb_(mutex_) : 0;
-#else
-  return pthread_mutex_unlock(&log_pthread_mutex_);
-#endif
+struct ulog_s *logger_create(void *private_data, LogOutput output_cb) {
+  struct ulog_s *logger = malloc(sizeof(struct ulog_s));
+  if (!logger) return NULL;
+  memset(logger, 0, sizeof(struct ulog_s));
+
+  pthread_mutex_init(&logger->mutex_, NULL);
+  logger->cur_buf_ptr_ = logger->log_out_buf_;
+  logger->log_evt_num_ = 1;
+  logger->log_output_enabled_ = true;
+  logger->log_process_id_enabled_ = true;
+  logger->log_output_enabled_ = true;
+  logger->log_color_enabled_ = true;
+  logger->log_time_enabled_ = true;
+  logger->log_level_enabled_ = true;
+  logger->log_file_line_enabled_ = true;
+  logger->log_function_enabled_ = true;
+  logger_set_output_callback(logger, private_data, output_cb);
+  return logger;
 }
 
-uintptr_t logger_nolock_hex_dump(const void *data, size_t length, size_t width,
+void logger_destroy(struct ulog_s **logger) {
+  if (!logger || !*logger) {
+    return;
+  }
+  pthread_mutex_destroy(&(*logger)->mutex_);
+  free(*logger);
+  (*logger) = NULL;
+}
+
+void logger_set_output_callback(struct ulog_s *logger, void *private_data,
+                                LogOutput output_cb) {
+  if (!logger) return;
+  logger_output_lock(logger);
+
+  logger->output_cb_ = output_cb;
+  logger->user_data_ = private_data;
+
+  logger_output_unlock(logger);
+}
+
+void logger_enable_output(struct ulog_s *logger, bool enable) {
+  logger && (logger->log_output_enabled_ = enable);
+}
+
+void logger_enable_color(struct ulog_s *logger, bool enable) {
+  logger && (logger->log_color_enabled_ = enable);
+}
+
+bool logger_color_is_enabled(struct ulog_s *logger) {
+  return logger && logger->log_color_enabled_;
+}
+
+void logger_enable_number_output(struct ulog_s *logger, bool enable) {
+  logger && (logger->log_number_enabled_ = enable);
+}
+
+void logger_enable_time_output(struct ulog_s *logger, bool enable) {
+  logger && (logger->log_time_enabled_ = enable);
+}
+
+void logger_enable_process_id_output(struct ulog_s *logger, bool enable) {
+  logger && (logger->log_process_id_enabled_ = enable);
+}
+
+void logger_enable_level_output(struct ulog_s *logger, bool enable) {
+  logger && (logger->log_level_enabled_ = enable);
+}
+
+void logger_enable_file_line_output(struct ulog_s *logger, bool enable) {
+  logger && (logger->log_file_line_enabled_ = enable);
+}
+
+void logger_enable_function_output(struct ulog_s *logger, bool enable) {
+  logger && (logger->log_function_enabled_ = enable);
+}
+
+void logger_set_output_level(struct ulog_s *logger, LogLevel level) {
+  logger && (logger->log_level_ = level);
+}
+
+uint64_t logger_real_time_us() {
+  struct timespec tp;
+  clock_gettime(CLOCK_REALTIME, &tp);
+  return (uint64_t)(tp.tv_sec) * 1000 * 1000 + tp.tv_nsec / 1000;
+}
+
+uint64_t logger_monotonic_time_us() {
+  struct timespec tp;
+  clock_gettime(CLOCK_MONOTONIC, &tp);
+  return (uint64_t)(tp.tv_sec) * 1000 * 1000 + tp.tv_nsec / 1000;
+}
+
+int logger_output_lock(struct ulog_s *logger) {
+  if (logger) {
+    return pthread_mutex_lock(&logger->mutex_);
+  }
+  return -1;
+}
+
+int logger_output_unlock(struct ulog_s *logger) {
+  if (logger) {
+    return pthread_mutex_unlock(&logger->mutex_);
+  }
+  return -1;
+}
+
+uintptr_t logger_nolock_hex_dump(struct ulog_s *logger, const void *data,
+                                 size_t length, size_t width,
                                  uintptr_t base_address, bool tail_addr_out) {
-  if (!data || width == 0 || !is_logger_valid()) return 0;
+  if (!data || width == 0 || !is_logger_valid(logger)) return 0;
 
   const uint8_t *data_raw = data;
   const uint8_t *data_cur = data;
 
   // The output fails, in order to avoid output confusion, the rest will not
   // be output
-  if (logger_nolock_flush() <= 0) {
+  if (logger_nolock_flush(logger) <= 0) {
     return 0;
   }
 
   bool out_break = false;
   while (length) {
-    SNPRINTF_WRAPPER("%08" PRIxPTR "  ", data_cur - data_raw + base_address);
+    SNPRINTF_WRAPPER(logger, "%08" PRIxPTR "  ",
+                     data_cur - data_raw + base_address);
     for (size_t i = 0; i < width; i++) {
       if (i < length)
-        SNPRINTF_WRAPPER("%02" PRIx8 " %s", data_cur[i],
+        SNPRINTF_WRAPPER(logger, "%02" PRIx8 " %s", data_cur[i],
                          i == width / 2 - 1 ? " " : "");
       else
-        SNPRINTF_WRAPPER("   %s", i == width / 2 - 1 ? " " : "");
+        SNPRINTF_WRAPPER(logger, "   %s", i == width / 2 - 1 ? " " : "");
     }
-    SNPRINTF_WRAPPER(" |");
+    SNPRINTF_WRAPPER(logger, " |");
     for (size_t i = 0; i < width && i < length; i++)
-      SNPRINTF_WRAPPER("%c", isprint(data_cur[i]) ? data_cur[i] : '.');
-    SNPRINTF_WRAPPER("|\r\n");
+      SNPRINTF_WRAPPER(logger, "%c", isprint(data_cur[i]) ? data_cur[i] : '.');
+    SNPRINTF_WRAPPER(logger, "|\r\n");
 
     // The output fails, in order to avoid output confusion, the rest will not
     // be output
-    if (logger_nolock_flush() <= 0) {
+    if (logger_nolock_flush(logger) <= 0) {
       out_break = true;
       break;
     }
@@ -221,149 +273,159 @@ uintptr_t logger_nolock_hex_dump(const void *data, size_t length, size_t width,
   }
 
   if (out_break) {
-    SNPRINTF_WRAPPER("hex dump is break!\r\n");
+    SNPRINTF_WRAPPER(logger, "hex dump is break!\r\n");
   } else if (tail_addr_out) {
-    SNPRINTF_WRAPPER("%08" PRIxPTR "\r\n", data_cur - data_raw + base_address);
+    SNPRINTF_WRAPPER(logger, "%08" PRIxPTR "\r\n",
+                     data_cur - data_raw + base_address);
   }
-  logger_nolock_flush();
+  logger_nolock_flush(logger);
   return data_cur - data_raw + base_address;
 }
 
-static void logger_raw_internal(bool lock_and_flush, const char *fmt,
-                                va_list ap) {
-  if (!is_logger_valid() || !fmt) return;
+static void logger_raw_internal(struct ulog_s *logger, bool lock_and_flush,
+                                const char *fmt, va_list ap) {
+  if (!is_logger_valid(logger) || !fmt) return;
 
-  if (lock_and_flush) logger_output_lock();
+  if (lock_and_flush) logger_output_lock(logger);
 
-  VSNPRINTF_WRAPPER(fmt, ap);
+  VSNPRINTF_WRAPPER(logger, fmt, ap);
 
   if (lock_and_flush) {
-    logger_nolock_flush();
-    logger_output_unlock();
+    logger_nolock_flush(logger);
+    logger_output_unlock(logger);
   }
 }
 
-void logger_raw(bool lock_and_flush, const char *fmt, ...) {
+void logger_raw(struct ulog_s *logger, bool lock_and_flush, const char *fmt,
+                ...) {
   va_list ap;
   va_start(ap, fmt);
-  logger_raw_internal(lock_and_flush, fmt, ap);
+  logger_raw_internal(logger, lock_and_flush, fmt, ap);
   va_end(ap);
 }
 
-void logger_raw_no_format_check(bool lock_and_flush, const char *fmt, ...) {
+void logger_raw_no_format_check(struct ulog_s *logger, bool lock_and_flush,
+                                const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  logger_raw_internal(lock_and_flush, fmt, ap);
+  logger_raw_internal(logger, lock_and_flush, fmt, ap);
   va_end(ap);
 }
 
-int logger_nolock_flush(void) {
+int logger_nolock_flush(struct ulog_s *logger) {
   int ret = 0;
-  if (cur_buf_ptr_ != kLogBufferStartIndex_) {
-    ret = output_cb_(external_private_data_, kLogBufferStartIndex_);
-    cur_buf_ptr_ = kLogBufferStartIndex_;
+  if (is_logger_valid(logger) && logger->cur_buf_ptr_ != logger->log_out_buf_) {
+    ret = logger->output_cb_(logger->user_data_, logger->log_out_buf_);
+    logger->cur_buf_ptr_ = logger->log_out_buf_;
   }
   return ret;
 }
 
-static void logger_log_internal(LogLevel level, const char *file,
-                                const char *func, uint32_t line, bool newline,
+static void logger_log_internal(struct ulog_s *logger, LogLevel level,
+                                const char *file, const char *func,
+                                uint32_t line, bool newline,
                                 bool lock_and_flush, const char *fmt,
                                 va_list ap) {
-  if (!is_logger_valid() || !fmt || level < log_level_) return;
+  if (!is_logger_valid(logger) || !fmt || level < logger->log_level_) return;
 
-  if (lock_and_flush) logger_output_lock();
+  if (lock_and_flush) logger_output_lock(logger);
 
   // Color
-  if (log_number_enabled_ || log_time_enabled_ || log_level_enabled_)
-    SNPRINTF_WRAPPER("%s", log_color_enabled_
-                               ? level_infos[level][INDEX_SECONDARY_COLOR]
-                               : "");
+  if (logger->log_number_enabled_ || logger->log_time_enabled_ ||
+      logger->log_level_enabled_)
+    SNPRINTF_WRAPPER(logger, "%s",
+                     logger->log_color_enabled_
+                         ? level_infos[level][INDEX_SECONDARY_COLOR]
+                         : "");
 
   // Print serial number
-  if (log_number_enabled_) SNPRINTF_WRAPPER("#%06" PRIu32 " ", log_evt_num_++);
+  if (logger->log_number_enabled_)
+    SNPRINTF_WRAPPER(logger, "#%06" PRIu32 " ", logger->log_evt_num_++);
 
   // Print time
-  if (log_time_enabled_) {
-    uint64_t time_ms = logger_get_time_us() / 1000;
-    if (time_format_ == LOG_TIME_FORMAT_LOCAL_TIME) {
-      time_t time_s = time_ms / 1000;
-      struct tm lt = *localtime(&time_s);
-      SNPRINTF_WRAPPER("%04d-%02d-%02d %02d:%02d:%02d.%03d ",
-                       lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday, lt.tm_hour,
-                       lt.tm_min, lt.tm_sec, (int)(time_ms % 1000));
-    } else {
-      SNPRINTF_WRAPPER("%" PRId64 ".%03" PRId64 " ", time_ms / 1000,
-                       time_ms % 1000);
-    }
+  if (logger->log_time_enabled_) {
+    uint64_t time_ms = logger_real_time_us() / 1000;
+    time_t time_s = time_ms / 1000;
+    struct tm lt = *localtime(&time_s);
+    SNPRINTF_WRAPPER(logger, "%04d-%02d-%02d %02d:%02d:%02d.%03d ",
+                     lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday, lt.tm_hour,
+                     lt.tm_min, lt.tm_sec, (int)(time_ms % 1000));
   }
 
   // Print process and thread id
-  if (log_process_id_enabled_)
-    SNPRINTF_WRAPPER("%" PRId32 "-%" PRId32 " ", (int32_t)GET_PID(),
-                     (int32_t)GET_TID());
+  if (logger->log_process_id_enabled_)
+    SNPRINTF_WRAPPER(logger, "%" PRId32 "-%" PRId32 " ",
+                     (int32_t)logger_get_pid(), (int32_t)logger_get_tid());
 
   // Print level
-  if (log_level_enabled_)
-    SNPRINTF_WRAPPER("%s", level_infos[level][INDEX_LEVEL_MARK]);
+  if (logger->log_level_enabled_)
+    SNPRINTF_WRAPPER(logger, "%s", level_infos[level][INDEX_LEVEL_MARK]);
 
   // Print gray color
-  if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_)
-    SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_GRAY : "");
+  if (logger->log_level_enabled_ || logger->log_file_line_enabled_ ||
+      logger->log_function_enabled_)
+    SNPRINTF_WRAPPER(logger, "%s", logger->log_color_enabled_ ? STR_GRAY : "");
 
   // Print '/'
-  if (log_level_enabled_) SNPRINTF_WRAPPER("/");
+  if (logger->log_level_enabled_) SNPRINTF_WRAPPER(logger, "/");
 
   // Print '('
-  if (log_file_line_enabled_ || log_function_enabled_) SNPRINTF_WRAPPER("(");
+  if (logger->log_file_line_enabled_ || logger->log_function_enabled_)
+    SNPRINTF_WRAPPER(logger, "(");
 
   // Print file and line
-  if (log_file_line_enabled_) SNPRINTF_WRAPPER("%s:%" PRIu32, file, line);
+  if (logger->log_file_line_enabled_)
+    SNPRINTF_WRAPPER(logger, "%s:%" PRIu32, file, line);
 
   // Print function
-  if (log_function_enabled_)
-    SNPRINTF_WRAPPER("%s%s", log_file_line_enabled_ ? " " : "", func);
+  if (logger->log_function_enabled_)
+    SNPRINTF_WRAPPER(logger, "%s%s", logger->log_file_line_enabled_ ? " " : "",
+                     func);
 
   // Print ')'
-  if (log_file_line_enabled_ || log_function_enabled_) SNPRINTF_WRAPPER(")");
+  if (logger->log_file_line_enabled_ || logger->log_function_enabled_)
+    SNPRINTF_WRAPPER(logger, ")");
 
   // Print ' '
-  if (log_level_enabled_ || log_file_line_enabled_ || log_function_enabled_)
-    SNPRINTF_WRAPPER(" ");
+  if (logger->log_level_enabled_ || logger->log_file_line_enabled_ ||
+      logger->log_function_enabled_)
+    SNPRINTF_WRAPPER(logger, " ");
 
   // Print log info
-  SNPRINTF_WRAPPER("%s", log_color_enabled_
-                             ? level_infos[level][INDEX_SECONDARY_COLOR]
-                             : "");
+  SNPRINTF_WRAPPER(logger, "%s",
+                   logger->log_color_enabled_
+                       ? level_infos[level][INDEX_SECONDARY_COLOR]
+                       : "");
 
-  VSNPRINTF_WRAPPER(fmt, ap);
+  VSNPRINTF_WRAPPER(logger, fmt, ap);
 
-  SNPRINTF_WRAPPER("%s", log_color_enabled_ ? STR_RESET : "");
+  SNPRINTF_WRAPPER(logger, "%s", logger->log_color_enabled_ ? STR_RESET : "");
 
-  if (newline) SNPRINTF_WRAPPER("\r\n");
+  if (newline) SNPRINTF_WRAPPER(logger, "\r\n");
 
   if (lock_and_flush) {
-    logger_nolock_flush();
-    logger_output_unlock();
+    logger_nolock_flush(logger);
+    logger_output_unlock(logger);
   }
 }
 
-void logger_log_no_format_check(LogLevel level, const char *file,
-                                const char *func, uint32_t line, bool newline,
+void logger_log_no_format_check(struct ulog_s *logger, LogLevel level,
+                                const char *file, const char *func,
+                                uint32_t line, bool newline,
                                 bool lock_and_flush, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  logger_log_internal(level, file, func, line, newline, lock_and_flush, fmt,
-                      ap);
+  logger_log_internal(logger, level, file, func, line, newline, lock_and_flush,
+                      fmt, ap);
   va_end(ap);
 }
 
-void logger_log(LogLevel level, const char *file, const char *func,
-                uint32_t line, bool newline, bool lock_and_flush,
-                const char *fmt, ...) {
+void logger_log(struct ulog_s *logger, LogLevel level, const char *file,
+                const char *func, uint32_t line, bool newline,
+                bool lock_and_flush, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  logger_log_internal(level, file, func, line, newline, lock_and_flush, fmt,
-                      ap);
+  logger_log_internal(logger, level, file, func, line, newline, lock_and_flush,
+                      fmt, ap);
   va_end(ap);
 }

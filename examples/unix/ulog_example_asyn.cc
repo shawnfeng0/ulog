@@ -32,10 +32,11 @@ int main() {
   auto &fifo = *new ulog::FifoPowerOfTwo{32768};
 
   // Initial logger
-  logger_init(&fifo, [](void *private_data, const char *str) {
-    auto &fifo = *(ulog::FifoPowerOfTwo *)(private_data);
-    return (int)fifo.InPacket(str, strlen(str));
-  });
+  logger_set_output_callback(
+      ULOG_GLOBAL, &fifo, [](void *private_data, const char *str) {
+        auto &fifo = *(ulog::FifoPowerOfTwo *)(private_data);
+        return (int)fifo.InPacket(str, strlen(str));
+      });
 
   pthread_t tid;
   pthread_create(&tid, nullptr, ulog_asyn_thread, &fifo);
@@ -60,6 +61,8 @@ int main() {
 
           // Hex dump
           LOGGER_HEX_DUMP(text, 45, 16);
+
+          LOGGER_TIME_CODE(int a = 0;);
 
           // Output multiple tokens to one line
           time_t now = 1577259816;
