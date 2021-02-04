@@ -10,13 +10,13 @@ namespace file {
 static constexpr char kFolderSep = '/';
 
 // Return true if path exists (file or directory)
-bool path_exists(const std::string &filename) {
+static inline bool path_exists(const std::string &filename) {
   struct stat buffer {};
   return (::stat(filename.c_str(), &buffer) == 0);
 }
 
 // Return file size according to open FILE* object
-std::size_t filesize(FILE *f) {
+static inline std::size_t filesize(FILE *f) {
   if (f == nullptr) {
     return 0;
   }
@@ -39,13 +39,13 @@ std::size_t filesize(FILE *f) {
 }
 
 // return true on success
-static bool mkdir_(const std::string &path) {
+static inline bool mkdir_(const std::string &path) {
   return ::mkdir(path.c_str(), mode_t(0755)) == 0;
 }
 
 // create the given directory - and all directories leading to it
 // return true on success or if the directory already exists
-bool create_dir(const std::string &path) {
+static inline bool create_dir(const std::string &path) {
   if (path_exists(path)) {
     return true;
   }
@@ -78,7 +78,7 @@ bool create_dir(const std::string &path) {
 // "abc/" => "abc"
 // "abc" => ""
 // "abc///" => "abc//"
-std::string dir_name(const std::string &path) {
+static inline std::string dir_name(const std::string &path) {
   auto pos = path.find_last_of(kFolderSep);
   return pos != std::string::npos ? path.substr(0, pos) : std::string{};
 }
