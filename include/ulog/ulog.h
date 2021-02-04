@@ -29,7 +29,7 @@ extern struct ulog_s *ulog_global_instance_ptr;
 #define ULOG_GLOBAL ulog_global_instance_ptr
 
 // TODO: need document
-struct ulog_s *logger_create();
+struct ulog_s *logger_create(void *private_data, LogOutput output_cb);
 void logger_destroy(struct ulog_s **logger);
 
 /**
