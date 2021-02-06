@@ -80,8 +80,8 @@ struct ulog_s {
 };
 
 // Will be exported externally
-static struct ulog_s ulog_global_instance_ = {
-    .cur_buf_ptr_ = ulog_global_instance_.log_out_buf_,
+static struct ulog_s global_logger_instance_ = {
+    .cur_buf_ptr_ = global_logger_instance_.log_out_buf_,
     .log_evt_num_ = 1,
     .mutex_ = PTHREAD_MUTEX_INITIALIZER,
 
@@ -99,7 +99,7 @@ static struct ulog_s ulog_global_instance_ = {
     .log_level_ = ULOG_LEVEL_TRACE,
 };
 
-struct ulog_s *ulog_global_instance_ptr = &ulog_global_instance_;
+struct ulog_s *ulog_global_logger = &global_logger_instance_;
 
 #define SNPRINTF_WRAPPER(logger, fmt, ...)                          \
   ({                                                                \
@@ -145,13 +145,13 @@ struct ulog_s *logger_create(void *private_data, LogOutput output_cb) {
   return logger;
 }
 
-void logger_destroy(struct ulog_s **logger) {
-  if (!logger || !*logger) {
+void logger_destroy(struct ulog_s **logger_ptr) {
+  if (!logger_ptr || !*logger_ptr) {
     return;
   }
-  pthread_mutex_destroy(&(*logger)->mutex_);
-  free(*logger);
-  (*logger) = NULL;
+  pthread_mutex_destroy(&(*logger_ptr)->mutex_);
+  free(*logger_ptr);
+  (*logger_ptr) = NULL;
 }
 
 void logger_set_output_callback(struct ulog_s *logger, void *private_data,

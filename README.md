@@ -6,8 +6,7 @@ A library written in C/C ++ for printing logs of lightweight embedded devices.
 
 ## Platforms and Dependent
 
-* Any C/C++ language environment, only need C standard library support.
-
+* Current version only supports unix-like platforms.
 * LOGGER_TOKEN and LOGGER_MULTI_TOKEN requires C++11 or GCC extension support, but other functions are not needed.
 
 ## Features
@@ -111,35 +110,11 @@ sudo make install
 
 Detailed documentation is described in ulog.h
 
-### 1 Initialization (**Non-Unix** platforms)
+### 1 Initialization
 
 Unix platform has default configuration, you can use it directly without configuration
 
-#### 1.1 Set the log mutex (Can only be called before using the print function)
-
-Note: **Unix-like platforms have default settings, so this function cannot be called.**
-
-The log library uses the same buffer and log number variable, so be sure to set this if you use it in different threads. It should be set before the log library is used.
-
-```C
-void logger_set_mutex_lock(void *mutex, LogMutexLock mutex_lock_cb, LogMutexUnlock mutex_unlock_cb);
-
-// Sample(posix thread)
-static pthread_mutex_t log_pthread_mutex = PTHREAD_MUTEX_INITIALIZER;
-int pthread_mutex_lock_wrapper(void *__mutex) {
-  return pthread_mutex_lock((pthread_mutex_t *) __mutex);
-}
-int pthread_mutex_unlock_wrapper(void *__mutex) {
-  return pthread_mutex_unlock((pthread_mutex_t *) __mutex);
-}
-
-int main(int argc, char *argv[]) {
-  logger_set_mutex_lock(&log_pthread_mutex, pthread_mutex_lock_wrapper, pthread_mutex_lock_wrapper);
-  // ...
-}
-```
-
-#### 1.2 Initialize the logger and set the string output callback function
+#### 1.1 Initialize the logger and set the string output callback function
 
 The simplest configuration is just to configure the output callback.
 

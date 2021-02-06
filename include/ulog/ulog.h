@@ -25,12 +25,23 @@ typedef enum {
 extern "C" {
 #endif
 
-extern struct ulog_s *ulog_global_instance_ptr;
-#define ULOG_GLOBAL ulog_global_instance_ptr
+extern struct ulog_s *ulog_global_logger;
+#define ULOG_GLOBAL ulog_global_logger
 
-// TODO: need document
+/**
+ * Create a ulog_s instance, and use @logger_set_output_callback() set output
+ * function
+ * @param private_data @see logger_set_output_callback()
+ * @param output_cb @see logger_set_output_callback()
+ * @return Return a new ulog instance
+ */
 struct ulog_s *logger_create(void *private_data, LogOutput output_cb);
-void logger_destroy(struct ulog_s **logger);
+
+/**
+ * Destroy ulog instance
+ * @param logger_ptr Ulog instance returned from logger_create
+ */
+void logger_destroy(struct ulog_s **logger_ptr);
 
 /**
  * Enable log output, which is enabled by default
