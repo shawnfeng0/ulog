@@ -218,17 +218,11 @@ uint64_t logger_monotonic_time_us() {
 }
 
 int logger_output_lock(struct ulog_s *logger) {
-  if (logger) {
-    return pthread_mutex_lock(&logger->mutex_);
-  }
-  return -1;
+  return logger ? pthread_mutex_lock(&logger->mutex_) : -1;
 }
 
 int logger_output_unlock(struct ulog_s *logger) {
-  if (logger) {
-    return pthread_mutex_unlock(&logger->mutex_);
-  }
-  return -1;
+  return logger ? pthread_mutex_unlock(&logger->mutex_) : -1;
 }
 
 uintptr_t logger_nolock_hex_dump(struct ulog_s *logger, const void *data,
