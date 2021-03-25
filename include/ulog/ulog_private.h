@@ -174,8 +174,10 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
       _OUT_RAW_LOCKED(logger, _GEN_TOKEN_FORMAT(logger, "%d"), #token,         \
                       (token) ? 1 : 0);                                        \
       /* Signed integer */                                                     \
-    } else if (_IS_SAME_TYPE(token, char) || _IS_SAME_TYPE(token, short) ||    \
-               _IS_SAME_TYPE(token, int) || _IS_SAME_TYPE(token, long) ||      \
+    } else if (_IS_SAME_TYPE(token, char) ||                                   \
+               _IS_SAME_TYPE(token, signed char) ||                            \
+               _IS_SAME_TYPE(token, short) || _IS_SAME_TYPE(token, int) ||     \
+               _IS_SAME_TYPE(token, long) ||                                   \
                _IS_SAME_TYPE(token, long long)) {                              \
       _OUT_RAW_LOCKED(logger, _GEN_TOKEN_FORMAT(logger, "%" PRId64), #token,   \
                       (int64_t)(token));                                       \
@@ -189,6 +191,8 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
                       (uint64_t)(token));                                      \
     } else if (_IS_SAME_TYPE(token, char *) ||                                 \
                _IS_SAME_TYPE(token, const char *) ||                           \
+               _IS_SAME_TYPE(token, signed char *) ||                           \
+               _IS_SAME_TYPE(token, const signed char *) ||                           \
                _IS_SAME_TYPE(token, unsigned char *) ||                        \
                _IS_SAME_TYPE(token, const unsigned char *) ||                  \
                _IS_SAME_TYPE(token, char[]) ||                                 \
