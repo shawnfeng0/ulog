@@ -11,7 +11,7 @@ typedef int (*LogMutexUnlock)(void *mutex);
 typedef int (*LogMutexLock)(void *mutex);
 typedef uint64_t (*LogGetTimeUs)(void);
 
-typedef enum {
+enum ulog_level_e {
   ULOG_LEVEL_TRACE = 0,
   ULOG_LEVEL_DEBUG,
   ULOG_LEVEL_INFO,
@@ -19,7 +19,7 @@ typedef enum {
   ULOG_LEVEL_ERROR,
   ULOG_LEVEL_FATAL,
   ULOG_LEVEL_NUMBER
-} LogLevel;
+};
 
 #ifdef __cplusplus
 extern "C" {
@@ -102,7 +102,7 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
  * level is the lowest level, so logs of all levels are output.
  * @param level Minimum log output level
  */
-void logger_set_output_level(struct ulog_s *logger, LogLevel level);
+void logger_set_output_level(struct ulog_s *logger, enum ulog_level_e level);
 
 /**
  * Initialize the logger and set the string output callback function. The

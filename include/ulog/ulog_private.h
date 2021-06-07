@@ -410,10 +410,10 @@ void logger_raw_no_format_check(struct ulog_s *logger, bool lock_and_flush,
  * @param ...
  */
 _ATTRIBUTE_CHECK_FORMAT(8, 9)
-void logger_log(struct ulog_s *logger, LogLevel level, const char *file,
+void logger_log(struct ulog_s *logger, enum ulog_level_e level, const char *file,
                 const char *func, uint32_t line, bool newline,
                 bool lock_and_flush, const char *fmt, ...);
-void logger_log_no_format_check(struct ulog_s *logger, LogLevel level,
+void logger_log_no_format_check(struct ulog_s *logger, enum ulog_level_e level,
                                 const char *file, const char *func,
                                 uint32_t line, bool newline,
                                 bool lock_and_flush, const char *fmt, ...);

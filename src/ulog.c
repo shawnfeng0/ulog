@@ -76,7 +76,7 @@ struct ulog_s {
   bool log_level_enabled_;
   bool log_file_line_enabled_;
   bool log_function_enabled_;
-  LogLevel log_level_;
+  enum ulog_level_e log_level_;
 };
 
 // Will be exported externally
@@ -201,7 +201,7 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable) {
   logger && (logger->log_function_enabled_ = enable);
 }
 
-void logger_set_output_level(struct ulog_s *logger, LogLevel level) {
+void logger_set_output_level(struct ulog_s *logger, enum ulog_level_e level) {
   logger && (logger->log_level_ = level);
 }
 
@@ -315,7 +315,7 @@ int logger_nolock_flush(struct ulog_s *logger) {
   return ret;
 }
 
-static void logger_log_internal(struct ulog_s *logger, LogLevel level,
+static void logger_log_internal(struct ulog_s *logger, enum ulog_level_e level,
                                 const char *file, const char *func,
                                 uint32_t line, bool newline,
                                 bool lock_and_flush, const char *fmt,
@@ -403,7 +403,7 @@ static void logger_log_internal(struct ulog_s *logger, LogLevel level,
   }
 }
 
-void logger_log_no_format_check(struct ulog_s *logger, LogLevel level,
+void logger_log_no_format_check(struct ulog_s *logger, enum ulog_level_e level,
                                 const char *file, const char *func,
                                 uint32_t line, bool newline,
                                 bool lock_and_flush, const char *fmt, ...) {
@@ -414,7 +414,7 @@ void logger_log_no_format_check(struct ulog_s *logger, LogLevel level,
   va_end(ap);
 }
 
-void logger_log(struct ulog_s *logger, LogLevel level, const char *file,
+void logger_log(struct ulog_s *logger, enum ulog_level_e level, const char *file,
                 const char *func, uint32_t line, bool newline,
                 bool lock_and_flush, const char *fmt, ...) {
   va_list ap;

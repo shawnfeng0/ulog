@@ -50,7 +50,7 @@ static int put_str(void *private_data, const char *str) {
 
 int main() {
   // Initial logger
-  logger_set_output_callback(nullptr, put_str);
+  logger_set_output_callback(ULOG_GLOBAL, NULL, put_str);
 
   double pi = 3.14159265;
   // Different log levels
@@ -304,5 +304,5 @@ void logger_enable_function_output(bool enable);
 // ULOG_LEVEL_WARN
 // ULOG_LEVEL_ERROR
 // ULOG_LEVEL_FATAL
-void logger_set_output_level(LogLevel level);
+void logger_set_output_level(enum ulog_level_e level);
 ```
