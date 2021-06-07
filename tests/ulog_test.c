@@ -40,6 +40,28 @@ int main() {
   LOGGER_TOKEN(50 * pi / 180);
   LOGGER_TOKEN(&pi);  // print address of pi
 
+  LOGGER_TOKEN((char)10);
+  LOGGER_TOKEN((signed char)10);
+  LOGGER_TOKEN((unsigned char)10);
+  LOGGER_TOKEN((const char)10);
+  LOGGER_TOKEN((const signed char)10);
+  LOGGER_TOKEN((const unsigned char)10);
+  LOGGER_TOKEN((char *)"test");
+  LOGGER_TOKEN((signed char *)"test");
+  LOGGER_TOKEN((unsigned char *)"test");
+
+  LOGGER_TOKEN((short)10);
+  LOGGER_TOKEN((signed short)10);
+  LOGGER_TOKEN((unsigned short)10);
+
+  LOGGER_TOKEN((int)10);
+  LOGGER_TOKEN((signed int)10);
+  LOGGER_TOKEN((unsigned int)10);
+
+  LOGGER_TOKEN((long)10);
+  LOGGER_TOKEN((signed long)10);
+  LOGGER_TOKEN((unsigned long)10);
+
   char *text = (char *)"Ulog is a micro log library.";
   LOGGER_TOKEN((char *)text);
 
