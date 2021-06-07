@@ -7,8 +7,10 @@
 
 #include <pthread.h>
 
+#include <condition_variable>
 #include <cstdint>
 #include <cstring>
+#include <mutex>
 
 namespace ulog {
 
@@ -64,7 +66,7 @@ class FifoPowerOfTwo {
       return 0;
     }
 
-    LockGuard lg(mutex_);
+    std::lock_guard<std::mutex> lg(mutex_);
 
     if (unused() < num_elements) {
       num_dropped_ += num_elements;
@@ -77,7 +79,7 @@ class FifoPowerOfTwo {
     CopyInLocked(buf, num_elements, in_);
     in_ += num_elements;
 
-    cond_.Sign();
+    cond_.notify_all();
     return num_elements;
   }
 
@@ -86,7 +88,7 @@ class FifoPowerOfTwo {
       return 0;
     }
 
-    LockGuard lg(mutex_);
+    std::lock_guard<std::mutex> lg(mutex_);
 
     peak_ = max(peak_, used());
 
@@ -96,7 +98,7 @@ class FifoPowerOfTwo {
     in_ += len;
     num_dropped_ += num_elements - len;
 
-    cond_.Sign();
+    cond_.notify_all();
     return len;
   }
 
@@ -105,7 +107,7 @@ class FifoPowerOfTwo {
       return 0;
     }
 
-    LockGuard lg(mutex_);
+    std::lock_guard<std::mutex> lg(mutex_);
     num_elements = min(num_elements, used());
     CopyOutLocked(out_buf, num_elements, out_);
     return num_elements;
@@ -117,12 +119,12 @@ class FifoPowerOfTwo {
       return 0;
     }
 
-    LockGuard lg(mutex_);
+    std::unique_lock<std::mutex> lg(mutex_);
 
     if (-1 == time_ms) {
-      while (empty()) cond_.Wait(mutex_.get());
+      while (empty()) cond_.wait(lg);
     } else if (empty()) {
-      cond_.WaitFor(mutex_.get(), time_ms);
+      cond_.wait_for(lg, std::chrono::milliseconds{time_ms});
       if (empty()) return 0;
     }
 
@@ -137,7 +139,7 @@ class FifoPowerOfTwo {
       return 0;
     }
 
-    LockGuard lg(mutex_);
+    std::lock_guard<std::mutex> lg(mutex_);
     num_elements = min(num_elements, used());
     CopyOutLocked(out_buf, num_elements, out_);
     out_ += num_elements;
@@ -152,7 +154,7 @@ class FifoPowerOfTwo {
    * accessing the fifo.
    */
   void Reset() {
-    LockGuard lg(mutex_);
+    std::lock_guard<std::mutex> lg(mutex_);
     out_ = in_;
   }
 
@@ -190,62 +192,9 @@ class FifoPowerOfTwo {
   const size_t element_size_;  // the size of the element
   size_t num_dropped_{};       // Number of dropped elements
   size_t peak_{};              // fifo peak
-  class Mutex {
-   public:
-    Mutex() { pthread_mutex_init(&mutex_, nullptr); }
-    ~Mutex() { pthread_mutex_destroy(&mutex_); }
-    void Lock() { pthread_mutex_lock(&mutex_); }
-    void Unlock() { pthread_mutex_unlock(&mutex_); }
-    pthread_mutex_t &get() { return mutex_; }
 
-   private:
-    pthread_mutex_t mutex_{};
-  } mutex_{};  // TODO: If there is only one input and one output thread, then
-               // locks are not necessary
-
-  class Condition {
-   public:
-    Condition() {
-      pthread_condattr_t attr;
-      pthread_condattr_init(&attr);
-      pthread_condattr_setclock(&attr, clockid_);
-      pthread_cond_init(&cond_, &attr);
-      pthread_condattr_destroy(&attr);
-    }
-    ~Condition() { pthread_cond_destroy(&cond_); }
-    bool Wait(pthread_mutex_t &mutex) {
-      return 0 == pthread_cond_wait(&cond_, &mutex);
-    }
-    bool WaitFor(pthread_mutex_t &mutex, uint64_t time_ms) {
-      struct timespec atime {};
-      GenerateFutureTime(clockid_, time_ms, atime);
-      return 0 == pthread_cond_timedwait(&cond_, &mutex, &atime);
-    }
-    void Sign() { pthread_cond_signal(&cond_); }
-
-   private:
-    // Increase time_ms time based on the current clockid time
-    static inline void GenerateFutureTime(clockid_t clockid, uint64_t time_ms,
-                                          struct timespec &out) {
-      // Calculate an absolute time in the future
-      const decltype(out.tv_nsec) kSec2Nsec = 1000 * 1000 * 1000;
-      clock_gettime(clockid, &out);
-      uint64_t nano_secs = out.tv_nsec + time_ms * 1000 * 1000;
-      out.tv_nsec = nano_secs % kSec2Nsec;
-      out.tv_sec += nano_secs / kSec2Nsec;
-    }
-    pthread_cond_t cond_{};
-    static constexpr clockid_t clockid_ = CLOCK_REALTIME;
-  } cond_{};
-
-  class LockGuard {
-   public:
-    explicit LockGuard(Mutex &m) : m_(m) { m.Lock(); }
-    ~LockGuard() { m_.Unlock(); }
-
-   private:
-    Mutex &m_;
-  };
+  std::mutex mutex_{};
+  std::condition_variable cond_{};
 
   void CopyInLocked(const void *src, size_t len, size_t off) const {
     size_t size = this->size();

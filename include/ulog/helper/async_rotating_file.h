@@ -38,7 +38,7 @@ class AsyncRotatingFile {
           uint8_t data[1024];
           std::time_t last_flush_time = std::time(nullptr);
           while (!should_exit_) {
-            int len = fifo_.OutWaitIfEmpty(data, sizeof(data) - 1, 1000);
+            auto len = fifo_.OutWaitIfEmpty(data, sizeof(data) - 1, 1000);
             if (len > 0) {
               rotating_file_.SinkIt(data, len);
               if (should_print_) {
