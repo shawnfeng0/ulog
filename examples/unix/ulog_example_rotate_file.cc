@@ -15,6 +15,8 @@ static void OutputFunc() {
     double pi = 3.14159265;
     LOGGER_DEBUG("PI = %.3f", pi);
 
+    LOGGER_ERROR("Error log test");
+
     // Output debugging expression
     LOGGER_TOKEN(pi);
     LOGGER_TOKEN(50 * pi / 180);

@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <ctime>
+#include <iostream>
 #include <string>
 #include <utility>
 
@@ -36,20 +37,18 @@ class AsyncRotatingFile {
         rotating_file_(std::move(filename), max_file_size, max_files),
         flush_period_sec_(max_flush_period_sec) {
     auto async_thread_function = [&]() {
-      uint8_t data[1024];
+      uint8_t data[2 * 1024];
       std::time_t last_flush_time = std::time(nullptr);
       while (!should_exit_) {
-        {
-          std::unique_lock<std::mutex> lg(flush_lock_);
-          auto len = fifo_.OutWaitIfEmpty(data, sizeof(data) - 1, 1000);
-          if (len > 0) {
-            rotating_file_.SinkIt(data, len);
-            if (should_print_) {
-              data[len] = '\0';  // Generate C string
-              printf("%s", data);
-            }
+        auto len = fifo_.OutWaitIfEmpty(data, sizeof(data) - 1, 1000);
+        if (len > 0) {
+          rotating_file_.SinkIt(data, len);
+          if (should_print_) {
+            data[len] = '\0';  // Generate C string
+            printf("%s", data);
           }
         }
+        ++write_count_;  // For flush use
 
         // Flush
         std::time_t cur_time = std::time(nullptr);
@@ -74,9 +73,16 @@ class AsyncRotatingFile {
   void Flush() {
     fifo_.Flush();
 
+    // TODO: Use semaphore to realize the flush of waiting for asynchronous
+    // thread
+
+    auto count = write_count_.load();
     // Try to lock to ensure that the reading of fifo and writing of files in
     // the asynchronous thread have been completed
-    std::unique_lock<std::mutex> lg(flush_lock_);
+    do {
+      fifo_.InterruptOutput();
+      std::this_thread::yield();
+    } while (write_count_ == count);
   }
 
   size_t InPacket(const void *buf, size_t num_elements) {
@@ -93,8 +99,10 @@ class AsyncRotatingFile {
   RotatingFile rotating_file_;
   std::unique_ptr<std::thread> async_thread_;
   const bool should_print_;
+
+  // For flush
   std::time_t flush_period_sec_;
-  std::mutex flush_lock_;
+  std::atomic_size_t write_count_{};
 
   std::atomic_bool should_exit_{false};
 };

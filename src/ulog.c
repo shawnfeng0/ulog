@@ -411,13 +411,11 @@ static void logger_log_internal(struct ulog_s *logger, enum ulog_level_e level,
 
   if (lock_and_flush) {
     logger_nolock_flush(logger);
-  }
 
-  if (logger->flush_cb_ && level >= ULOG_LEVEL_ERROR) {
-    logger->flush_cb_(logger->user_data_);
-  }
+    if (level >= ULOG_LEVEL_ERROR && logger->flush_cb_) {
+      logger->flush_cb_(logger->user_data_);
+    }
 
-  if (lock_and_flush) {
     logger_output_unlock(logger);
   }
 }
