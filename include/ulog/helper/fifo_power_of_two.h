@@ -66,7 +66,7 @@ class FifoPowerOfTwo {
       return 0;
     }
 
-    std::lock_guard<std::mutex> lg(mutex_);
+    std::unique_lock<std::mutex> lg(mutex_);
 
     if (unused() < num_elements) {
       num_dropped_ += num_elements;
@@ -79,7 +79,7 @@ class FifoPowerOfTwo {
     CopyInLocked(buf, num_elements, in_);
     in_ += num_elements;
 
-    cond_.notify_all();
+    have_data_notify_.notify_all();
     return num_elements;
   }
 
@@ -88,7 +88,7 @@ class FifoPowerOfTwo {
       return 0;
     }
 
-    std::lock_guard<std::mutex> lg(mutex_);
+    std::unique_lock<std::mutex> lg(mutex_);
 
     peak_ = max(peak_, used());
 
@@ -98,7 +98,7 @@ class FifoPowerOfTwo {
     in_ += len;
     num_dropped_ += num_elements - len;
 
-    cond_.notify_all();
+    have_data_notify_.notify_all();
     return len;
   }
 
@@ -107,7 +107,7 @@ class FifoPowerOfTwo {
       return 0;
     }
 
-    std::lock_guard<std::mutex> lg(mutex_);
+    std::unique_lock<std::mutex> lg(mutex_);
     num_elements = min(num_elements, used());
     CopyOutLocked(out_buf, num_elements, out_);
     return num_elements;
@@ -122,15 +122,20 @@ class FifoPowerOfTwo {
     std::unique_lock<std::mutex> lg(mutex_);
 
     if (-1 == time_ms) {
-      while (empty()) cond_.wait(lg);
+      have_data_notify_.wait(lg);
     } else if (empty()) {
-      cond_.wait_for(lg, std::chrono::milliseconds{time_ms});
+      have_data_notify_.wait_for(lg, std::chrono::milliseconds{time_ms});
       if (empty()) return 0;
     }
 
     num_elements = min(num_elements, used());
     CopyOutLocked(out_buf, num_elements, out_);
     out_ += num_elements;
+
+    if (empty()) {
+      no_data_notify_.notify_all();
+    }
+
     return num_elements;
   }
 
@@ -139,12 +144,24 @@ class FifoPowerOfTwo {
       return 0;
     }
 
-    std::lock_guard<std::mutex> lg(mutex_);
+    std::unique_lock<std::mutex> lg(mutex_);
     num_elements = min(num_elements, used());
     CopyOutLocked(out_buf, num_elements, out_);
     out_ += num_elements;
+
+    if (empty()) {
+      no_data_notify_.notify_all();
+    }
+
     return num_elements;
   }
+
+  void Flush() {
+    std::unique_lock<std::mutex> lg(mutex_);
+    no_data_notify_.wait(lg, [&] { return empty(); });
+  }
+
+  void InterruptOutput() { have_data_notify_.notify_all(); }
 
   /**
    * removes the entire fifo content
@@ -154,7 +171,7 @@ class FifoPowerOfTwo {
    * accessing the fifo.
    */
   void Reset() {
-    std::lock_guard<std::mutex> lg(mutex_);
+    std::unique_lock<std::mutex> lg(mutex_);
     out_ = in_;
   }
 
@@ -194,7 +211,8 @@ class FifoPowerOfTwo {
   size_t peak_{};              // fifo peak
 
   std::mutex mutex_{};
-  std::condition_variable cond_{};
+  std::condition_variable have_data_notify_{};
+  std::condition_variable no_data_notify_{};
 
   void CopyInLocked(const void *src, size_t len, size_t off) const {
     size_t size = this->size();
