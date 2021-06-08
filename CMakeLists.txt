@@ -11,10 +11,9 @@ option(ULOG_BUILD_TESTS "Build tests" OFF)
 
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
-include_directories(include)
-
 # ulog library
 add_library(ulog src/ulog.c)
+target_include_directories(ulog PUBLIC include)
 
 if (ULOG_BUILD_EXAMPLES)
     add_subdirectory(examples)
