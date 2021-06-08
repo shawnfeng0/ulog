@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <time.h>
 
-static int put_str(void *private_data, const char *str) {
-  private_data = private_data;  // unused
+static int put_str(void *user_data, const char *str) {
+  user_data = user_data;  // unused
 #if defined(WIN32) || defined(__unix__) || defined(__APPLE__)
   return printf("%s", str);
 #else
@@ -15,7 +15,7 @@ static int put_str(void *private_data, const char *str) {
 int main() {
   struct ulog_s *local_logger = logger_create(NULL, put_str);
   // Initial logger
-  logger_set_output_callback(ULOG_GLOBAL, NULL, put_str);
+  logger_set_output_callback(ULOG_GLOBAL, put_str);
 
   // Different log levels
   double pi = 3.14159265;

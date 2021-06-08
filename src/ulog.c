@@ -65,7 +65,8 @@ struct ulog_s {
 
   // Private data set by the user will be passed to the output function
   void *user_data_;
-  LogOutput output_cb_;
+  ulog_output_callback output_cb_;
+  ulog_flush_callback flush_cb_;
 
   // Format configuration
   bool log_process_id_enabled_;
@@ -88,6 +89,7 @@ static struct ulog_s global_logger_instance_ = {
     // Logger default configuration
     .user_data_ = NULL,
     .output_cb_ = logger_printf,
+    .flush_cb_ = NULL,
     .log_process_id_enabled_ = true,
     .log_output_enabled_ = true,
     .log_color_enabled_ = true,
@@ -111,21 +113,21 @@ struct ulog_s *ulog_global_logger = &global_logger_instance_;
         logger->log_out_buf_ + strlen(logger->log_out_buf_);        \
   })
 
-#define VSNPRINTF_WRAPPER(logger, fmt, arg_list)                     \
-  ({                                                                 \
-    vsnprintf(logger->cur_buf_ptr_,                                  \
-              (logger->log_out_buf_ + sizeof(logger->log_out_buf_) - \
-               logger->cur_buf_ptr_),                                \
-              fmt, arg_list);                                        \
-    logger->cur_buf_ptr_ =                                           \
-        logger->log_out_buf_ + strlen(logger->log_out_buf_);         \
+#define VSNPRINTF_WRAPPER(logger, fmt, arg_list)                         \
+  ({                                                                     \
+    vsnprintf((logger)->cur_buf_ptr_,                                    \
+              ((logger)->log_out_buf_ + sizeof((logger)->log_out_buf_) - \
+               (logger)->cur_buf_ptr_),                                  \
+              fmt, arg_list);                                            \
+    (logger)->cur_buf_ptr_ =                                             \
+        (logger)->log_out_buf_ + strlen((logger)->log_out_buf_);         \
   })
 
 static inline bool is_logger_valid(struct ulog_s *logger) {
   return logger && logger->output_cb_ && logger->log_output_enabled_;
 }
 
-struct ulog_s *logger_create(void *private_data, LogOutput output_cb) {
+struct ulog_s *logger_create(void *user_data, ulog_output_callback output_cb) {
   struct ulog_s *logger = malloc(sizeof(struct ulog_s));
   if (!logger) return NULL;
   memset(logger, 0, sizeof(struct ulog_s));
@@ -141,7 +143,8 @@ struct ulog_s *logger_create(void *private_data, LogOutput output_cb) {
   logger->log_level_enabled_ = true;
   logger->log_file_line_enabled_ = true;
   logger->log_function_enabled_ = true;
-  logger_set_output_callback(logger, private_data, output_cb);
+  logger_set_user_data(logger, user_data);
+  logger_set_output_callback(logger, output_cb);
   return logger;
 }
 
@@ -154,15 +157,24 @@ void logger_destroy(struct ulog_s **logger_ptr) {
   (*logger_ptr) = NULL;
 }
 
-void logger_set_output_callback(struct ulog_s *logger, void *private_data,
-                                LogOutput output_cb) {
-  if (!logger) return;
-  logger_output_lock(logger);
-
-  logger->output_cb_ = output_cb;
-  logger->user_data_ = private_data;
-
+#define LOCK_AND_SET(logger, dest, source) \
+  if (!(logger)) return;                   \
+  logger_output_lock(logger);              \
+  (logger)->dest = source;                 \
   logger_output_unlock(logger);
+
+void logger_set_user_data(struct ulog_s *logger, void *user_data) {
+  LOCK_AND_SET(logger, user_data_, user_data);
+}
+
+void logger_set_output_callback(struct ulog_s *logger,
+                                ulog_output_callback output_cb) {
+  LOCK_AND_SET(logger, output_cb_, output_cb);
+}
+
+void logger_set_flush_callback(struct ulog_s *logger,
+                               ulog_flush_callback flush_cb) {
+  LOCK_AND_SET(logger, flush_cb_, flush_cb);
 }
 
 void logger_enable_output(struct ulog_s *logger, bool enable) {
@@ -399,6 +411,13 @@ static void logger_log_internal(struct ulog_s *logger, enum ulog_level_e level,
 
   if (lock_and_flush) {
     logger_nolock_flush(logger);
+  }
+
+  if (logger->flush_cb_ && level >= ULOG_LEVEL_ERROR) {
+    logger->flush_cb_(logger->user_data_);
+  }
+
+  if (lock_and_flush) {
     logger_output_unlock(logger);
   }
 }
@@ -414,8 +433,8 @@ void logger_log_no_format_check(struct ulog_s *logger, enum ulog_level_e level,
   va_end(ap);
 }
 
-void logger_log(struct ulog_s *logger, enum ulog_level_e level, const char *file,
-                const char *func, uint32_t line, bool newline,
+void logger_log(struct ulog_s *logger, enum ulog_level_e level,
+                const char *file, const char *func, uint32_t line, bool newline,
                 bool lock_and_flush, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);

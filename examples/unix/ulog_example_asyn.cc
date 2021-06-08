@@ -32,11 +32,15 @@ int main() {
   auto &fifo = *new ulog::FifoPowerOfTwo{32768};
 
   // Initial logger
-  logger_set_output_callback(
-      ULOG_GLOBAL, &fifo, [](void *private_data, const char *str) {
-        auto &fifo = *(ulog::FifoPowerOfTwo *)(private_data);
-        return (int)fifo.InPacket(str, strlen(str));
-      });
+  logger_set_user_data(ULOG_GLOBAL, &fifo);
+  logger_set_output_callback(ULOG_GLOBAL, [](void *user_data, const char *str) {
+    auto &fifo = *(ulog::FifoPowerOfTwo *)(user_data);
+    return (int)fifo.InPacket(str, strlen(str));
+  });
+  logger_set_flush_callback(ULOG_GLOBAL, [](void *user_data) {
+    auto &fifo = *(ulog::FifoPowerOfTwo *)(user_data);
+    fifo.Flush();
+  });
 
   pthread_t tid;
   pthread_create(&tid, nullptr, ulog_asyn_thread, &fifo);

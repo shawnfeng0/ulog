@@ -40,11 +40,15 @@ int main(int argc, char *argv[]) {
       65536 * 2, "/tmp/ulog/test.txt", 100 * 1024, 5, 1, true);
 
   // Initial logger
-  logger_set_output_callback(
-      ULOG_GLOBAL, &async_rotate, [](void *private_data, const char *str) {
-        auto &async = *(ulog::AsyncRotatingFile *)(private_data);
-        return (int)async.InPacket(str, strlen(str));
-      });
+  logger_set_user_data(ULOG_GLOBAL, &async_rotate);
+  logger_set_output_callback(ULOG_GLOBAL, [](void *user_data, const char *str) {
+    auto &async = *(ulog::AsyncRotatingFile *)(user_data);
+    return (int)async.InPacket(str, strlen(str));
+  });
+  logger_set_flush_callback(ULOG_GLOBAL, [](void *user_data) {
+    auto &async = *(ulog::AsyncRotatingFile *)(user_data);
+    async.Flush();
+  });
 
   // Create some output thread
   std::vector<std::thread> threads;

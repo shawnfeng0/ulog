@@ -6,10 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef int (*LogOutput)(void *private_data, const char *ptr);
-typedef int (*LogMutexUnlock)(void *mutex);
-typedef int (*LogMutexLock)(void *mutex);
-typedef uint64_t (*LogGetTimeUs)(void);
+typedef int (*ulog_output_callback)(void *user_data, const char *ptr);
+typedef void (*ulog_flush_callback)(void *user_data);
 
 enum ulog_level_e {
   ULOG_LEVEL_TRACE = 0,
@@ -31,11 +29,11 @@ extern struct ulog_s *ulog_global_logger;
 /**
  * Create a ulog_s instance, and use @logger_set_output_callback() set output
  * function
- * @param private_data @see logger_set_output_callback()
+ * @param user_data @see logger_set_output_callback()
  * @param output_cb @see logger_set_output_callback()
  * @return Return a new ulog instance
  */
-struct ulog_s *logger_create(void *private_data, LogOutput output_cb);
+struct ulog_s *logger_create(void *user_data, ulog_output_callback output_cb);
 
 /**
  * Destroy ulog instance
@@ -107,12 +105,17 @@ void logger_set_output_level(struct ulog_s *logger, enum ulog_level_e level);
 /**
  * Initialize the logger and set the string output callback function. The
  * simplest configuration is just to configure the output callback.
- * @param private_data Set by the user, each output will be passed to output_cb,
+ * @param user_data Set by the user, each output will be passed to output_cb,
  * output can be more flexible.
  * @param output_cb Callback function to output string
  */
-void logger_set_output_callback(struct ulog_s *logger, void *private_data,
-                                LogOutput output_cb);
+void logger_set_user_data(struct ulog_s *logger, void *user_data);
+
+void logger_set_output_callback(struct ulog_s *logger,
+                                ulog_output_callback output_cb);
+
+void logger_set_flush_callback(struct ulog_s *logger,
+                               ulog_flush_callback output_cb);
 
 /**
  * Get time of clock_id::CLOCK_MONOTONIC

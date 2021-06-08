@@ -39,8 +39,8 @@ git submodule add https://github.com/ShawnFeng0/ulog.git
 #include <stdio.h>
 #include <time.h>
 
-static int put_str(void *private_data, const char *str) {
-  private_data = private_data; // unused
+static int put_str(void *user_data, const char *str) {
+  user_data = user_data; // unused
 #if defined(WIN32) || defined(__unix__) || defined(__APPLE__)
   return printf("%s", str);
 #else
@@ -118,14 +118,14 @@ Unix platform has default configuration, you can use it directly without configu
 
 The simplest configuration is just to configure the output callback.
 
-private_data: Set by the user, each output will be passed to output_cb, output can be more flexible.
+user_data: Set by the user, each output will be passed to output_cb, output can be more flexible.
  
 ```C
-void logger_set_output_callback(void *private_data, LogOutput output_cb);
+void logger_set_output_callback(void *user_data, ulog_output_callback output_cb);
 
 // Sample
-static int put_str(void *private_data, const char *str) {
-  private_data = private_data;
+static int put_str(void *user_data, const char *str) {
+  user_data = user_data;
   return printf("%s", str);
 }
 int main(int argc, char *argv[]) {
