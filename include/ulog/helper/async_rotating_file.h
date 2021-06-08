@@ -5,6 +5,7 @@
 #ifndef ULOG_INCLUDE_ULOG_HELPER_ASYNC_ROTATING_FILE_H_
 #define ULOG_INCLUDE_ULOG_HELPER_ASYNC_ROTATING_FILE_H_
 
+#include <atomic>
 #include <ctime>
 #include <string>
 #include <utility>
@@ -33,35 +34,49 @@ class AsyncRotatingFile {
       : should_print_(should_print),
         fifo_(fifo_size),
         rotating_file_(std::move(filename), max_file_size, max_files),
-        flush_period_sec_(max_flush_period_sec),
-        async_thread_([&] {
-          uint8_t data[1024];
-          std::time_t last_flush_time = std::time(nullptr);
-          while (!should_exit_) {
-            auto len = fifo_.OutWaitIfEmpty(data, sizeof(data) - 1, 1000);
-            if (len > 0) {
-              rotating_file_.SinkIt(data, len);
-              if (should_print_) {
-                data[len] = '\0';  // Generate C string
-                printf("%s", data);
-              }
-            }
-
-            // Flush
-            std::time_t cur_time = std::time(nullptr);
-            if (cur_time - last_flush_time >= flush_period_sec_) {
-              last_flush_time = cur_time;
-              rotating_file_.Flush();
+        flush_period_sec_(max_flush_period_sec) {
+    auto async_thread_function = [&]() {
+      uint8_t data[1024];
+      std::time_t last_flush_time = std::time(nullptr);
+      while (!should_exit_) {
+        {
+          std::unique_lock<std::mutex> lg(flush_lock_);
+          auto len = fifo_.OutWaitIfEmpty(data, sizeof(data) - 1, 1000);
+          if (len > 0) {
+            rotating_file_.SinkIt(data, len);
+            if (should_print_) {
+              data[len] = '\0';  // Generate C string
+              printf("%s", data);
             }
           }
-        }) {}
+        }
+
+        // Flush
+        std::time_t cur_time = std::time(nullptr);
+        if (cur_time - last_flush_time >= flush_period_sec_) {
+          last_flush_time = cur_time;
+          rotating_file_.Flush();
+        }
+      }
+    };
+    async_thread_ =
+        std::unique_ptr<std::thread>{new std::thread{async_thread_function}};
+  }
 
   AsyncRotatingFile(const AsyncRotatingFile &) = delete;
   AsyncRotatingFile &operator=(const AsyncRotatingFile &) = delete;
 
   ~AsyncRotatingFile() {
-    should_exit_ = true;
-    async_thread_.join();
+    should_exit_.store(true);
+    if (async_thread_) async_thread_->join();
+  }
+
+  void Flush() {
+    fifo_.Flush();
+
+    // Try to lock to ensure that the reading of fifo and writing of files in
+    // the asynchronous thread have been completed
+    std::unique_lock<std::mutex> lg(flush_lock_);
   }
 
   size_t InPacket(const void *buf, size_t num_elements) {
@@ -76,11 +91,12 @@ class AsyncRotatingFile {
  private:
   FifoPowerOfTwo fifo_;
   RotatingFile rotating_file_;
-  std::thread async_thread_;
+  std::unique_ptr<std::thread> async_thread_;
   const bool should_print_;
   std::time_t flush_period_sec_;
+  std::mutex flush_lock_;
 
-  bool should_exit_ = false;
+  std::atomic_bool should_exit_{false};
 };
 
 }  // namespace ulog
