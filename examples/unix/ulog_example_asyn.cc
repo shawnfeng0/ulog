@@ -6,21 +6,21 @@
 #include "ulog/helper/fifo_power_of_two.h"
 #include "ulog/ulog.h"
 
-static uint64_t get_time_us() {
-  struct timespec tp = {0, 0};
-  clock_gettime(CLOCK_REALTIME, &tp);
-  return static_cast<uint64_t>(tp.tv_sec) * 1000 * 1000 + tp.tv_nsec / 1000;
-}
-
 void *ulog_asyn_thread(void *arg) {
   auto &fifo = *(ulog::FifoPowerOfTwo *)(arg);
 
-  uint64_t start_us = get_time_us();
-  uint64_t time_out_us = start_us + 10 * 1000 * 1000;
-  char str[500];
-  while (get_time_us() < time_out_us) {
-    memset(str, '\0', sizeof(str));
-    if (fifo.OutWaitIfEmpty(str, sizeof(str) - 1, 1000) > 0) printf("%s", str);
+  char str[1024];
+
+  size_t empty_times = 0;
+  while (empty_times < 2) {
+    auto len = fifo.OutWaitIfEmpty(str, sizeof(str) - 1, 100);
+    if (len > 0) {
+      str[len] = '\0';
+      printf("%s", str);
+      empty_times = 0;
+    } else {
+      ++empty_times;
+    }
   }
 
   printf("fifo.num_dropped():%zu, fifo.peak():%zu, fifo.size():%zu",

@@ -67,6 +67,7 @@ class AsyncRotatingFile {
 
   ~AsyncRotatingFile() {
     should_exit_.store(true);
+    fifo_.InterruptOutput();
     if (async_thread_) async_thread_->join();
   }
 
