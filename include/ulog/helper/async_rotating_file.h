@@ -70,7 +70,7 @@ class AsyncRotatingFile {
     if (async_thread_) async_thread_->join();
   }
 
-  void Flush() {
+  void Flush() const {
     fifo_.Flush();
 
     // TODO: Use semaphore to realize the flush of waiting for asynchronous

@@ -16,7 +16,11 @@ namespace ulog {
 
 // Reference from kfifo of linux
 class FifoPowerOfTwo {
-#define _is_power_of_2(x) ((x) != 0 && (((x) & ((x)-1)) == 0))
+  template <typename T>
+  static inline constexpr bool is_power_of_2(T x) {
+    return ((x) != 0 && (((x) & ((x)-1)) == 0));
+  }
+
  public:
   FifoPowerOfTwo(void *buffer, size_t buf_size, size_t element_size = 1)
       : data_((unsigned char *)buffer),
@@ -156,12 +160,12 @@ class FifoPowerOfTwo {
     return num_elements;
   }
 
-  void Flush() {
+  void Flush() const {
     std::unique_lock<std::mutex> lg(mutex_);
     no_data_notify_.wait(lg, [&] { return empty(); });
   }
 
-  void InterruptOutput() { have_data_notify_.notify_all(); }
+  void InterruptOutput() const { have_data_notify_.notify_all(); }
 
   /**
    * removes the entire fifo content
@@ -210,9 +214,9 @@ class FifoPowerOfTwo {
   size_t num_dropped_{};       // Number of dropped elements
   size_t peak_{};              // fifo peak
 
-  std::mutex mutex_{};
-  std::condition_variable have_data_notify_{};
-  std::condition_variable no_data_notify_{};
+  mutable std::mutex mutex_{};
+  mutable std::condition_variable have_data_notify_{};
+  mutable std::condition_variable no_data_notify_{};
 
   void CopyInLocked(const void *src, size_t len, size_t off) const {
     size_t size = this->size();
