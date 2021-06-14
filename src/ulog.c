@@ -19,19 +19,18 @@
 #endif
 
 enum {
-  INDEX_PRIMARY_COLOR = 0,
-  INDEX_SECONDARY_COLOR,
+  INDEX_LEVEL_COLOR,
   INDEX_LEVEL_MARK,
   INDEX_MAX,
 };
 
-static char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
-    {(char *)STR_BOLD_WHITE, (char *)STR_WHITE, (char *)"T"},    // TRACE
-    {(char *)STR_BOLD_BLUE, (char *)STR_BLUE, (char *)"D"},      // DEBUG
-    {(char *)STR_BOLD_GREEN, (char *)STR_GREEN, (char *)"I"},    // INFO
-    {(char *)STR_BOLD_YELLOW, (char *)STR_YELLOW, (char *)"W"},  // WARN
-    {(char *)STR_BOLD_RED, (char *)STR_RED, (char *)"E"},        // ERROR
-    {(char *)STR_BOLD_PURPLE, (char *)STR_PURPLE, (char *)"F"},  // FATAL
+static const char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
+    {STR_WHITE, "T"},   // TRACE
+    {STR_BLUE, "D"},    // DEBUG
+    {STR_GREEN, "I"},   // INFO
+    {STR_YELLOW, "W"},  // WARN
+    {STR_RED, "E"},     // ERROR
+    {STR_PURPLE, "F"},  // FATAL
 };
 
 static inline int logger_printf(void *x, const char *str) {
@@ -158,10 +157,12 @@ void logger_destroy(struct ulog_s **logger_ptr) {
 }
 
 #define LOCK_AND_SET(logger, dest, source) \
-  if (!(logger)) return;                   \
-  logger_output_lock(logger);              \
-  (logger)->dest = source;                 \
-  logger_output_unlock(logger);
+  ({                                       \
+    if (!(logger)) return;                 \
+    logger_output_lock(logger);            \
+    (logger)->dest = source;               \
+    logger_output_unlock(logger);          \
+  })
 
 void logger_set_user_data(struct ulog_s *logger, void *user_data) {
   LOCK_AND_SET(logger, user_data_, user_data);
@@ -341,7 +342,7 @@ static void logger_log_internal(struct ulog_s *logger, enum ulog_level_e level,
       logger->log_level_enabled_)
     SNPRINTF_WRAPPER(logger, "%s",
                      logger->log_color_enabled_
-                         ? level_infos[level][INDEX_SECONDARY_COLOR]
+                         ? level_infos[level][INDEX_LEVEL_COLOR]
                          : "");
 
   // Print serial number
@@ -398,10 +399,9 @@ static void logger_log_internal(struct ulog_s *logger, enum ulog_level_e level,
     SNPRINTF_WRAPPER(logger, " ");
 
   // Print log info
-  SNPRINTF_WRAPPER(logger, "%s",
-                   logger->log_color_enabled_
-                       ? level_infos[level][INDEX_SECONDARY_COLOR]
-                       : "");
+  SNPRINTF_WRAPPER(
+      logger, "%s",
+      logger->log_color_enabled_ ? level_infos[level][INDEX_LEVEL_COLOR] : "");
 
   VSNPRINTF_WRAPPER(logger, fmt, ap);
 
