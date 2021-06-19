@@ -13,8 +13,9 @@ static int put_str(void *user_data, const char *str) {
 }
 
 int main() {
-  struct ulog_s *local_logger = logger_create(NULL, put_str);
+  struct ulog_s *local_logger = logger_create();
   // Initial logger
+  logger_set_output_callback(local_logger, put_str);
   logger_set_output_callback(ULOG_GLOBAL, put_str);
 
   // Different log levels

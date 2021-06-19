@@ -68,8 +68,8 @@ struct ulog_s {
   ulog_flush_callback flush_cb_;
 
   // Format configuration
-  bool log_process_id_enabled_;
   bool log_output_enabled_;
+  bool log_process_id_enabled_;
   bool log_color_enabled_;
   bool log_number_enabled_;
   bool log_time_enabled_;
@@ -126,24 +126,28 @@ static inline bool is_logger_valid(struct ulog_s *logger) {
   return logger && logger->output_cb_ && logger->log_output_enabled_;
 }
 
-struct ulog_s *logger_create(void *user_data, ulog_output_callback output_cb) {
+struct ulog_s *logger_create() {
   struct ulog_s *logger = malloc(sizeof(struct ulog_s));
   if (!logger) return NULL;
   memset(logger, 0, sizeof(struct ulog_s));
 
-  pthread_mutex_init(&logger->mutex_, NULL);
   logger->cur_buf_ptr_ = logger->log_out_buf_;
   logger->log_evt_num_ = 1;
+  pthread_mutex_init(&logger->mutex_, NULL);
+
+  logger->user_data_ = NULL;
+  logger->output_cb_ = NULL;
+  logger->flush_cb_ = NULL;
+
   logger->log_output_enabled_ = true;
   logger->log_process_id_enabled_ = true;
-  logger->log_output_enabled_ = true;
   logger->log_color_enabled_ = true;
+  logger->log_number_enabled_ = false;
   logger->log_time_enabled_ = true;
   logger->log_level_enabled_ = true;
   logger->log_file_line_enabled_ = true;
   logger->log_function_enabled_ = true;
-  logger_set_user_data(logger, user_data);
-  logger_set_output_callback(logger, output_cb);
+  logger->log_level_ = ULOG_LEVEL_TRACE;
   return logger;
 }
 

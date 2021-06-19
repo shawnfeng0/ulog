@@ -27,16 +27,13 @@ extern struct ulog_s *ulog_global_logger;
 #define ULOG_GLOBAL ulog_global_logger
 
 /**
- * Create a ulog_s instance, and use @logger_set_output_callback() set output
- * function
- * @param user_data @see logger_set_output_callback()
- * @param output_cb @see logger_set_output_callback()
+ * Create a logger instance
  * @return Return a new ulog instance
  */
-struct ulog_s *logger_create(void *user_data, ulog_output_callback output_cb);
+struct ulog_s *logger_create(void);
 
 /**
- * Destroy ulog instance
+ * Destroy logger instance
  * @param logger_ptr Ulog instance returned from logger_create
  */
 void logger_destroy(struct ulog_s **logger_ptr);
