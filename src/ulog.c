@@ -103,25 +103,30 @@ static struct ulog_s global_logger_instance_ = {
 
 struct ulog_s *ulog_global_logger = &global_logger_instance_;
 
-#define SNPRINTF_WRAPPER(logger, fmt, ...)                          \
-  ({                                                                \
-    snprintf(logger->cur_buf_ptr_,                                  \
-             (logger->log_out_buf_ + sizeof(logger->log_out_buf_) - \
-              logger->cur_buf_ptr_),                                \
-             fmt, ##__VA_ARGS__);                                   \
-    logger->cur_buf_ptr_ =                                          \
-        logger->log_out_buf_ + strlen(logger->log_out_buf_);        \
-  })
+static inline int logger_vsnprintf(struct ulog_s *logger, const char *fmt,
+                                   va_list ap) {
+  ssize_t buffer_length = logger->log_out_buf_ + sizeof(logger->log_out_buf_) -
+                          logger->cur_buf_ptr_;
+  int expected_length =
+      vsnprintf((logger)->cur_buf_ptr_, buffer_length, fmt, ap);
 
-#define VSNPRINTF_WRAPPER(logger, fmt, arg_list)                         \
-  ({                                                                     \
-    vsnprintf((logger)->cur_buf_ptr_,                                    \
-              ((logger)->log_out_buf_ + sizeof((logger)->log_out_buf_) - \
-               (logger)->cur_buf_ptr_),                                  \
-              fmt, arg_list);                                            \
-    (logger)->cur_buf_ptr_ =                                             \
-        (logger)->log_out_buf_ + strlen((logger)->log_out_buf_);         \
-  })
+  if (expected_length < buffer_length) {
+    logger->cur_buf_ptr_ += expected_length;
+  } else {
+    // The buffer is filled, pointing to terminating null byte ('\0')
+    logger->cur_buf_ptr_ =
+        logger->log_out_buf_ + sizeof(logger->log_out_buf_) - 1;
+  }
+  return expected_length;
+}
+
+static inline int logger_snprintf(struct ulog_s *logger, const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  int expected_length = logger_vsnprintf(logger, fmt, ap);
+  va_end(ap);
+  return expected_length;
+}
 
 static inline bool is_logger_valid(struct ulog_s *logger) {
   return logger && logger->output_cb_ && logger->log_output_enabled_;
@@ -259,19 +264,19 @@ uintptr_t logger_nolock_hex_dump(struct ulog_s *logger, const void *data,
 
   bool out_break = false;
   while (length) {
-    SNPRINTF_WRAPPER(logger, "%08" PRIxPTR "  ",
-                     data_cur - data_raw + base_address);
+    logger_snprintf(logger, "%08" PRIxPTR "  ",
+                    data_cur - data_raw + base_address);
     for (size_t i = 0; i < width; i++) {
       if (i < length)
-        SNPRINTF_WRAPPER(logger, "%02" PRIx8 " %s", data_cur[i],
-                         i == width / 2 - 1 ? " " : "");
+        logger_snprintf(logger, "%02" PRIx8 " %s", data_cur[i],
+                        i == width / 2 - 1 ? " " : "");
       else
-        SNPRINTF_WRAPPER(logger, "   %s", i == width / 2 - 1 ? " " : "");
+        logger_snprintf(logger, "   %s", i == width / 2 - 1 ? " " : "");
     }
-    SNPRINTF_WRAPPER(logger, " |");
+    logger_snprintf(logger, " |");
     for (size_t i = 0; i < width && i < length; i++)
-      SNPRINTF_WRAPPER(logger, "%c", isprint(data_cur[i]) ? data_cur[i] : '.');
-    SNPRINTF_WRAPPER(logger, "|\r\n");
+      logger_snprintf(logger, "%c", isprint(data_cur[i]) ? data_cur[i] : '.');
+    logger_snprintf(logger, "|\r\n");
 
     // The output fails, in order to avoid output confusion, the rest will not
     // be output
@@ -285,10 +290,10 @@ uintptr_t logger_nolock_hex_dump(struct ulog_s *logger, const void *data,
   }
 
   if (out_break) {
-    SNPRINTF_WRAPPER(logger, "hex dump is break!\r\n");
+    logger_snprintf(logger, "hex dump is break!\r\n");
   } else if (tail_addr_out) {
-    SNPRINTF_WRAPPER(logger, "%08" PRIxPTR "\r\n",
-                     data_cur - data_raw + base_address);
+    logger_snprintf(logger, "%08" PRIxPTR "\r\n",
+                    data_cur - data_raw + base_address);
   }
   logger_nolock_flush(logger);
   return data_cur - data_raw + base_address;
@@ -300,7 +305,7 @@ static void logger_raw_internal(struct ulog_s *logger, bool lock_and_flush,
 
   if (lock_and_flush) logger_output_lock(logger);
 
-  VSNPRINTF_WRAPPER(logger, fmt, ap);
+  logger_vsnprintf(logger, fmt, ap);
 
   if (lock_and_flush) {
     logger_nolock_flush(logger);
@@ -345,74 +350,74 @@ static void logger_log_internal(struct ulog_s *logger, enum ulog_level_e level,
   // Color
   if (logger->log_number_enabled_ || logger->log_time_enabled_ ||
       logger->log_level_enabled_)
-    SNPRINTF_WRAPPER(logger, "%s",
-                     logger->log_color_enabled_
-                         ? level_infos[level][INDEX_LEVEL_COLOR]
-                         : "");
+    logger_snprintf(logger, "%s",
+                    logger->log_color_enabled_
+                        ? level_infos[level][INDEX_LEVEL_COLOR]
+                        : "");
 
   // Print serial number
   if (logger->log_number_enabled_)
-    SNPRINTF_WRAPPER(logger, "#%06" PRIu32 " ", logger->log_evt_num_++);
+    logger_snprintf(logger, "#%06" PRIu32 " ", logger->log_evt_num_++);
 
   // Print time
   if (logger->log_time_enabled_) {
     uint64_t time_ms = logger_real_time_us() / 1000;
     time_t time_s = time_ms / 1000;
     struct tm lt = *localtime(&time_s);
-    SNPRINTF_WRAPPER(logger, "%04d-%02d-%02d %02d:%02d:%02d.%03d ",
-                     lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday, lt.tm_hour,
-                     lt.tm_min, lt.tm_sec, (int)(time_ms % 1000));
+    logger_snprintf(logger, "%04d-%02d-%02d %02d:%02d:%02d.%03d ",
+                    lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday, lt.tm_hour,
+                    lt.tm_min, lt.tm_sec, (int)(time_ms % 1000));
   }
 
   // Print process and thread id
   if (logger->log_process_id_enabled_)
-    SNPRINTF_WRAPPER(logger, "%" PRId32 "-%" PRId32 " ",
-                     (int32_t)logger_get_pid(), (int32_t)logger_get_tid());
+    logger_snprintf(logger, "%" PRId32 "-%" PRId32 " ",
+                    (int32_t)logger_get_pid(), (int32_t)logger_get_tid());
 
   // Print level
   if (logger->log_level_enabled_)
-    SNPRINTF_WRAPPER(logger, "%s", level_infos[level][INDEX_LEVEL_MARK]);
+    logger_snprintf(logger, "%s", level_infos[level][INDEX_LEVEL_MARK]);
 
   // Print gray color
   if (logger->log_level_enabled_ || logger->log_file_line_enabled_ ||
       logger->log_function_enabled_)
-    SNPRINTF_WRAPPER(logger, "%s", logger->log_color_enabled_ ? STR_GRAY : "");
+    logger_snprintf(logger, "%s", logger->log_color_enabled_ ? STR_GRAY : "");
 
   // Print '/'
-  if (logger->log_level_enabled_) SNPRINTF_WRAPPER(logger, "/");
+  if (logger->log_level_enabled_) logger_snprintf(logger, "/");
 
   // Print '('
   if (logger->log_file_line_enabled_ || logger->log_function_enabled_)
-    SNPRINTF_WRAPPER(logger, "(");
+    logger_snprintf(logger, "(");
 
   // Print file and line
   if (logger->log_file_line_enabled_)
-    SNPRINTF_WRAPPER(logger, "%s:%" PRIu32, file, line);
+    logger_snprintf(logger, "%s:%" PRIu32, file, line);
 
   // Print function
   if (logger->log_function_enabled_)
-    SNPRINTF_WRAPPER(logger, "%s%s", logger->log_file_line_enabled_ ? " " : "",
-                     func);
+    logger_snprintf(logger, "%s%s", logger->log_file_line_enabled_ ? " " : "",
+                    func);
 
   // Print ')'
   if (logger->log_file_line_enabled_ || logger->log_function_enabled_)
-    SNPRINTF_WRAPPER(logger, ")");
+    logger_snprintf(logger, ")");
 
   // Print ' '
   if (logger->log_level_enabled_ || logger->log_file_line_enabled_ ||
       logger->log_function_enabled_)
-    SNPRINTF_WRAPPER(logger, " ");
+    logger_snprintf(logger, " ");
 
   // Print log info
-  SNPRINTF_WRAPPER(
+  logger_snprintf(
       logger, "%s",
       logger->log_color_enabled_ ? level_infos[level][INDEX_LEVEL_COLOR] : "");
 
-  VSNPRINTF_WRAPPER(logger, fmt, ap);
+  logger_vsnprintf(logger, fmt, ap);
 
-  SNPRINTF_WRAPPER(logger, "%s", logger->log_color_enabled_ ? STR_RESET : "");
+  logger_snprintf(logger, "%s", logger->log_color_enabled_ ? STR_RESET : "");
 
-  if (newline) SNPRINTF_WRAPPER(logger, "\r\n");
+  if (newline) logger_snprintf(logger, "\r\n");
 
   if (lock_and_flush) {
     logger_nolock_flush(logger);
