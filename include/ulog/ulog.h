@@ -39,11 +39,10 @@ struct ulog_s *logger_create(void);
 void logger_destroy(struct ulog_s **logger_ptr);
 
 /**
- * Initialize the logger and set the string output callback function. The
- * simplest configuration is just to configure the output callback.
+ * Set user data, each output will be passed to output_callback/flush_callback,
+ * making the output more flexible.
  *
- * @param user_data Set by the user, each output will be passed to
- * output_callback/flush_callback, output can be more flexible.
+ * @param user_data The user data pointer.
  */
 void logger_set_user_data(struct ulog_s *logger, void *user_data);
 
@@ -66,6 +65,10 @@ void logger_set_output_callback(struct ulog_s *logger,
  */
 void logger_set_flush_callback(struct ulog_s *logger,
                                ulog_flush_callback flush_callback);
+
+/*****************************************************************************
+ * log format configuration:
+ */
 
 /**
  * Set the minimum log level. Logs below this level will not be output. The
@@ -117,7 +120,9 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
 }
 #endif
 
-// LOG related macros ----------------------------------------------------------
+/*****************************************************************************
+ * log related macros:
+ */
 
 #include "ulog/ulog_private.h"
 
@@ -126,38 +131,36 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
  * @param fmt Format of the format string
  * @param ... Parameters in the format
  */
-#define LOGGER_TRACE(fmt, ...) \
-  _OUT_LOG(ULOG_GLOBAL, ULOG_LEVEL_TRACE, fmt, ##__VA_ARGS__)
 #define LOGGER_LOCAL_TRACE(logger, fmt, ...) \
   _OUT_LOG(logger, ULOG_LEVEL_TRACE, fmt, ##__VA_ARGS__)
+#define LOGGER_TRACE(fmt, ...) \
+  LOGGER_LOCAL_TRACE(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
-#define LOGGER_DEBUG(fmt, ...) \
-  _OUT_LOG(ULOG_GLOBAL, ULOG_LEVEL_DEBUG, fmt, ##__VA_ARGS__)
 #define LOGGER_LOCAL_DEBUG(logger, fmt, ...) \
   _OUT_LOG(logger, ULOG_LEVEL_DEBUG, fmt, ##__VA_ARGS__)
+#define LOGGER_DEBUG(fmt, ...) \
+  LOGGER_LOCAL_DEBUG(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
-#define LOGGER_INFO(fmt, ...) \
-  _OUT_LOG(ULOG_GLOBAL, ULOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
 #define LOGGER_LOCAL_INFO(logger, fmt, ...) \
   _OUT_LOG(logger, ULOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
+#define LOGGER_INFO(fmt, ...) LOGGER_LOCAL_INFO(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
-#define LOGGER_WARN(fmt, ...) \
-  _OUT_LOG(ULOG_GLOBAL, ULOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
 #define LOGGER_LOCAL_WARN(logger, fmt, ...) \
   _OUT_LOG(logger, ULOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
+#define LOGGER_WARN(fmt, ...) LOGGER_LOCAL_WARN(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
-#define LOGGER_ERROR(fmt, ...) \
-  _OUT_LOG(ULOG_GLOBAL, ULOG_LEVEL_ERROR, fmt, ##__VA_ARGS__)
 #define LOGGER_LOCAL_ERROR(logger, fmt, ...) \
   _OUT_LOG(logger, ULOG_LEVEL_ERROR, fmt, ##__VA_ARGS__)
+#define LOGGER_ERROR(fmt, ...) \
+  LOGGER_LOCAL_ERROR(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
-#define LOGGER_FATAL(fmt, ...) \
-  _OUT_LOG(ULOG_GLOBAL, ULOG_LEVEL_FATAL, fmt, ##__VA_ARGS__)
 #define LOGGER_LOCAL_FATAL(logger, fmt, ...) \
   _OUT_LOG(logger, ULOG_LEVEL_FATAL, fmt, ##__VA_ARGS__)
+#define LOGGER_FATAL(fmt, ...) \
+  LOGGER_LOCAL_FATAL(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
-#define LOGGER_RAW(fmt, ...) _OUT_RAW(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 #define LOGGER_LOCAL_RAW(logger, fmt, ...) _OUT_RAW(logger, fmt, ##__VA_ARGS__)
+#define LOGGER_RAW(fmt, ...) LOGGER_LOCAL_RAW(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
 /**
  * Output various tokens (Requires C++ 11 or GNU extension)
@@ -173,8 +176,8 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
  * @param token Can be float, double, [unsigned / signed] char / short / int /
  * long / long long and pointers of the above type
  */
-#define LOGGER_TOKEN(token) _OUT_TOKEN(ULOG_GLOBAL, token)
 #define LOGGER_LOCAL_TOKEN(logger, token) _OUT_TOKEN(logger, token)
+#define LOGGER_TOKEN(token) LOGGER_LOCAL_TOKEN(ULOG_GLOBAL, token)
 
 /**
  * Output multiple tokens to one line (Requires C++ 11 or GNU extension)
@@ -187,9 +190,10 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
  * @param token Same definition as LOG_TOKEN parameter, but can output up to 16
  * tokens at the same time
  */
-#define LOGGER_MULTI_TOKEN(...) _OUT_MULTI_TOKEN(ULOG_GLOBAL, __VA_ARGS__)
 #define LOGGER_LOCAL_MULTI_TOKEN(logger, ...) \
   _OUT_MULTI_TOKEN(logger, __VA_ARGS__)
+#define LOGGER_MULTI_TOKEN(...) \
+  LOGGER_LOCAL_MULTI_TOKEN(ULOG_GLOBAL, __VA_ARGS__)
 
 /**
  * Statistics code running time,
@@ -203,8 +207,8 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
  * output:
  * time { uint32_t n = 1000 * 1000; while (n--); } => 1315us
  */
-#define LOGGER_TIME_CODE(...) _TIME_CODE(ULOG_GLOBAL, __VA_ARGS__)
 #define LOGGER_LOCAL_TIME_CODE(logger, ...) _TIME_CODE(logger, __VA_ARGS__)
+#define LOGGER_TIME_CODE(...) LOGGER_LOCAL_TIME_CODE(ULOG_GLOBAL, __VA_ARGS__)
 
 /**
  * Display contents in hexadecimal and ascii.
@@ -223,9 +227,9 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
  * @param length Display length starting from "data"
  * @param width How many bytes of data are displayed in each line
  */
-#define LOGGER_HEX_DUMP(data, length, width) \
-  _HEX_DUMP(ULOG_GLOBAL, data, length, width)
 #define LOGGER_LOCAL_HEX_DUMP(logger, data, length, width) \
   _HEX_DUMP(logger, data, length, width)
+#define LOGGER_HEX_DUMP(data, length, width) \
+  LOGGER_LOCAL_HEX_DUMP(ULOG_GLOBAL, data, length, width)
 
 #endif  //__ULOG_H__

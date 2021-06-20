@@ -29,6 +29,101 @@
 #define _ATTRIBUTE_CHECK_FORMAT(m, n)
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * Lock the log mutex
+ * @return
+ */
+int logger_output_lock(struct ulog_s *logger);
+
+/**
+ * Unlock the log mutex
+ * @return
+ */
+int logger_output_unlock(struct ulog_s *logger);
+
+/**
+ * Display contents in hexadecimal and ascii.
+ * Same format as "hexdump -C filename"
+ * @param data The starting address of the data to be displayed
+ * @param length Display length starting from "data"
+ * @param width How many bytes of data are displayed in each line
+ * @param base_address Base address, the displayed address starts from this
+ * value
+ * @param tail_addr_out Tail address output, whether to output the last address
+ * after output
+ * @return Last output address
+ */
+uintptr_t logger_nolock_hex_dump(struct ulog_s *logger, const void *data,
+                                 size_t length, size_t width,
+                                 uintptr_t base_address, bool tail_addr_out);
+
+/**
+ * Raw data output, similar to printf
+ * @param fmt Format of the format string
+ * @param lock_and_flush Whether the output needs to be locked during output, it
+ * is recommended to lock
+ * @param ... Parameters in the format
+ */
+_ATTRIBUTE_CHECK_FORMAT(3, 4)
+void logger_raw(struct ulog_s *logger, bool lock_and_flush, const char *fmt,
+                ...);
+void logger_raw_no_format_check(struct ulog_s *logger, bool lock_and_flush,
+                                const char *fmt, ...);
+
+/**
+ * Print log
+ * Internal functions should not be called directly from outside, macros such as
+ * LOG_DEBUG / LOG_INFO should be used
+ * @param level Output level
+ * @param file File name
+ * @param func Function name
+ * @param line Line number of the file
+ * @param newline Whether to output a new line at the end
+ * @param lock_and_flush Whether the output needs to be locked during output, it
+ * is recommended to lock
+ * @param fmt Format string, consistent with printf series functions
+ * @param ...
+ */
+_ATTRIBUTE_CHECK_FORMAT(8, 9)
+void logger_log(struct ulog_s *logger, enum ulog_level_e level,
+                const char *file, const char *func, uint32_t line, bool newline,
+                bool lock_and_flush, const char *fmt, ...);
+void logger_log_no_format_check(struct ulog_s *logger, enum ulog_level_e level,
+                                const char *file, const char *func,
+                                uint32_t line, bool newline,
+                                bool lock_and_flush, const char *fmt, ...);
+
+/**
+ * Flush log buffer
+ * @note: Internal function, please do not call.
+ */
+int logger_nolock_flush(struct ulog_s *logger);
+
+/**
+ * Determine if the current color output is on
+ */
+bool logger_color_is_enabled(struct ulog_s *logger);
+
+/**
+ * Get time of clock_id::CLOCK_MONOTONIC
+ * @return Returns the system startup time, in microseconds.
+ */
+uint64_t logger_monotonic_time_us();
+
+/**
+ * Get time of clock_id::CLOCK_REALTIME
+ * @return Returns the real time, in microseconds.
+ */
+uint64_t logger_real_time_us();
+
+#ifdef __cplusplus
+}
+#endif
+
 #define _OUT_LOG(logger, level, ...)                                      \
   ({                                                                      \
     logger_log(logger, level, __FILENAME__, __FUNCTION__, __LINE__, true, \
@@ -56,9 +151,6 @@
 #ifdef __cplusplus
 namespace ulog {
 namespace _token {
-
-extern "C" void logger_raw(struct ulog_s *logger, bool lock_and_flush,
-                           const char *fmt, ...);
 
 // void *
 inline void print(struct ulog_s *logger, const char *name, const void *value) {
@@ -182,8 +274,8 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
                       (uint64_t)(token));                                      \
     } else if (_IS_SAME_TYPE(token, char *) ||                                 \
                _IS_SAME_TYPE(token, const char *) ||                           \
-               _IS_SAME_TYPE(token, signed char *) ||                           \
-               _IS_SAME_TYPE(token, const signed char *) ||                           \
+               _IS_SAME_TYPE(token, signed char *) ||                          \
+               _IS_SAME_TYPE(token, const signed char *) ||                    \
                _IS_SAME_TYPE(token, unsigned char *) ||                        \
                _IS_SAME_TYPE(token, const unsigned char *) ||                  \
                _IS_SAME_TYPE(token, char[]) ||                                 \
@@ -340,100 +432,5 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
                            true);                                          \
     logger_output_unlock(logger);                                          \
   })
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * Lock the log mutex
- * @return
- */
-int logger_output_lock(struct ulog_s *logger);
-
-/**
- * Unlock the log mutex
- * @return
- */
-int logger_output_unlock(struct ulog_s *logger);
-
-/**
- * Display contents in hexadecimal and ascii.
- * Same format as "hexdump -C filename"
- * @param data The starting address of the data to be displayed
- * @param length Display length starting from "data"
- * @param width How many bytes of data are displayed in each line
- * @param base_address Base address, the displayed address starts from this
- * value
- * @param tail_addr_out Tail address output, whether to output the last address
- * after output
- * @return Last output address
- */
-uintptr_t logger_nolock_hex_dump(struct ulog_s *logger, const void *data,
-                                 size_t length, size_t width,
-                                 uintptr_t base_address, bool tail_addr_out);
-
-/**
- * Raw data output, similar to printf
- * @param fmt Format of the format string
- * @param lock_and_flush Whether the output needs to be locked during output, it
- * is recommended to lock
- * @param ... Parameters in the format
- */
-_ATTRIBUTE_CHECK_FORMAT(3, 4)
-void logger_raw(struct ulog_s *logger, bool lock_and_flush, const char *fmt,
-                ...);
-void logger_raw_no_format_check(struct ulog_s *logger, bool lock_and_flush,
-                                const char *fmt, ...);
-
-/**
- * Print log
- * Internal functions should not be called directly from outside, macros such as
- * LOG_DEBUG / LOG_INFO should be used
- * @param level Output level
- * @param file File name
- * @param func Function name
- * @param line Line number of the file
- * @param newline Whether to output a new line at the end
- * @param lock_and_flush Whether the output needs to be locked during output, it
- * is recommended to lock
- * @param fmt Format string, consistent with printf series functions
- * @param ...
- */
-_ATTRIBUTE_CHECK_FORMAT(8, 9)
-void logger_log(struct ulog_s *logger, enum ulog_level_e level, const char *file,
-                const char *func, uint32_t line, bool newline,
-                bool lock_and_flush, const char *fmt, ...);
-void logger_log_no_format_check(struct ulog_s *logger, enum ulog_level_e level,
-                                const char *file, const char *func,
-                                uint32_t line, bool newline,
-                                bool lock_and_flush, const char *fmt, ...);
-
-/**
- * Flush log buffer
- * @note: Internal function, please do not call.
- */
-int logger_nolock_flush(struct ulog_s *logger);
-
-/**
- * Determine if the current color output is on
- */
-bool logger_color_is_enabled(struct ulog_s *logger);
-
-/**
- * Get time of clock_id::CLOCK_MONOTONIC
- * @return Returns the system startup time, in microseconds.
- */
-uint64_t logger_monotonic_time_us();
-
-/**
- * Get time of clock_id::CLOCK_REALTIME
- * @return Returns the real time, in microseconds.
- */
-uint64_t logger_real_time_us();
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif  // _ULOG_COMMON_H

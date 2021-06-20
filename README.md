@@ -108,6 +108,8 @@ sudo make install
 
 ## How to use
 
+Please refer to the examples in the [tests](tests) or [examples](examples) folder,  there are examples of asynchronous log output written in C++ and asynchronous output to files in the [examples](examples) directory.
+
 Detailed documentation is described in ulog.h
 
 ### 1 Initialization
@@ -118,23 +120,48 @@ Unix platform has default configuration, you can use it directly without configu
 
 The simplest configuration is just to configure the output callback.
 
-user_data: Set by the user, each output will be passed to output_cb, output can be more flexible.
- 
-```C
-void logger_set_output_callback(void *user_data, ulog_output_callback output_cb);
+user_data: Set by the user, each output will be passed to output_callback, output can be more flexible.
 
-// Sample
+```C
+// Create a logger instance, the ULOG_GLOBAL is an existing global instance. If the system uses only one logger instance, there is no need to create it again.
+struct ulog_s *logger_create(void);
+void logger_destroy(struct ulog_s **logger_ptr);
+
+// Set user data, each output will be passed to output_callback/flush_callback, making the output more flexible.
+void logger_set_user_data(struct ulog_s *logger, void *user_data);
+
+// Set the callback function for log output, the log is output through this function
+typedef int (*ulog_output_callback)(void *user_data, const char *ptr);
+void logger_set_output_callback(struct ulog_s *logger, ulog_output_callback output_callback);
+
+// Set the callback function of log flush, which is executed when the log level is error
+typedef void (*ulog_flush_callback)(void *user_data);
+void logger_set_flush_callback(struct ulog_s *logger, ulog_flush_callback flush_callback);
+
+// sample:
 static int put_str(void *user_data, const char *str) {
-  user_data = user_data;
+  user_data = user_data; // unused
   return printf("%s", str);
 }
 int main(int argc, char *argv[]) {
-  logger_set_output_callback(NULL, put_str);
+  struct ulog_s *local_logger = logger_create();
+  
+  logger_set_output_callback(local_logger, put_str);
+  logger_set_output_callback(ULOG_GLOBAL, put_str);
+    
+  logger_set_flush_callback(ULOG_GLOBAL, NULL);
+  logger_set_flush_callback(local_logger, NULL);
+
   // ...
+  
+  logger_destroy(&local_logger);
 }
 ```
 
 ### 2 Print log
+
+The `LOGGER_XXX(fmt, ...)` just uses `ULOG_GLOBAL` for `LOGGER_LOCAL_XXXX`
+example: `#define LOGGER_TRACE(fmt, ...) LOGGER_LOCAL_TRACE(ULOG_GLOBAL, fmt, ##__VA_ARGS__)`
 
 #### 2.1 Normal log
 
@@ -142,7 +169,7 @@ Same format as **printf**.
 
 ```C
 double pi = 3.14159265;
-LOGGER_TRACE("PI = %.3f", pi);
+LOGGER_TRACE("PI = %.3f", pi); // Use a separate logger: LOGGER_LOCAL_TRACE(local_logger, "PI = %.3f", pi);
 LOGGER_DEBUG("PI = %.3f", pi);
 LOGGER_INFO("PI = %.3f", pi);
 LOGGER_WARN("PI = %.3f", pi);
@@ -168,7 +195,8 @@ Output various tokens, the function will automatically recognize the type of tok
 /*
   @param token Can be float, double, [unsigned / signed] char / short / int / long / long long and pointers of the above type
  */
-#define LOGGER_TOKEN(token) ...
+#define LOGGER_LOCAL_TOKEN(logger, token) ...
+#define LOGGER_TOKEN(token) LOGGER_LOCAL_TOKEN(ULOG_GLOBAL, token)
 ```
 
 Output multiple tokens to one line, each parameter can be a different type
@@ -178,7 +206,8 @@ Output multiple tokens to one line, each parameter can be a different type
  * @param token Same definition as LOGGER_TOKEN parameter, but can output up to 16
  * tokens at the same time
  */
-#define LOGGER_MULTI_TOKEN(...) ...
+#define LOGGER_LOCAL_MULTI_TOKEN(logger, ...) ...
+#define LOGGER_MULTI_TOKEN(...) LOGGER_LOCAL_MULTI_TOKEN(ULOG_GLOBAL, __VA_ARGS__)
 ```
 
 Example:
@@ -211,7 +240,8 @@ Display contents in hexadecimal and ascii. Same format as "hexdump -C filename"
  * @param length Display length starting from "data"
  * @param width How many bytes of data are displayed in each line
  */
-#define LOGGER_HEX_DUMP(data, length, width) ...
+#define LOGGER_LOCAL_HEX_DUMP(logger, data, length, width) ...
+#define LOGGER_HEX_DUMP(data, length, width) LOGGER_LOCAL_HEX_DUMP(ULOG_GLOBAL, data, length, width)
 ```
 
 Example:
@@ -233,7 +263,12 @@ hex_dump(data:&str1, length:20, width:8) =>
 #### 2.4 Statistics code running time
 
 ```C
-#define LOGGER_TIME_CODE(...) ...
+/*
+ * Statistics code running time
+ * @param Code snippet
+ */
+#define LOGGER_LOCAL_TIME_CODE(logger, ...) ...
+#define LOGGER_TIME_CODE(...) LOGGER_LOCAL_TIME_CODE(ULOG_GLOBAL, __VA_ARGS__)
 ```
 
 Example:
@@ -255,42 +290,42 @@ time { uint32_t n = 1000 * 1000; while (n--); } => 1315us
 
 ```C
 // Enable log output, which is enabled by default
-void logger_enable_output(bool enable);
+void logger_enable_output(struct ulog_s *logger, bool enable);
 ```
 
 ```C
 // Enable color output, which is enabled by default
-void logger_enable_color(bool enable);
+void logger_enable_color(struct ulog_s *logger, bool enable);
 ```
 
 ```C
 // Enable log number output, disabled by default
-void logger_enable_number_output(bool enable);
+void logger_enable_number_output(struct ulog_s *logger, bool enable);
 ```
 
 ```C
 // Enable log time output, enabled by default
-void logger_enable_time_output(bool enable);
+void logger_enable_time_output(struct ulog_s *logger, bool enable);
 ```
 
 ```C
 // Enable process and thread id output, enabled by default (Only in unix like platform)
-void logger_enable_process_id_output(bool enable);
+void logger_enable_process_id_output(struct ulog_s *logger, bool enable);
 ```
 
 ```C
 // Enable log level output, enabled by default
-void logger_enable_level_output(bool enable);
+void logger_enable_level_output(struct ulog_s *logger, bool enable);
 ```
 
 ```C
 // Enable log file line output, enabled by default
-void logger_enable_file_line_output(bool enable);
+void logger_enable_file_line_output(struct ulog_s *logger, bool enable);
 ```
 
 ```C
 // Enable log function name output, enabled by default
-void logger_enable_function_output(bool enable);
+void logger_enable_function_output(struct ulog_s *logger, bool enable);
 ```
 
 ```C
@@ -304,5 +339,5 @@ void logger_enable_function_output(bool enable);
 // ULOG_LEVEL_WARN
 // ULOG_LEVEL_ERROR
 // ULOG_LEVEL_FATAL
-void logger_set_output_level(enum ulog_level_e level);
+void logger_set_output_level(struct ulog_s *logger, enum ulog_level_e level);
 ```
