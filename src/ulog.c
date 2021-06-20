@@ -89,6 +89,7 @@ static struct ulog_s global_logger_instance_ = {
     .user_data_ = NULL,
     .output_cb_ = logger_printf,
     .flush_cb_ = NULL,
+
     .log_process_id_enabled_ = true,
     .log_output_enabled_ = true,
     .log_color_enabled_ = true,
@@ -173,13 +174,13 @@ void logger_set_user_data(struct ulog_s *logger, void *user_data) {
 }
 
 void logger_set_output_callback(struct ulog_s *logger,
-                                ulog_output_callback output_cb) {
-  LOCK_AND_SET(logger, output_cb_, output_cb);
+                                ulog_output_callback output_callback) {
+  LOCK_AND_SET(logger, output_cb_, output_callback);
 }
 
 void logger_set_flush_callback(struct ulog_s *logger,
-                               ulog_flush_callback flush_cb) {
-  LOCK_AND_SET(logger, flush_cb_, flush_cb);
+                               ulog_flush_callback flush_callback) {
+  LOCK_AND_SET(logger, flush_cb_, flush_callback);
 }
 
 void logger_enable_output(struct ulog_s *logger, bool enable) {

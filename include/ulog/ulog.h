@@ -34,97 +34,84 @@ struct ulog_s *logger_create(void);
 
 /**
  * Destroy logger instance
- * @param logger_ptr Ulog instance returned from logger_create
+ * @param logger_ptr Pointer to logger pointer, it will be set to NULL pointer
  */
 void logger_destroy(struct ulog_s **logger_ptr);
 
 /**
- * Enable log output, which is enabled by default
- * @param enable True is enabled, false is disabled
+ * Initialize the logger and set the string output callback function. The
+ * simplest configuration is just to configure the output callback.
+ *
+ * @param user_data Set by the user, each output will be passed to
+ * output_callback/flush_callback, output can be more flexible.
  */
-void logger_enable_output(struct ulog_s *logger, bool enable);
+void logger_set_user_data(struct ulog_s *logger, void *user_data);
 
 /**
- * Enable color output, which is enabled by default
- * @param enable True is enabled, false is disabled
+ * Set the callback function for log output, the log is output through this
+ * function
+ *
+ * @param logger
+ * @param output_callback Callback function to output string
  */
-void logger_enable_color(struct ulog_s *logger, bool enable);
+void logger_set_output_callback(struct ulog_s *logger,
+                                ulog_output_callback output_callback);
 
 /**
- * Determine if the current color output is on
- * @return True is enabled, false is disabled
+ * Set the callback function of log flush, which is executed when the log level
+ * is error
+ *
+ * @param logger
+ * @param flush_callback Callback function to flush the log
  */
-bool logger_color_is_enabled(struct ulog_s *logger);
+void logger_set_flush_callback(struct ulog_s *logger,
+                               ulog_flush_callback flush_callback);
 
 /**
- * Enable log number output, disabled by default
- * @param enable True is enabled, false is disabled
- */
-void logger_enable_number_output(struct ulog_s *logger, bool enable);
-
-/**
- * Enable log time output, enabled by default
- * @param enable True is enabled, false is disabled
- */
-void logger_enable_time_output(struct ulog_s *logger, bool enable);
-
-/**
- * Enable process and thread id output, enabled by default
- * @param enable True is enabled, false is disabled
- */
-void logger_enable_process_id_output(struct ulog_s *logger, bool enable);
-
-/**
- * Enable log level output, enabled by default
- * @param enable True is enabled, false is disabled
- */
-void logger_enable_level_output(struct ulog_s *logger, bool enable);
-
-/**
- * Enable log file line output, enabled by default
- * @param enable True is enabled, false is disabled
- */
-void logger_enable_file_line_output(struct ulog_s *logger, bool enable);
-
-/**
- * Enable log function name output, enabled by default
- * @param enable True is enabled, false is disabled
- */
-void logger_enable_function_output(struct ulog_s *logger, bool enable);
-
-/**
- * Set the log level. Logs below this level will not be output. The default
- * level is the lowest level, so logs of all levels are output.
- * @param level Minimum log output level
+ * Set the minimum log level. Logs below this level will not be output. The
+ * default level is the lowest level, so logs of all levels are output.
  */
 void logger_set_output_level(struct ulog_s *logger, enum ulog_level_e level);
 
 /**
- * Initialize the logger and set the string output callback function. The
- * simplest configuration is just to configure the output callback.
- * @param user_data Set by the user, each output will be passed to output_cb,
- * output can be more flexible.
- * @param output_cb Callback function to output string
+ * Enable or disable log output, which is enabled by default
  */
-void logger_set_user_data(struct ulog_s *logger, void *user_data);
-
-void logger_set_output_callback(struct ulog_s *logger,
-                                ulog_output_callback output_cb);
-
-void logger_set_flush_callback(struct ulog_s *logger,
-                               ulog_flush_callback output_cb);
+void logger_enable_output(struct ulog_s *logger, bool enable);
 
 /**
- * Get time of clock_id::CLOCK_MONOTONIC
- * @return Returns the system startup time, in microseconds.
+ * Enable or disable color output, which is enabled by default
  */
-uint64_t logger_monotonic_time_us();
+void logger_enable_color(struct ulog_s *logger, bool enable);
 
 /**
- * Get time of clock_id::CLOCK_REALTIME
- * @return Returns the real time, in microseconds.
+ * Enable or disable log number output, disabled by default
  */
-uint64_t logger_real_time_us();
+void logger_enable_number_output(struct ulog_s *logger, bool enable);
+
+/**
+ * Enable or disable log time output, enabled by default
+ */
+void logger_enable_time_output(struct ulog_s *logger, bool enable);
+
+/**
+ * Enable or disable process and thread id output, enabled by default
+ */
+void logger_enable_process_id_output(struct ulog_s *logger, bool enable);
+
+/**
+ * Enable or disable log level output, enabled by default
+ */
+void logger_enable_level_output(struct ulog_s *logger, bool enable);
+
+/**
+ * Enable or disable log file line output, enabled by default
+ */
+void logger_enable_file_line_output(struct ulog_s *logger, bool enable);
+
+/**
+ * Enable or disable log function name output, enabled by default
+ */
+void logger_enable_function_output(struct ulog_s *logger, bool enable);
 
 #ifdef __cplusplus
 }

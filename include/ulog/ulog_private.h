@@ -415,6 +415,23 @@ void logger_log_no_format_check(struct ulog_s *logger, enum ulog_level_e level,
  */
 int logger_nolock_flush(struct ulog_s *logger);
 
+/**
+ * Determine if the current color output is on
+ */
+bool logger_color_is_enabled(struct ulog_s *logger);
+
+/**
+ * Get time of clock_id::CLOCK_MONOTONIC
+ * @return Returns the system startup time, in microseconds.
+ */
+uint64_t logger_monotonic_time_us();
+
+/**
+ * Get time of clock_id::CLOCK_REALTIME
+ * @return Returns the real time, in microseconds.
+ */
+uint64_t logger_real_time_us();
+
 #ifdef __cplusplus
 }
 #endif
