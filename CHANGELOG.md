@@ -1,0 +1,95 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres
+to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.3.1...HEAD
+
+## [0.3.1] - 2021-06-21
+
+[0.3.1]: https://github.com/ShawnFeng0/ulog/compare/v0.3.0...v0.3.1
+
+### Added
+
+* Execute flush operation when outputting logs above the error level
+* Support setting flush callback function
+
+### Changed
+
+* Use enum ulog_level_e to replace LogLevel to avoid naming conflicts with other projects
+* Set ulog cmake public header file path (use modern cmake target_include_directories(xxx PUBLIC xxx) syntax)
+* Optimize the internal processing of the snprintf function to reduce the call of strlen()
+* Set user_data and output_callback separately, keeping each setting independent, keep the logger_create function simple
+
+### Fixed
+
+* Support signed char type token printing
+
+## [0.3.0] - 2021-02-04
+
+[0.3.0]: https://github.com/ShawnFeng0/ulog/compare/v0.2.0...v0.3.0
+
+### Added
+
+* Support the creation of different logger instances
+
+## [0.2.0] - 2020-11-26
+
+[0.2.0]:  https://github.com/ShawnFeng0/ulog/compare/v0.1.2...v0.2.0
+
+### Added
+
+* Add user private data settings to make the output more flexible
+* Add examples of asynchronous file output and auxiliary classes
+
+### Changed
+
+* Use LOGGER_XXX macros instead of LOG_XXX to avoid naming conflicts
+* Remove the brackets from the time information
+
+### Fixed
+
+* fix: It is executed twice when the log parameter is a function
+
+### Removed
+
+* Delete the ABORT() and ASSERT() auxiliary functions, it should not be the responsibility of the log library
+
+## [0.1.2] - 2020-05-25
+
+[0.1.2]: https://github.com/ShawnFeng0/ulog/compare/v0.1.1...v0.1.2
+
+### Removed
+
+* Delete too many macro definitions (try to use functions instead of macros):
+* Delete ULOG_DISABLE macro
+* Delete ULOG_DEFAULT_LEVEL macro
+* Delete ULOG_DISABLE_COLOR macro
+* Delete ULOG_CLS macro
+
+### Fixed
+
+- After the first line of hexdump indicates that the output fails, the output will not continue
+
+## [0.1.1] - 2020-05-22
+
+[0.1.1]: https://github.com/ShawnFeng0/ulog/compare/v0.1.0...v0.1.1
+
+### Changed
+
+* LOG_TIME_CODE uses microseconds as the output unit
+* Make asynchronous logs block waiting
+
+## [0.1.0] - 2020-02-07
+
+[0.1.0]: https://github.com/ShawnFeng0/ulog/releases/tag/v0.1.0
+
+* Realize basic functions
+* Various log levels output, rich colors, hexdump output, token output, time_code statistics
+
+* Add fifo for asynchronous output
+
