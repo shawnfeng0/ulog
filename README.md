@@ -19,18 +19,6 @@ A library written in C/C ++ for printing logs of lightweight embedded devices.
 
 ## Quick Demo
 
-### Integration into the project
-
-```bash
-git submodule add https://github.com/ShawnFeng0/ulog.git
-```
-
-1. As a submodule or [Download](https://github.com/ShawnFeng0/ulog/archive/master.zip) the entire project.
-
-2. Add **ulog/include** to the include path of your project
-
-3. Add ulog / src / ulog.c to the project's source file list
-
 ### Code
 
 ```C++
@@ -96,6 +84,29 @@ int main() {
 
 ![example](doc/figures/example.png)
 
+## Build and integration into the project
+
+```bash
+git submodule add https://github.com/ShawnFeng0/ulog.git
+```
+
+1. As a submodule or [Download](https://github.com/ShawnFeng0/ulog/archive/master.zip) the entire project.
+
+If you use cmake (recommended):
+
+2. Configure the following in the cmakelists.txt of the main project:
+
+```cmake
+add_subdirectory(ulog)
+target_link_libraries(${PROJECT_NAME} PUBLIC ulog) # Link libulog.a and include ulog/include path
+```
+
+or:
+
+2. Add **ulog/include** to the include path of your project
+
+3. Add ulog / src / ulog.c to the project's source file list
+
 ## Install (Optional, Only in Unix)
 
 If you want to install this library system-wide, you can do so via
@@ -108,7 +119,8 @@ sudo make install
 
 ## How to use
 
-Please refer to the examples in the [tests](tests) or [examples](examples) folder,  there are examples of asynchronous log output written in C++ and asynchronous output to files in the [examples](examples) directory.
+Please refer to the examples in the [tests](tests) or [examples](examples) folder, there are examples of asynchronous
+log output written in C++ and asynchronous output to files in the [examples](examples) directory.
 
 Detailed documentation is described in ulog.h
 
