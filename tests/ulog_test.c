@@ -4,7 +4,7 @@
 #include <time.h>
 
 static int put_str(void *user_data, const char *str) {
-  user_data = user_data;  // unused
+  (void)user_data;  // unused
 #if defined(WIN32) || defined(__unix__) || defined(__APPLE__)
   return printf("%s", str);
 #else

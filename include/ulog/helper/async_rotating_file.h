@@ -96,10 +96,10 @@ class AsyncRotatingFile {
   bool is_idle() const { return fifo_.empty(); }
 
  private:
+  const bool should_print_;
   FifoPowerOfTwo fifo_;
   RotatingFile rotating_file_;
   std::unique_ptr<std::thread> async_thread_;
-  const bool should_print_;
 
   // For flush
   std::time_t flush_period_sec_;

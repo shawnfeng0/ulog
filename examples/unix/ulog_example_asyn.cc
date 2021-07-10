@@ -50,7 +50,8 @@ int main() {
     pthread_t tid_output;
     pthread_create(
         &tid_output, nullptr,
-        [](void *arg) -> void * {
+        [](void *unused) -> void * {
+          (void)unused;
           double pi = 3.14159265;
           LOGGER_DEBUG("PI = %.3f", pi);
           LOGGER_RAW("PI = %.3f\r\n", pi);

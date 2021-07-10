@@ -33,7 +33,8 @@ static const char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
     {STR_PURPLE, "F"},  // FATAL
 };
 
-static inline int logger_printf(void *x, const char *str) {
+static inline int logger_printf(void *unused, const char *str) {
+  (void)unused;
   return printf("%s", str);
 }
 
@@ -189,11 +190,11 @@ void logger_set_flush_callback(struct ulog_s *logger,
 }
 
 void logger_enable_output(struct ulog_s *logger, bool enable) {
-  logger && (logger->log_output_enabled_ = enable);
+  (void)(logger && (logger->log_output_enabled_ = enable));
 }
 
 void logger_enable_color(struct ulog_s *logger, bool enable) {
-  logger && (logger->log_color_enabled_ = enable);
+  (void)(logger && (logger->log_color_enabled_ = enable));
 }
 
 bool logger_color_is_enabled(struct ulog_s *logger) {
@@ -201,31 +202,31 @@ bool logger_color_is_enabled(struct ulog_s *logger) {
 }
 
 void logger_enable_number_output(struct ulog_s *logger, bool enable) {
-  logger && (logger->log_number_enabled_ = enable);
+  (void)(logger && (logger->log_number_enabled_ = enable));
 }
 
 void logger_enable_time_output(struct ulog_s *logger, bool enable) {
-  logger && (logger->log_time_enabled_ = enable);
+  (void)(logger && (logger->log_time_enabled_ = enable));
 }
 
 void logger_enable_process_id_output(struct ulog_s *logger, bool enable) {
-  logger && (logger->log_process_id_enabled_ = enable);
+  (void)(logger && (logger->log_process_id_enabled_ = enable));
 }
 
 void logger_enable_level_output(struct ulog_s *logger, bool enable) {
-  logger && (logger->log_level_enabled_ = enable);
+  (void)(logger && (logger->log_level_enabled_ = enable));
 }
 
 void logger_enable_file_line_output(struct ulog_s *logger, bool enable) {
-  logger && (logger->log_file_line_enabled_ = enable);
+  (void)(logger && (logger->log_file_line_enabled_ = enable));
 }
 
 void logger_enable_function_output(struct ulog_s *logger, bool enable) {
-  logger && (logger->log_function_enabled_ = enable);
+  (void)(logger && (logger->log_function_enabled_ = enable));
 }
 
 void logger_set_output_level(struct ulog_s *logger, enum ulog_level_e level) {
-  logger && (logger->log_level_ = level);
+  (void)(logger && (logger->log_level_ = level));
 }
 
 uint64_t logger_real_time_us() {

@@ -37,7 +37,7 @@ static void OutputFunc() {
   });
 }
 
-int main(int argc, char *argv[]) {
+int main() {
   auto &async_rotate = *new ulog::AsyncRotatingFile(
       65536 * 2, "/tmp/ulog/test.txt", 100 * 1024, 5, 1, true);
 

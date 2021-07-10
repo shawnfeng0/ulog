@@ -10,6 +10,7 @@ option(ULOG_BUILD_EXAMPLES "Build examples" OFF)
 option(ULOG_BUILD_TESTS "Build tests" OFF)
 
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+add_compile_options(-Wextra -Wall)
 
 # ulog library
 add_library(ulog src/ulog.c)

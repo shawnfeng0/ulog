@@ -24,8 +24,8 @@ class FifoPowerOfTwo {
  public:
   FifoPowerOfTwo(void *buffer, size_t buf_size, size_t element_size = 1)
       : data_((unsigned char *)buffer),
-        element_size_(element_size != 0 ? element_size : 1),
-        is_allocated_memory_(false) {
+        is_allocated_memory_(false),
+        element_size_(element_size != 0 ? element_size : 1) {
     size_t num_elements = buf_size / element_size_;
 
     if (num_elements < 2) {
@@ -41,8 +41,8 @@ class FifoPowerOfTwo {
   }
 
   explicit FifoPowerOfTwo(size_t num_elements, size_t element_size = 1)
-      : element_size_(element_size != 0 ? element_size : 1),
-        is_allocated_memory_(true) {
+      : is_allocated_memory_(true),
+        element_size_(element_size != 0 ? element_size : 1) {
     if (num_elements < 2) num_elements = 2;
 
     // round up to the next power of 2, since our 'let the indices wrap'
@@ -203,12 +203,11 @@ class FifoPowerOfTwo {
   size_t peak() const { return peak_; }
 
  private:
-  size_t in_{};            // data is added at offset (in % size)
-  size_t out_{};           // data is extracted from off. (out % size)
-  unsigned char *data_{};  // the buffer holding the data
-  const bool is_allocated_memory_{
-      false};      // Used to identify whether the internal
-                   // buffer is allocated internally
+  size_t in_{};                     // data is added at offset (in % size)
+  size_t out_{};                    // data is extracted from off. (out % size)
+  unsigned char *data_{};           // the buffer holding the data
+  const bool is_allocated_memory_;  // Used to identify whether the internal
+                                    // buffer is allocated internally
   size_t mask_{};  // (Constant) Mask used to match the correct in / out pointer
   const size_t element_size_;  // the size of the element
   size_t num_dropped_{};       // Number of dropped elements
