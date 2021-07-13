@@ -27,5 +27,4 @@ endif ()
 # install
 install(TARGETS ulog
         ARCHIVE DESTINATION lib)
-file(GLOB ULOG_BASE_HEADERS include/ulog/*.h)
-install(FILES ${ULOG_BASE_HEADERS} DESTINATION include/ulog)
+install(DIRECTORY include/ulog DESTINATION include)
