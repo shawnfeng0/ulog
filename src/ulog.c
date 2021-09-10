@@ -106,8 +106,9 @@ struct ulog_s *ulog_global_logger = &global_logger_instance_;
 
 static inline int logger_vsnprintf(struct ulog_s *logger, const char *fmt,
                                    va_list ap) {
-  ssize_t buffer_length = logger->log_out_buf_ + sizeof(logger->log_out_buf_) -
-                          logger->cur_buf_ptr_;
+  char *buffer_end = logger->log_out_buf_ + sizeof(logger->log_out_buf_);
+  ssize_t buffer_length = buffer_end - logger->cur_buf_ptr_;
+
   int expected_length =
       vsnprintf((logger)->cur_buf_ptr_, buffer_length, fmt, ap);
 
@@ -115,8 +116,7 @@ static inline int logger_vsnprintf(struct ulog_s *logger, const char *fmt,
     logger->cur_buf_ptr_ += expected_length;
   } else {
     // The buffer is filled, pointing to terminating null byte ('\0')
-    logger->cur_buf_ptr_ =
-        logger->log_out_buf_ + sizeof(logger->log_out_buf_) - 1;
+    logger->cur_buf_ptr_ = buffer_end - 1;
   }
   return expected_length;
 }
