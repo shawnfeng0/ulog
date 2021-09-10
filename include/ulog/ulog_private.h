@@ -255,7 +255,7 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
       _OUT_RAW_LOCKED(logger, _GEN_TOKEN_FORMAT(logger, "%f"), #token, token); \
     } else if (_IS_SAME_TYPE(token, bool)) {                                   \
       _OUT_RAW_LOCKED(logger, _GEN_TOKEN_FORMAT(logger, "%d"), #token,         \
-                      (token) ? 1 : 0);                                        \
+                      ((int)(intptr_t)(token)) ? 1 : 0);                       \
       /* Signed integer */                                                     \
     } else if (_IS_SAME_TYPE(token, char) ||                                   \
                _IS_SAME_TYPE(token, signed char) ||                            \
