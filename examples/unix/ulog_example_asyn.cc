@@ -61,13 +61,11 @@ int main() {
           LOGGER_TOKEN(50 * pi / 180);
           LOGGER_TOKEN(&pi);  // print address of pi
 
-          char *text = (char *)"Ulog is a micro log library.";
-          LOGGER_TOKEN((char *)text);
+          const char *text = "Ulog is a micro log library.";
+          LOGGER_TOKEN(text);
 
           // Hex dump
           LOGGER_HEX_DUMP(text, 45, 16);
-
-          LOGGER_TIME_CODE(int a = 0;);
 
           // Output multiple tokens to one line
           time_t now = 1577259816;

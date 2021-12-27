@@ -63,8 +63,8 @@ int main() {
   LOGGER_TOKEN((signed long)10);
   LOGGER_TOKEN((unsigned long)10);
 
-  char *text = (char *)"Ulog is a micro log library.";
-  LOGGER_TOKEN((char *)text);
+  const char *text = "Ulog is a micro log library.";
+  LOGGER_TOKEN(text);
 
   // Hex dump
   LOGGER_HEX_DUMP(text, 45, 16);
