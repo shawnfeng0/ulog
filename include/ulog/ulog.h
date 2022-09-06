@@ -132,34 +132,35 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
  * @param ... Parameters in the format
  */
 #define LOGGER_LOCAL_TRACE(logger, fmt, ...) \
-  _OUT_LOG(logger, ULOG_LEVEL_TRACE, fmt, ##__VA_ARGS__)
+  ULOG_OUT_LOG(logger, ULOG_LEVEL_TRACE, fmt, ##__VA_ARGS__)
 #define LOGGER_TRACE(fmt, ...) \
   LOGGER_LOCAL_TRACE(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
 #define LOGGER_LOCAL_DEBUG(logger, fmt, ...) \
-  _OUT_LOG(logger, ULOG_LEVEL_DEBUG, fmt, ##__VA_ARGS__)
+  ULOG_OUT_LOG(logger, ULOG_LEVEL_DEBUG, fmt, ##__VA_ARGS__)
 #define LOGGER_DEBUG(fmt, ...) \
   LOGGER_LOCAL_DEBUG(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
 #define LOGGER_LOCAL_INFO(logger, fmt, ...) \
-  _OUT_LOG(logger, ULOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
+  ULOG_OUT_LOG(logger, ULOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
 #define LOGGER_INFO(fmt, ...) LOGGER_LOCAL_INFO(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
 #define LOGGER_LOCAL_WARN(logger, fmt, ...) \
-  _OUT_LOG(logger, ULOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
+  ULOG_OUT_LOG(logger, ULOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
 #define LOGGER_WARN(fmt, ...) LOGGER_LOCAL_WARN(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
 #define LOGGER_LOCAL_ERROR(logger, fmt, ...) \
-  _OUT_LOG(logger, ULOG_LEVEL_ERROR, fmt, ##__VA_ARGS__)
+  ULOG_OUT_LOG(logger, ULOG_LEVEL_ERROR, fmt, ##__VA_ARGS__)
 #define LOGGER_ERROR(fmt, ...) \
   LOGGER_LOCAL_ERROR(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
 #define LOGGER_LOCAL_FATAL(logger, fmt, ...) \
-  _OUT_LOG(logger, ULOG_LEVEL_FATAL, fmt, ##__VA_ARGS__)
+  ULOG_OUT_LOG(logger, ULOG_LEVEL_FATAL, fmt, ##__VA_ARGS__)
 #define LOGGER_FATAL(fmt, ...) \
   LOGGER_LOCAL_FATAL(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
-#define LOGGER_LOCAL_RAW(logger, fmt, ...) _OUT_RAW(logger, fmt, ##__VA_ARGS__)
+#define LOGGER_LOCAL_RAW(logger, fmt, ...) \
+  ULOG_OUT_RAW(logger, fmt, ##__VA_ARGS__)
 #define LOGGER_RAW(fmt, ...) LOGGER_LOCAL_RAW(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
 /**
@@ -176,7 +177,7 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
  * @param token Can be float, double, [unsigned / signed] char / short / int /
  * long / long long and pointers of the above type
  */
-#define LOGGER_LOCAL_TOKEN(logger, token) _OUT_TOKEN(logger, token)
+#define LOGGER_LOCAL_TOKEN(logger, token) ULOG_OUT_TOKEN(logger, token)
 #define LOGGER_TOKEN(token) LOGGER_LOCAL_TOKEN(ULOG_GLOBAL, token)
 
 /**
@@ -191,7 +192,7 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
  * tokens at the same time
  */
 #define LOGGER_LOCAL_MULTI_TOKEN(logger, ...) \
-  _OUT_MULTI_TOKEN(logger, __VA_ARGS__)
+  ULOG_OUT_MULTI_TOKEN(logger, __VA_ARGS__)
 #define LOGGER_MULTI_TOKEN(...) \
   LOGGER_LOCAL_MULTI_TOKEN(ULOG_GLOBAL, __VA_ARGS__)
 
@@ -207,7 +208,7 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
  * output:
  * time { uint32_t n = 1000 * 1000; while (n--); } => 1315us
  */
-#define LOGGER_LOCAL_TIME_CODE(logger, ...) _TIME_CODE(logger, __VA_ARGS__)
+#define LOGGER_LOCAL_TIME_CODE(logger, ...) ULOG_TIME_CODE(logger, __VA_ARGS__)
 #define LOGGER_TIME_CODE(...) LOGGER_LOCAL_TIME_CODE(ULOG_GLOBAL, __VA_ARGS__)
 
 /**
@@ -228,7 +229,7 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
  * @param width How many bytes of data are displayed in each line
  */
 #define LOGGER_LOCAL_HEX_DUMP(logger, data, length, width) \
-  _HEX_DUMP(logger, data, length, width)
+  ULOG_HEX_DUMP(logger, data, length, width)
 #define LOGGER_HEX_DUMP(data, length, width) \
   LOGGER_LOCAL_HEX_DUMP(ULOG_GLOBAL, data, length, width)
 

@@ -25,12 +25,12 @@ enum {
 };
 
 static const char *level_infos[ULOG_LEVEL_NUMBER][INDEX_MAX] = {
-    {STR_WHITE, "T"},   // TRACE
-    {STR_BLUE, "D"},    // DEBUG
-    {STR_GREEN, "I"},   // INFO
-    {STR_YELLOW, "W"},  // WARN
-    {STR_RED, "E"},     // ERROR
-    {STR_PURPLE, "F"},  // FATAL
+    {ULOG_STR_WHITE, "T"},   // TRACE
+    {ULOG_STR_BLUE, "D"},    // DEBUG
+    {ULOG_STR_GREEN, "I"},   // INFO
+    {ULOG_STR_YELLOW, "W"},  // WARN
+    {ULOG_STR_RED, "E"},     // ERROR
+    {ULOG_STR_PURPLE, "F"},  // FATAL
 };
 
 static inline int logger_printf(void *unused, const char *str) {
@@ -382,7 +382,8 @@ static void logger_log_internal(struct ulog_s *logger, enum ulog_level_e level,
   // Print gray color
   if (logger->log_level_enabled_ || logger->log_file_line_enabled_ ||
       logger->log_function_enabled_)
-    logger_snprintf(logger, "%s", logger->log_color_enabled_ ? STR_GRAY : "");
+    logger_snprintf(logger, "%s",
+                    logger->log_color_enabled_ ? ULOG_STR_GRAY : "");
 
   // Print '/'
   if (logger->log_level_enabled_) logger_snprintf(logger, "/");
@@ -416,7 +417,8 @@ static void logger_log_internal(struct ulog_s *logger, enum ulog_level_e level,
 
   logger_vsnprintf(logger, fmt, ap);
 
-  logger_snprintf(logger, "%s", logger->log_color_enabled_ ? STR_RESET : "");
+  logger_snprintf(logger, "%s",
+                  logger->log_color_enabled_ ? ULOG_STR_RESET : "");
 
   if (newline) logger_snprintf(logger, "\r\n");
 
