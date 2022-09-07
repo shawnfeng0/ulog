@@ -141,8 +141,11 @@ uint64_t logger_real_time_us();
                                                   "=> " ULOG_STR_GREEN format \
                                   : "%s => " format
 
-#define ULOG_GEN_STRING_TOKEN_FORMAT(color) \
-  ULOG_STR_RED "\"" color "%s" ULOG_STR_RED "\""
+#define ULOG_GEN_STRING_TOKEN_FORMAT(logger)                    \
+  logger_color_is_enabled(logger) ? ULOG_STR_BLUE               \
+      "%s " ULOG_STR_RED "=> " ULOG_STR_RED "\"" ULOG_STR_GREEN \
+      "%s" ULOG_STR_RED "\""                                    \
+                                  : "%s => \"%s\""
 
 #ifdef __cplusplus
 namespace ulog {
@@ -284,11 +287,8 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
       /* Arrays can be changed to pointer types by (var) +1, but this is not   \
        * compatible with (void *) types */                                     \
       const char *_ulog_value = (const char *)(uintptr_t)(token);              \
-      ULOG_OUT_RAW_NOLOCK(                                                     \
-          logger,                                                              \
-          ULOG_GEN_TOKEN_FORMAT(logger,                                        \
-                                ULOG_GEN_STRING_TOKEN_FORMAT(ULOG_STR_GREEN)), \
-          #token, _ulog_value ? _ulog_value : "NULL");                         \
+      ULOG_OUT_RAW_NOLOCK(logger, ULOG_GEN_STRING_TOKEN_FORMAT(logger),        \
+                          #token, _ulog_value ? _ulog_value : "NULL");         \
     } else if (ULOG_IS_SAME_TYPE(token, void *) ||                             \
                ULOG_IS_SAME_TYPE(token, short *) ||                            \
                ULOG_IS_SAME_TYPE(token, unsigned short *) ||                   \
@@ -395,25 +395,24 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
 #define ULOG_FORMAT_FOR_TIME_CODE(logger, format, unit)            \
   logger_color_is_enabled(logger) ? ULOG_STR_GREEN                 \
       "time " ULOG_STR_RED "{ " ULOG_STR_BLUE "%s%s " ULOG_STR_RED \
-      "} => " ULOG_STR_GREEN "%" format unit                       \
+      "} => " ULOG_STR_GREEN "%" format ULOG_STR_RED unit          \
                                   : "time { %s%s } => %" format unit
 
-#define ULOG_TIME_CODE(logger, ...)                                            \
-  ({                                                                           \
-    const int _CODE_LENGTH_MAX = 50;                                           \
-    uint64_t _ulog_start_time_us = logger_monotonic_time_us();                 \
-    __VA_ARGS__;                                                               \
-    uint64_t _ulog_end_time_us = logger_monotonic_time_us();                   \
-    uint32_t _ulog_timediff_us = (_ulog_end_time_us - _ulog_start_time_us);    \
-    char _ulog_function_str[_CODE_LENGTH_MAX];                                 \
-    memset(_ulog_function_str, 0, _CODE_LENGTH_MAX);                           \
-    strncpy(_ulog_function_str, #__VA_ARGS__, _CODE_LENGTH_MAX - 1);           \
-    LOGGER_DEBUG(ULOG_FORMAT_FOR_TIME_CODE(logger, PRIu32, ULOG_STR_RED "us"), \
-                 _ulog_function_str,                                           \
-                 strncmp(#__VA_ARGS__, _ulog_function_str, _CODE_LENGTH_MAX)   \
-                     ? "..."                                                   \
-                     : "",                                                     \
-                 _ulog_timediff_us);                                           \
+#define ULOG_TIME_CODE(logger, ...)                                          \
+  ({                                                                         \
+    const int _CODE_LENGTH_MAX = 50;                                         \
+    uint64_t _ulog_start_time_us = logger_monotonic_time_us();               \
+    __VA_ARGS__;                                                             \
+    uint64_t _ulog_end_time_us = logger_monotonic_time_us();                 \
+    uint32_t _ulog_timediff_us = (_ulog_end_time_us - _ulog_start_time_us);  \
+    char _ulog_function_str[_CODE_LENGTH_MAX];                               \
+    memset(_ulog_function_str, 0, _CODE_LENGTH_MAX);                         \
+    strncpy(_ulog_function_str, #__VA_ARGS__, _CODE_LENGTH_MAX - 1);         \
+    LOGGER_DEBUG(                                                            \
+        ULOG_FORMAT_FOR_TIME_CODE(logger, PRIu32, "us"), _ulog_function_str, \
+        strncmp(#__VA_ARGS__, _ulog_function_str, _CODE_LENGTH_MAX) ? "..."  \
+                                                                    : "",    \
+        _ulog_timediff_us);                                                  \
   })
 
 #define ULOG_GEN_COLOR_FORMAT_FOR_HEX_DUMP(place1, place2, place3, place4)    \
