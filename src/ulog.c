@@ -339,11 +339,9 @@ int logger_nolock_flush(struct ulog_s *logger) {
   return ret;
 }
 
-static void logger_log_internal(struct ulog_s *logger, enum ulog_level_e level,
-                                const char *file, const char *func,
-                                uint32_t line, bool newline,
-                                bool lock_and_flush, const char *fmt,
-                                va_list ap) {
+void logger_log(struct ulog_s *logger, enum ulog_level_e level,
+                const char *file, const char *func, uint32_t line, bool newline,
+                bool lock_and_flush, const char *fmt, ...) {
   if (!is_logger_valid(logger) || !fmt || level < logger->log_level_) return;
 
   if (lock_and_flush) logger_output_lock(logger);
@@ -363,7 +361,7 @@ static void logger_log_internal(struct ulog_s *logger, enum ulog_level_e level,
   // Print time
   if (logger->log_time_enabled_) {
     uint64_t time_ms = logger_real_time_us() / 1000;
-    time_t time_s = time_ms / 1000;
+    time_t time_s = (time_t)(time_ms / 1000);
     struct tm lt = *localtime(&time_s);
     logger_snprintf(logger, "%04d-%02d-%02d %02d:%02d:%02d.%03d ",
                     lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday, lt.tm_hour,
@@ -415,7 +413,10 @@ static void logger_log_internal(struct ulog_s *logger, enum ulog_level_e level,
       logger, "%s",
       logger->log_color_enabled_ ? level_infos[level][INDEX_LEVEL_COLOR] : "");
 
+  va_list ap;
+  va_start(ap, fmt);
   logger_vsnprintf(logger, fmt, ap);
+  va_end(ap);
 
   logger_snprintf(logger, "%s",
                   logger->log_color_enabled_ ? ULOG_STR_RESET : "");
@@ -431,25 +432,4 @@ static void logger_log_internal(struct ulog_s *logger, enum ulog_level_e level,
 
     logger_output_unlock(logger);
   }
-}
-
-void logger_log_no_format_check(struct ulog_s *logger, enum ulog_level_e level,
-                                const char *file, const char *func,
-                                uint32_t line, bool newline,
-                                bool lock_and_flush, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  logger_log_internal(logger, level, file, func, line, newline, lock_and_flush,
-                      fmt, ap);
-  va_end(ap);
-}
-
-void logger_log(struct ulog_s *logger, enum ulog_level_e level,
-                const char *file, const char *func, uint32_t line, bool newline,
-                bool lock_and_flush, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  logger_log_internal(logger, level, file, func, line, newline, lock_and_flush,
-                      fmt, ap);
-  va_end(ap);
 }

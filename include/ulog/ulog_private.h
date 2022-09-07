@@ -92,10 +92,6 @@ ULOG_ATTRIBUTE_CHECK_FORMAT(8, 9)
 void logger_log(struct ulog_s *logger, enum ulog_level_e level,
                 const char *file, const char *func, uint32_t line, bool newline,
                 bool lock_and_flush, const char *fmt, ...);
-void logger_log_no_format_check(struct ulog_s *logger, enum ulog_level_e level,
-                                const char *file, const char *func,
-                                uint32_t line, bool newline,
-                                bool lock_and_flush, const char *fmt, ...);
 
 /**
  * Flush log buffer
@@ -133,13 +129,12 @@ uint64_t logger_real_time_us();
 #define ULOG_OUT_RAW(logger, fmt, ...) \
   ({ logger_raw(logger, true, fmt, ##__VA_ARGS__); })
 
-#define ULOG_OUT_RAW_LOCKED(logger, fmt, ...) \
+#define ULOG_OUT_RAW_NOLOCK(logger, fmt, ...) \
   logger_raw_no_format_check(logger, false, fmt, ##__VA_ARGS__)
 
-#define ULOG_OUT_DEBUG_NOLOCK(logger, need_newline, ...)                  \
-  logger_log_no_format_check(logger, ULOG_LEVEL_DEBUG, __FILENAME__,      \
-                             __FUNCTION__, __LINE__, need_newline, false, \
-                             ##__VA_ARGS__)
+#define ULOG_OUT_DEBUG_NOLOCK(logger, need_newline, ...)                     \
+  logger_log(logger, ULOG_LEVEL_DEBUG, __FILENAME__, __FUNCTION__, __LINE__, \
+             need_newline, false, ##__VA_ARGS__)
 
 #define ULOG_GEN_TOKEN_FORMAT(logger, format)                                 \
   logger_color_is_enabled(logger) ? ULOG_STR_BLUE "%s " ULOG_STR_RED          \
@@ -254,10 +249,10 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
 #define ULOG_OUT_TOKEN_IMPLEMENT(logger, token)                                \
   ({                                                                           \
     if (ULOG_IS_SAME_TYPE(token, float) || ULOG_IS_SAME_TYPE(token, double)) { \
-      ULOG_OUT_RAW_LOCKED(logger, ULOG_GEN_TOKEN_FORMAT(logger, "%f"), #token, \
+      ULOG_OUT_RAW_NOLOCK(logger, ULOG_GEN_TOKEN_FORMAT(logger, "%f"), #token, \
                           token);                                              \
     } else if (ULOG_IS_SAME_TYPE(token, bool)) {                               \
-      ULOG_OUT_RAW_LOCKED(logger, ULOG_GEN_TOKEN_FORMAT(logger, "%d"), #token, \
+      ULOG_OUT_RAW_NOLOCK(logger, ULOG_GEN_TOKEN_FORMAT(logger, "%d"), #token, \
                           ((int)(intptr_t)(token)) ? 1 : 0);                   \
       /* Signed integer */                                                     \
     } else if (ULOG_IS_SAME_TYPE(token, char) ||                               \
@@ -266,7 +261,7 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
                ULOG_IS_SAME_TYPE(token, int) ||                                \
                ULOG_IS_SAME_TYPE(token, long) ||                               \
                ULOG_IS_SAME_TYPE(token, long long)) {                          \
-      ULOG_OUT_RAW_LOCKED(logger, ULOG_GEN_TOKEN_FORMAT(logger, "%" PRId64),   \
+      ULOG_OUT_RAW_NOLOCK(logger, ULOG_GEN_TOKEN_FORMAT(logger, "%" PRId64),   \
                           #token, (int64_t)(token));                           \
       /* Unsigned integer */                                                   \
     } else if (ULOG_IS_SAME_TYPE(token, unsigned char) ||                      \
@@ -274,7 +269,7 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
                ULOG_IS_SAME_TYPE(token, unsigned int) ||                       \
                ULOG_IS_SAME_TYPE(token, unsigned long) ||                      \
                ULOG_IS_SAME_TYPE(token, unsigned long long)) {                 \
-      ULOG_OUT_RAW_LOCKED(logger, ULOG_GEN_TOKEN_FORMAT(logger, "%" PRIu64),   \
+      ULOG_OUT_RAW_NOLOCK(logger, ULOG_GEN_TOKEN_FORMAT(logger, "%" PRIu64),   \
                           #token, (uint64_t)(token));                          \
     } else if (ULOG_IS_SAME_TYPE(token, char *) ||                             \
                ULOG_IS_SAME_TYPE(token, const char *) ||                       \
@@ -289,7 +284,7 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
       /* Arrays can be changed to pointer types by (var) +1, but this is not   \
        * compatible with (void *) types */                                     \
       const char *_ulog_value = (const char *)(uintptr_t)(token);              \
-      ULOG_OUT_RAW_LOCKED(                                                     \
+      ULOG_OUT_RAW_NOLOCK(                                                     \
           logger,                                                              \
           ULOG_GEN_TOKEN_FORMAT(logger,                                        \
                                 ULOG_GEN_STRING_TOKEN_FORMAT(ULOG_STR_GREEN)), \
@@ -305,10 +300,10 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
                ULOG_IS_SAME_TYPE(token, unsigned long long *) ||               \
                ULOG_IS_SAME_TYPE(token, float *) ||                            \
                ULOG_IS_SAME_TYPE(token, double *)) {                           \
-      ULOG_OUT_RAW_LOCKED(logger, ULOG_GEN_TOKEN_FORMAT(logger, "%p"), #token, \
-                          token);                                              \
+      ULOG_OUT_RAW_NOLOCK(logger, ULOG_GEN_TOKEN_FORMAT(logger, "%p"), #token, \
+                          (void *)(uintptr_t)(token));                         \
     } else {                                                                   \
-      ULOG_OUT_RAW_LOCKED(logger, ULOG_GEN_TOKEN_FORMAT(logger, "(none)"),     \
+      ULOG_OUT_RAW_NOLOCK(logger, ULOG_GEN_TOKEN_FORMAT(logger, "(none)"),     \
                           #token);                                             \
     }                                                                          \
   })
@@ -317,7 +312,7 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
 #define ULOG_OUT_TOKEN(logger, token)                 \
   ({                                                  \
     logger_output_lock(logger);                       \
-    ULOG_OUT_DEBUG_NOLOCK(logger, false, "");         \
+    ULOG_OUT_DEBUG_NOLOCK(logger, false, "%s", "");   \
     ULOG_OUT_TOKEN_IMPLEMENT(logger, token);          \
     logger_raw(logger, false, "\r\n" ULOG_STR_RESET); \
     logger_nolock_flush(logger);                      \
@@ -357,7 +352,7 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
 #define ULOG_OUT_MULTI_TOKEN(logger, ...)                                   \
   ({                                                                        \
     logger_output_lock(logger);                                             \
-    ULOG_OUT_DEBUG_NOLOCK(logger, false, "");                               \
+    ULOG_OUT_DEBUG_NOLOCK(logger, false, "%s", "");                         \
     ULOG_EXPAND(ULOG_MACRO_CONCAT(                                          \
         ULOG_TOKEN_AUX_, ULOG_ARG_COUNT(__VA_ARGS__))(logger, __VA_ARGS__)) \
     logger_nolock_flush(logger);                                            \
