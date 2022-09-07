@@ -17,10 +17,12 @@
 
 // Precompiler define to get only filename;
 #if !defined(__FILENAME__)
-#define __FILENAME__                                       \
-  (strrchr(__FILE__, '/')    ? strrchr(__FILE__, '/') + 1  \
-   : strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 \
-                             : __FILE__)
+static inline const char *ulog_get_filename(const char *filepath) {
+  return strrchr(filepath, '/')    ? strrchr(filepath, '/') + 1
+         : strrchr(filepath, '\\') ? strrchr(filepath, '\\') + 1
+                                   : filepath;
+}
+#define __FILENAME__ ulog_get_filename(__FILE__)
 #endif
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -53,8 +55,8 @@ int logger_output_unlock(struct ulog_s *logger);
  * @param width How many bytes of data are displayed in each line
  * @param base_address Base address, the displayed address starts from this
  * value
- * @param tail_addr_out Tail address output, whether to output the last address
- * after output
+ * @param tail_addr_out Tail address output, whether to output the last
+ * address after output
  * @return Last output address
  */
 uintptr_t logger_nolock_hex_dump(struct ulog_s *logger, const void *data,
@@ -64,8 +66,8 @@ uintptr_t logger_nolock_hex_dump(struct ulog_s *logger, const void *data,
 /**
  * Raw data output, similar to printf
  * @param fmt Format of the format string
- * @param lock_and_flush Whether the output needs to be locked during output, it
- * is recommended to lock
+ * @param lock_and_flush Whether the output needs to be locked during
+ * output, it is recommended to lock
  * @param ... Parameters in the format
  */
 ULOG_ATTRIBUTE_CHECK_FORMAT(3, 4)
@@ -76,15 +78,15 @@ void logger_raw_no_format_check(struct ulog_s *logger, bool lock_and_flush,
 
 /**
  * Print log
- * Internal functions should not be called directly from outside, macros such as
- * LOG_DEBUG / LOG_INFO should be used
+ * Internal functions should not be called directly from outside, macros
+ * such as LOG_DEBUG / LOG_INFO should be used
  * @param level Output level
  * @param file File name
  * @param func Function name
  * @param line Line number of the file
  * @param newline Whether to output a new line at the end
- * @param lock_and_flush Whether the output needs to be locked during output, it
- * is recommended to lock
+ * @param lock_and_flush Whether the output needs to be locked during
+ * output, it is recommended to lock
  * @param fmt Format string, consistent with printf series functions
  * @param ...
  */
@@ -348,6 +350,7 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
  */
 #define ULOG_MACRO_CONCAT_PRIVATE(l, r) l##r
 #define ULOG_MACRO_CONCAT(l, r) ULOG_MACRO_CONCAT_PRIVATE(l, r)
+#define ULOG_UNIQUE(name) ULOG_MACRO_CONCAT(name, __LINE__)
 
 #define ULOG_OUT_MULTI_TOKEN(logger, ...)                                   \
   ({                                                                        \
@@ -398,21 +401,25 @@ inline void print(struct ulog_s *logger, const char *name, bool value) {
       "} => " ULOG_STR_GREEN "%" format ULOG_STR_RED unit          \
                                   : "time { %s%s } => %" format unit
 
-#define ULOG_TIME_CODE(logger, ...)                                          \
-  ({                                                                         \
-    const int _CODE_LENGTH_MAX = 50;                                         \
-    uint64_t _ulog_start_time_us = logger_monotonic_time_us();               \
-    __VA_ARGS__;                                                             \
-    uint64_t _ulog_end_time_us = logger_monotonic_time_us();                 \
-    uint32_t _ulog_timediff_us = (_ulog_end_time_us - _ulog_start_time_us);  \
-    char _ulog_function_str[_CODE_LENGTH_MAX];                               \
-    memset(_ulog_function_str, 0, _CODE_LENGTH_MAX);                         \
-    strncpy(_ulog_function_str, #__VA_ARGS__, _CODE_LENGTH_MAX - 1);         \
-    LOGGER_DEBUG(                                                            \
-        ULOG_FORMAT_FOR_TIME_CODE(logger, PRIu32, "us"), _ulog_function_str, \
-        strncmp(#__VA_ARGS__, _ulog_function_str, _CODE_LENGTH_MAX) ? "..."  \
-                                                                    : "",    \
-        _ulog_timediff_us);                                                  \
+#define ULOG_TIME_CODE(logger, ...)                                       \
+  ({                                                                      \
+    const int ULOG_UNIQUE(LENGTH_MAX) = 32;                               \
+    uint64_t ULOG_UNIQUE(start) = logger_monotonic_time_us();             \
+    __VA_ARGS__;                                                          \
+    uint64_t ULOG_UNIQUE(end) = logger_monotonic_time_us();               \
+    uint32_t ULOG_UNIQUE(diff) = (ULOG_UNIQUE(end) - ULOG_UNIQUE(start)); \
+    char ULOG_UNIQUE(func_str)[ULOG_UNIQUE(LENGTH_MAX)];                  \
+    const char ULOG_UNIQUE(raw)[] = #__VA_ARGS__;                         \
+    memset(ULOG_UNIQUE(func_str), 0, ULOG_UNIQUE(LENGTH_MAX));            \
+    strncpy(ULOG_UNIQUE(func_str), ULOG_UNIQUE(raw),                      \
+            ULOG_UNIQUE(LENGTH_MAX) - 1);                                 \
+    LOGGER_DEBUG(ULOG_FORMAT_FOR_TIME_CODE(logger, PRIu32, "us"),         \
+                 ULOG_UNIQUE(func_str),                                   \
+                 strncmp(ULOG_UNIQUE(raw), ULOG_UNIQUE(func_str),         \
+                         ULOG_UNIQUE(LENGTH_MAX))                         \
+                     ? "..."                                              \
+                     : "",                                                \
+                 ULOG_UNIQUE(diff));                                      \
   })
 
 #define ULOG_GEN_COLOR_FORMAT_FOR_HEX_DUMP(place1, place2, place3, place4)    \
