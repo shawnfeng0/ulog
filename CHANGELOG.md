@@ -7,7 +7,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.4.0...HEAD
+
+## [0.4.0] - 2022-09-08
+
+[0.4.0]: https://github.com/ShawnFeng0/ulog/compare/v0.3.1...v0.4.0
+
+### Added
+
+* Add MIT license
+* Add changelog file
+
+### Fixed
+
+* Resolve compile warnings under -W -Wall -Waddress compile options
+* TIME_CODE() and TOKEN(string) cannot turn off color output
+* Token output is not limited by level
 
 ## [0.3.1] - 2021-06-21
 
