@@ -16,7 +16,10 @@ enum ulog_level_e {
   ULOG_LEVEL_WARN,
   ULOG_LEVEL_ERROR,
   ULOG_LEVEL_FATAL,
-  ULOG_LEVEL_NUMBER
+  ULOG_LEVEL_NUMBER,
+
+  // Raw data level means output is always available
+  ULOG_LEVEL_RAW = ULOG_LEVEL_NUMBER
 };
 
 #ifdef __cplusplus
@@ -160,7 +163,7 @@ void logger_enable_function_output(struct ulog_s *logger, bool enable);
   LOGGER_LOCAL_FATAL(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
 #define LOGGER_LOCAL_RAW(logger, fmt, ...) \
-  ULOG_OUT_RAW(logger, fmt, ##__VA_ARGS__)
+  ULOG_OUT_RAW(logger, ULOG_LEVEL_RAW, fmt, ##__VA_ARGS__)
 #define LOGGER_RAW(fmt, ...) LOGGER_LOCAL_RAW(ULOG_GLOBAL, fmt, ##__VA_ARGS__)
 
 /**

@@ -300,9 +300,11 @@ uintptr_t logger_nolock_hex_dump(struct ulog_s *logger, const void *data,
   return data_cur - data_raw + base_address;
 }
 
-static void logger_raw_internal(struct ulog_s *logger, bool lock_and_flush,
-                                const char *fmt, va_list ap) {
-  if (!is_logger_valid(logger) || !fmt) return;
+static inline void logger_raw_internal(struct ulog_s *logger,
+                                       enum ulog_level_e level,
+                                       bool lock_and_flush, const char *fmt,
+                                       va_list ap) {
+  if (!is_logger_valid(logger) || !fmt || level < logger->log_level_) return;
 
   if (lock_and_flush) logger_output_lock(logger);
 
@@ -314,19 +316,19 @@ static void logger_raw_internal(struct ulog_s *logger, bool lock_and_flush,
   }
 }
 
-void logger_raw(struct ulog_s *logger, bool lock_and_flush, const char *fmt,
-                ...) {
+void logger_raw(struct ulog_s *logger, enum ulog_level_e level,
+                bool lock_and_flush, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  logger_raw_internal(logger, lock_and_flush, fmt, ap);
+  logger_raw_internal(logger, level, lock_and_flush, fmt, ap);
   va_end(ap);
 }
 
-void logger_raw_no_format_check(struct ulog_s *logger, bool lock_and_flush,
-                                const char *fmt, ...) {
+void logger_raw_no_format_check(struct ulog_s *logger, enum ulog_level_e level,
+                                bool lock_and_flush, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  logger_raw_internal(logger, lock_and_flush, fmt, ap);
+  logger_raw_internal(logger, level, lock_and_flush, fmt, ap);
   va_end(ap);
 }
 
@@ -339,9 +341,10 @@ int logger_nolock_flush(struct ulog_s *logger) {
   return ret;
 }
 
-void logger_log(struct ulog_s *logger, enum ulog_level_e level,
-                const char *file, const char *func, uint32_t line, bool newline,
-                bool lock_and_flush, const char *fmt, ...) {
+void logger_log_with_header(struct ulog_s *logger, enum ulog_level_e level,
+                            const char *file, const char *func, uint32_t line,
+                            bool newline, bool lock_and_flush, const char *fmt,
+                            ...) {
   if (!is_logger_valid(logger) || !fmt || level < logger->log_level_) return;
 
   if (lock_and_flush) logger_output_lock(logger);
