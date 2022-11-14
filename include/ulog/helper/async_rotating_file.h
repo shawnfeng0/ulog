@@ -40,7 +40,9 @@ class AsyncRotatingFile {
       uint8_t data[2 * 1024];
       std::time_t last_flush_time = std::time(nullptr);
       while (!should_exit_) {
-        auto len = fifo_.OutWaitIfEmpty(data, sizeof(data) - 1, 1000);
+        auto len = fifo_.OutputWaitFor(data, sizeof(data) - 1, 1000, [&] {
+          return !fifo_.empty() || need_flush_;
+        });
         if (len > 0) {
           rotating_file_.SinkIt(data, len);
           if (should_print_) {
@@ -48,13 +50,14 @@ class AsyncRotatingFile {
             printf("%s", data);
           }
         }
-        ++write_count_;  // For flush use
 
         // Flush
-        std::time_t cur_time = std::time(nullptr);
-        if (cur_time - last_flush_time >= flush_period_sec_) {
+        std::time_t const cur_time = std::time(nullptr);
+        if (need_flush_ || (cur_time - last_flush_time >= flush_period_sec_)) {
+          need_flush_ = false;
           last_flush_time = cur_time;
           rotating_file_.Flush();
+          ++flush_count_;
         }
       }
     };
@@ -66,28 +69,29 @@ class AsyncRotatingFile {
   AsyncRotatingFile &operator=(const AsyncRotatingFile &) = delete;
 
   ~AsyncRotatingFile() {
-    should_exit_.store(true);
+    should_exit_ = true;
     fifo_.InterruptOutput();
     if (async_thread_) async_thread_->join();
   }
 
-  void Flush() const {
+  void Flush() {
     fifo_.Flush();
 
     // TODO: Use semaphore to realize the flush of waiting for asynchronous
     // thread
 
-    auto count = write_count_.load();
+    auto count = flush_count_.load();
     // Try to lock to ensure that the reading of fifo and writing of files in
     // the asynchronous thread have been completed
     do {
+      need_flush_ = true;
       fifo_.InterruptOutput();
       std::this_thread::yield();
-    } while (write_count_ == count);
+    } while (flush_count_ == count);
   }
 
   size_t InPacket(const void *buf, size_t num_elements) {
-    return fifo_.InPacket(buf, num_elements);
+    return fifo_.InputPacketOrDrop(buf, num_elements);
   }
 
   size_t fifo_size() const { return fifo_.size(); }
@@ -103,7 +107,8 @@ class AsyncRotatingFile {
 
   // For flush
   std::time_t flush_period_sec_;
-  std::atomic_size_t write_count_{};
+  std::atomic_size_t flush_count_{};
+  std::atomic_bool need_flush_{false};
 
   std::atomic_bool should_exit_{false};
 };

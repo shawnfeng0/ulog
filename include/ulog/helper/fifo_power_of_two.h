@@ -26,7 +26,7 @@ class FifoPowerOfTwo {
       : data_((unsigned char *)buffer),
         is_allocated_memory_(false),
         element_size_(element_size != 0 ? element_size : 1) {
-    size_t num_elements = buf_size / element_size_;
+    size_t const num_elements = buf_size / element_size_;
 
     if (num_elements < 2) {
       mask_ = 0;
@@ -64,8 +64,42 @@ class FifoPowerOfTwo {
     if (is_allocated_memory_ && data_) delete[] data_;
   }
 
+  size_t InputWaitIfFull(const void *buf, size_t num_elements,
+                         int32_t timeout_ms = -1) {
+    auto until_condition = [&, this]() { return unused() > num_elements; };
+    return InputWaitFor(buf, num_elements, timeout_ms, until_condition);
+  }
+
+  template <typename Predicate>
+  size_t InputWaitFor(const void *buf, size_t num_elements, int32_t timeout_ms,
+                     Predicate until_condition) {
+    if (!buf) {
+      return 0;
+    }
+
+    std::unique_lock<std::mutex> lg(mutex_);
+
+    if (timeout_ms < 0) {
+      data_consumption_notify_.wait(lg, until_condition);
+    } else {
+      if (!data_consumption_notify_.wait_for(
+              lg, std::chrono::milliseconds(timeout_ms), until_condition)) {
+        // Did not wait
+        return 0;
+      }
+    }
+
+    peak_ = max(peak_, used());
+
+    CopyInLocked(buf, num_elements, in_);
+    in_ += num_elements;
+
+    data_production_notify_.notify_all();
+    return num_elements;
+  }
+
   // A packet is entered, either completely written or discarded.
-  size_t InPacket(const void *buf, size_t num_elements) {
+  size_t InputPacketOrDrop(const void *buf, size_t num_elements) {
     if (!buf) {
       return 0;
     }
@@ -83,11 +117,11 @@ class FifoPowerOfTwo {
     CopyInLocked(buf, num_elements, in_);
     in_ += num_elements;
 
-    have_data_notify_.notify_all();
+    data_production_notify_.notify_all();
     return num_elements;
   }
 
-  size_t In(const void *buf, size_t num_elements) {
+  size_t Input(const void *buf, size_t num_elements) {
     if (!buf) {
       return 0;
     }
@@ -102,11 +136,11 @@ class FifoPowerOfTwo {
     in_ += len;
     num_dropped_ += num_elements - len;
 
-    have_data_notify_.notify_all();
+    data_production_notify_.notify_all();
     return len;
   }
 
-  size_t OutPeek(void *out_buf, size_t num_elements) {
+  size_t OutputPeek(void *out_buf, size_t num_elements) {
     if (!out_buf) {
       return 0;
     }
@@ -117,33 +151,46 @@ class FifoPowerOfTwo {
     return num_elements;
   }
 
-  size_t OutWaitIfEmpty(void *out_buf, size_t num_elements,
-                        int32_t time_ms = -1) {
+  size_t OutputWaitIfEmpty(void *out_buf, size_t num_elements,
+                           int32_t timeout_ms = -1) {
+    auto until_condition = [this] { return !empty(); };
+    return OutputWaitFor(out_buf, num_elements, timeout_ms, until_condition);
+  }
+
+  template <typename Predicate>
+  size_t OutputWaitFor(void *out_buf, size_t num_elements, int32_t timeout_ms,
+                      Predicate until_condition) {
     if (!out_buf) {
       return 0;
     }
 
     std::unique_lock<std::mutex> lg(mutex_);
 
-    if (-1 == time_ms) {
-      have_data_notify_.wait(lg);
-    } else if (empty()) {
-      have_data_notify_.wait_for(lg, std::chrono::milliseconds{time_ms});
-      if (empty()) return 0;
+    if (timeout_ms < 0) {
+      data_production_notify_.wait(lg, until_condition);
+    } else {
+      if (!data_production_notify_.wait_for(
+              lg, std::chrono::milliseconds{timeout_ms}, until_condition)) {
+        // Did not wait
+        return 0;
+      }
     }
 
-    num_elements = min(num_elements, used());
-    CopyOutLocked(out_buf, num_elements, out_);
-    out_ += num_elements;
+    if (!empty()) {
+      num_elements = min(num_elements, used());
+      CopyOutLocked(out_buf, num_elements, out_);
+      out_ += num_elements;
+    }
 
     if (empty()) {
-      no_data_notify_.notify_all();
+      data_empty_notify_.notify_all();
     }
+    data_consumption_notify_.notify_all();
 
     return num_elements;
   }
 
-  size_t Out(void *out_buf, size_t num_elements) {
+  size_t Output(void *out_buf, size_t num_elements) {
     if (!out_buf) {
       return 0;
     }
@@ -154,18 +201,19 @@ class FifoPowerOfTwo {
     out_ += num_elements;
 
     if (empty()) {
-      no_data_notify_.notify_all();
+      data_empty_notify_.notify_all();
     }
+    data_consumption_notify_.notify_all();
 
     return num_elements;
   }
 
   void Flush() const {
     std::unique_lock<std::mutex> lg(mutex_);
-    no_data_notify_.wait(lg, [&] { return empty(); });
+    data_empty_notify_.wait(lg, [&] { return empty(); });
   }
 
-  void InterruptOutput() const { have_data_notify_.notify_all(); }
+  void InterruptOutput() const { data_production_notify_.notify_all(); }
 
   /**
    * removes the entire fifo content
@@ -191,7 +239,7 @@ class FifoPowerOfTwo {
 
   /* returns the number of used elements in the fifo */
   size_t used() const { return in_ - out_; }
-  bool empty() const { return used() == 0; }
+  bool empty() const { return in_ == out_; }
 
   /* returns the number of unused elements in the fifo */
   size_t unused() const { return size() - used(); }
@@ -214,8 +262,9 @@ class FifoPowerOfTwo {
   size_t peak_{};              // fifo peak
 
   mutable std::mutex mutex_{};
-  mutable std::condition_variable have_data_notify_{};
-  mutable std::condition_variable no_data_notify_{};
+  mutable std::condition_variable data_production_notify_{};
+  mutable std::condition_variable data_consumption_notify_{};
+  mutable std::condition_variable data_empty_notify_{};
 
   void CopyInLocked(const void *src, size_t len, size_t off) const {
     size_t size = this->size();

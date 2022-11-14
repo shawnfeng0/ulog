@@ -13,7 +13,7 @@ void *ulog_asyn_thread(void *arg) {
 
   size_t empty_times = 0;
   while (empty_times < 2) {
-    auto len = fifo.OutWaitIfEmpty(str, sizeof(str) - 1, 100);
+    auto len = fifo.OutputWaitIfEmpty(str, sizeof(str) - 1, 100);
     if (len > 0) {
       str[len] = '\0';
       printf("%s", str);
@@ -35,7 +35,7 @@ int main() {
   logger_set_user_data(ULOG_GLOBAL, &fifo);
   logger_set_output_callback(ULOG_GLOBAL, [](void *user_data, const char *str) {
     auto &fifo = *(ulog::FifoPowerOfTwo *)(user_data);
-    return (int)fifo.InPacket(str, strlen(str));
+    return (int)fifo.InputPacketOrDrop(str, strlen(str));
   });
   logger_set_flush_callback(ULOG_GLOBAL, [](void *user_data) {
     auto &fifo = *(ulog::FifoPowerOfTwo *)(user_data);
