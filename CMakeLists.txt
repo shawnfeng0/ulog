@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(ULOG_BUILD_EXAMPLES "Build examples" OFF)
 option(ULOG_BUILD_TESTS "Build tests" OFF)
+option(ULOG_BUILD_TOOLS "Build tools" ON)
 
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 add_compile_options(-Wextra -Wall)
@@ -22,6 +23,10 @@ endif ()
 
 if (ULOG_BUILD_TESTS)
     add_subdirectory(tests)
+endif ()
+
+if (ULOG_BUILD_TOOLS)
+    add_subdirectory(tools)
 endif ()
 
 # install

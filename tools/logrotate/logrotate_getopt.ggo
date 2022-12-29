@@ -1,0 +1,16 @@
+package "logrotate"
+version "1.0"
+purpose "Loop logging of standard inputs to several files"
+
+option "file_path" - "File path to record log"
+        string typestr="path" required
+option "file_size" - "Size of each file"
+        int    typestr="size" required
+option "file_number" - "Maximum number of files"
+        int    typestr="number" required
+option "fifo_size" - "Fifo size"
+        int    typestr="size" optional default="32768"
+option "stdout" - "Should print to stdout"
+        flag off
+option "flush_interval" - "Interval between flush"
+        int    typestr="second" optional default="0"
