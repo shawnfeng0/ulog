@@ -59,12 +59,12 @@ struct gengetopt_args_info
   
   unsigned int help_given ;	/**< @brief Whether help was given.  */
   unsigned int version_given ;	/**< @brief Whether version was given.  */
-  unsigned int file_path_given ;	/**< @brief Whether file_path was given.  */
-  unsigned int file_size_given ;	/**< @brief Whether file_size was given.  */
-  unsigned int file_number_given ;	/**< @brief Whether file_number was given.  */
-  unsigned int fifo_size_given ;	/**< @brief Whether fifo_size was given.  */
+  unsigned int file_path_given ;	/**< @brief Whether file-path was given.  */
+  unsigned int file_size_given ;	/**< @brief Whether file-size was given.  */
+  unsigned int file_number_given ;	/**< @brief Whether file-number was given.  */
+  unsigned int fifo_size_given ;	/**< @brief Whether fifo-size was given.  */
   unsigned int stdout_given ;	/**< @brief Whether stdout was given.  */
-  unsigned int flush_interval_given ;	/**< @brief Whether flush_interval was given.  */
+  unsigned int flush_interval_given ;	/**< @brief Whether flush-interval was given.  */
 
 } ;
 

@@ -36,12 +36,12 @@ const char *gengetopt_args_info_description = "";
 const char *gengetopt_args_info_help[] = {
   "  -h, --help                   Print help and exit",
   "  -V, --version                Print version and exit",
-  "      --file_path=path         File path to record log",
-  "      --file_size=size         Size of each file",
-  "      --file_number=number     Maximum number of files",
-  "      --fifo_size=size         Fifo size  (default=`32768')",
+  "      --file-path=path         File path to record log",
+  "      --file-size=size         Size of each file",
+  "      --file-number=number     Maximum number of files",
+  "      --fifo-size=size         Fifo size  (default=`32768')",
   "      --stdout                 Should print to stdout  (default=off)",
-  "      --flush_interval=second  Interval between flush  (default=`0')",
+  "      --flush-interval=second  Interval between flush  (default=`0')",
     0
 };
 
@@ -238,17 +238,17 @@ cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
   if (args_info->version_given)
     write_into_file(outfile, "version", 0, 0 );
   if (args_info->file_path_given)
-    write_into_file(outfile, "file_path", args_info->file_path_orig, 0);
+    write_into_file(outfile, "file-path", args_info->file_path_orig, 0);
   if (args_info->file_size_given)
-    write_into_file(outfile, "file_size", args_info->file_size_orig, 0);
+    write_into_file(outfile, "file-size", args_info->file_size_orig, 0);
   if (args_info->file_number_given)
-    write_into_file(outfile, "file_number", args_info->file_number_orig, 0);
+    write_into_file(outfile, "file-number", args_info->file_number_orig, 0);
   if (args_info->fifo_size_given)
-    write_into_file(outfile, "fifo_size", args_info->fifo_size_orig, 0);
+    write_into_file(outfile, "fifo-size", args_info->fifo_size_orig, 0);
   if (args_info->stdout_given)
     write_into_file(outfile, "stdout", 0, 0 );
   if (args_info->flush_interval_given)
-    write_into_file(outfile, "flush_interval", args_info->flush_interval_orig, 0);
+    write_into_file(outfile, "flush-interval", args_info->flush_interval_orig, 0);
   
 
   i = EXIT_SUCCESS;
@@ -367,19 +367,19 @@ cmdline_parser_required2 (struct gengetopt_args_info *args_info, const char *pro
   /* checks for required options */
   if (! args_info->file_path_given)
     {
-      fprintf (stderr, "%s: '--file_path' option required%s\n", prog_name, (additional_error ? additional_error : ""));
+      fprintf (stderr, "%s: '--file-path' option required%s\n", prog_name, (additional_error ? additional_error : ""));
       error_occurred = 1;
     }
   
   if (! args_info->file_size_given)
     {
-      fprintf (stderr, "%s: '--file_size' option required%s\n", prog_name, (additional_error ? additional_error : ""));
+      fprintf (stderr, "%s: '--file-size' option required%s\n", prog_name, (additional_error ? additional_error : ""));
       error_occurred = 1;
     }
   
   if (! args_info->file_number_given)
     {
-      fprintf (stderr, "%s: '--file_number' option required%s\n", prog_name, (additional_error ? additional_error : ""));
+      fprintf (stderr, "%s: '--file-number' option required%s\n", prog_name, (additional_error ? additional_error : ""));
       error_occurred = 1;
     }
   
@@ -551,12 +551,12 @@ cmdline_parser_internal (
       static struct option long_options[] = {
         { "help",	0, NULL, 'h' },
         { "version",	0, NULL, 'V' },
-        { "file_path",	1, NULL, 0 },
-        { "file_size",	1, NULL, 0 },
-        { "file_number",	1, NULL, 0 },
-        { "fifo_size",	1, NULL, 0 },
+        { "file-path",	1, NULL, 0 },
+        { "file-size",	1, NULL, 0 },
+        { "file-number",	1, NULL, 0 },
+        { "fifo-size",	1, NULL, 0 },
         { "stdout",	0, NULL, 0 },
-        { "flush_interval",	1, NULL, 0 },
+        { "flush-interval",	1, NULL, 0 },
         { 0,  0, 0, 0 }
       };
 
@@ -579,7 +579,7 @@ cmdline_parser_internal (
 
         case 0:	/* Long option with no short option */
           /* File path to record log.  */
-          if (strcmp (long_options[option_index].name, "file_path") == 0)
+          if (strcmp (long_options[option_index].name, "file-path") == 0)
           {
           
           
@@ -587,13 +587,13 @@ cmdline_parser_internal (
                  &(args_info->file_path_orig), &(args_info->file_path_given),
                 &(local_args_info.file_path_given), optarg, 0, 0, ARG_STRING,
                 check_ambiguity, override, 0, 0,
-                "file_path", '-',
+                "file-path", '-',
                 additional_error))
               goto failure;
           
           }
           /* Size of each file.  */
-          else if (strcmp (long_options[option_index].name, "file_size") == 0)
+          else if (strcmp (long_options[option_index].name, "file-size") == 0)
           {
           
           
@@ -601,13 +601,13 @@ cmdline_parser_internal (
                  &(args_info->file_size_orig), &(args_info->file_size_given),
                 &(local_args_info.file_size_given), optarg, 0, 0, ARG_INT,
                 check_ambiguity, override, 0, 0,
-                "file_size", '-',
+                "file-size", '-',
                 additional_error))
               goto failure;
           
           }
           /* Maximum number of files.  */
-          else if (strcmp (long_options[option_index].name, "file_number") == 0)
+          else if (strcmp (long_options[option_index].name, "file-number") == 0)
           {
           
           
@@ -615,13 +615,13 @@ cmdline_parser_internal (
                  &(args_info->file_number_orig), &(args_info->file_number_given),
                 &(local_args_info.file_number_given), optarg, 0, 0, ARG_INT,
                 check_ambiguity, override, 0, 0,
-                "file_number", '-',
+                "file-number", '-',
                 additional_error))
               goto failure;
           
           }
           /* Fifo size.  */
-          else if (strcmp (long_options[option_index].name, "fifo_size") == 0)
+          else if (strcmp (long_options[option_index].name, "fifo-size") == 0)
           {
           
           
@@ -629,7 +629,7 @@ cmdline_parser_internal (
                  &(args_info->fifo_size_orig), &(args_info->fifo_size_given),
                 &(local_args_info.fifo_size_given), optarg, 0, "32768", ARG_INT,
                 check_ambiguity, override, 0, 0,
-                "fifo_size", '-',
+                "fifo-size", '-',
                 additional_error))
               goto failure;
           
@@ -647,7 +647,7 @@ cmdline_parser_internal (
           
           }
           /* Interval between flush.  */
-          else if (strcmp (long_options[option_index].name, "flush_interval") == 0)
+          else if (strcmp (long_options[option_index].name, "flush-interval") == 0)
           {
           
           
@@ -655,7 +655,7 @@ cmdline_parser_internal (
                  &(args_info->flush_interval_orig), &(args_info->flush_interval_given),
                 &(local_args_info.flush_interval_given), optarg, 0, "0", ARG_INT,
                 check_ambiguity, override, 0, 0,
-                "flush_interval", '-',
+                "flush-interval", '-',
                 additional_error))
               goto failure;
           
