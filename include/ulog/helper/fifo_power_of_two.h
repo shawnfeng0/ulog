@@ -176,8 +176,8 @@ class FifoPowerOfTwo {
       }
     }
 
+    num_elements = min(num_elements, used());
     if (!empty()) {
-      num_elements = min(num_elements, used());
       CopyOutLocked(out_buf, num_elements, out_);
       out_ += num_elements;
     }
