@@ -67,11 +67,11 @@ class FifoPowerOfTwo {
   size_t InputWaitIfFull(const void *buf, size_t num_elements,
                          int32_t timeout_ms = -1) {
     auto until_condition = [&, this]() { return unused() > num_elements; };
-    return InputWaitFor(buf, num_elements, timeout_ms, until_condition);
+    return InputWaitUntil(buf, num_elements, timeout_ms, until_condition);
   }
 
   template <typename Predicate>
-  size_t InputWaitFor(const void *buf, size_t num_elements, int32_t timeout_ms,
+  size_t InputWaitUntil(const void *buf, size_t num_elements, int32_t timeout_ms,
                      Predicate until_condition) {
     if (!buf) {
       return 0;
@@ -154,11 +154,11 @@ class FifoPowerOfTwo {
   size_t OutputWaitIfEmpty(void *out_buf, size_t num_elements,
                            int32_t timeout_ms = -1) {
     auto until_condition = [this] { return !empty(); };
-    return OutputWaitFor(out_buf, num_elements, timeout_ms, until_condition);
+    return OutputWaitUntil(out_buf, num_elements, timeout_ms, until_condition);
   }
 
   template <typename Predicate>
-  size_t OutputWaitFor(void *out_buf, size_t num_elements, int32_t timeout_ms,
+  size_t OutputWaitUntil(void *out_buf, size_t num_elements, int32_t timeout_ms,
                       Predicate until_condition) {
     if (!out_buf) {
       return 0;
