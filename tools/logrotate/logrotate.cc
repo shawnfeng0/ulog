@@ -34,8 +34,8 @@ int main(int argc, char *argv[]) {
   char buffer[10 * 1024];
   while (poll(&fds, 1, -1) >= 0) {
     auto n = read(STDIN_FILENO, buffer, sizeof(buffer));
-    if (n == 0) return -1;
-    if (n > 0) async_rotate.InPacket(buffer, n);
+    if (n <= 0) break; // End of input
+    async_rotate.InPacket(buffer, n);
   }
   async_rotate.Flush();
 
