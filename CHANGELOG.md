@@ -88,7 +88,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- After the first line of hexdump indicates that the output fails, the output will not continue
+* After the first line of hexdump indicates that the output fails, the output will not continue
 
 ## [0.1.1] - 2020-05-22
 
@@ -107,4 +107,3 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 * Various log levels output, rich colors, hexdump output, token output, time_code statistics
 
 * Add fifo for asynchronous output
-

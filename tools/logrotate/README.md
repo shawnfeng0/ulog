@@ -2,6 +2,10 @@
 
 Loop logging of standard inputs to several files
 
+This is a command-line tool for circularly writing the output of other programs to some files via a pipe ("|").
+
+Written using ulog's asynchronous fifo and extended headers for file loop writing.
+
 ## Usage example
 
 ```bash
