@@ -7,9 +7,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.4.2...HEAD
 
-## [0.4.1] - 2022-09-08
+## [0.4.2] - 2023-02-09
+
+[0.4.2]: https://github.com/ShawnFeng0/ulog/compare/v0.4.1...v0.4.2
+
+### Fixed
+
+* Fix: logrotate compilation error: pthread symbol missing
+
+## [0.4.1] - 2023-02-08
 
 [0.4.1]: https://github.com/ShawnFeng0/ulog/compare/v0.4.0...v0.4.1
 
