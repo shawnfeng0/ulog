@@ -40,7 +40,11 @@ static inline std::size_t filesize(FILE *f) {
 
 // return true on success
 static inline bool mkdir_(const std::string &path) {
-  return ::mkdir(path.c_str(), mode_t(0755)) == 0;
+  int ret = ::mkdir(path.c_str(), mode_t(0755));
+  if (ret == 0 || (ret == -1 && errno == EEXIST)) {
+    return true;
+  }
+  return false;
 }
 
 // create the given directory - and all directories leading to it
