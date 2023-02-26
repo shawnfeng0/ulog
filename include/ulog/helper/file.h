@@ -10,6 +10,8 @@ namespace file {
 static constexpr char kFolderSep = '/';
 
 // Return true if path exists (file or directory)
+// Ref:
+// https://stackoverflow.com/questions/12774207/fastest-way-to-check-if-a-file-exists-using-standard-c-c11-14-17-c
 static inline bool path_exists(const std::string &filename) {
   struct stat buffer {};
   return (::stat(filename.c_str(), &buffer) == 0);
