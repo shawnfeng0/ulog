@@ -100,12 +100,17 @@ class RotatingFile {
     dst_out << src_in.rdbuf();
   }
 
-  // delete the target if exists, and rename the src file  to target
+  // Rename the src file to target
   // return true on success, false otherwise.
   static bool RenameFile(const std::string &src_filename,
                          const std::string &target_filename) {
-    // try to delete the target file in case it already exists.
-    (void)std::remove(target_filename.c_str());
+    // If the new filename already exists, according to the posix standard,
+    // rename will automatically delete the new file name, and will ensure that
+    // the path of the new file is always valid. If you use remove() to delete
+    // the new file first, other processes will not be able to access the new
+    // file for a moment.
+    // Ref:
+    // https://pubs.opengroup.org/onlinepubs/000095399/functions/rename.html
     return std::rename(src_filename.c_str(), target_filename.c_str()) == 0;
   }
 
