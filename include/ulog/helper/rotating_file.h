@@ -22,10 +22,12 @@ namespace ulog {
 class RotatingFile {
  public:
   RotatingFile(std::string base_filename, std::size_t max_size,
-               std::size_t max_files, bool rotate_on_open = false)
+               std::size_t max_files, bool rotate_on_open = false,
+               bool copy_and_truncate = false)
       : base_filename_(std::move(base_filename)),
         max_size_(max_size),
-        max_files_(max_files) {
+        max_files_(max_files),
+        copy_and_truncate_(copy_and_truncate) {
     file_writer_.Open(CalcFilename(base_filename_, 0));
     current_size_ = file_writer_.size();  // expensive. called only once
     if (rotate_on_open && current_size_ > 0) {
@@ -65,9 +67,16 @@ class RotatingFile {
       RenameFile(src, target);
     }
 
-    // In order to use tail -f to read files in real time, need to use copy
-    // instead of rename
-    CopyFile(base_filename_, CalcFilename(base_filename_, 1));
+    if (copy_and_truncate_) {
+      // In order to use tail -f to read files in real time, need to use copy
+      // instead of rename
+      CopyFile(base_filename_, CalcFilename(base_filename_, 1));
+    } else {
+      // "tail -"f may be interrupted when rename is executed, and "tail -F" can
+      // be used instead, but some "-F" implementations (busybox tail) cannot
+      // obtain all logs in real time.
+      RenameFile(base_filename_, CalcFilename(base_filename_, 1));
+    }
 
     file_writer_.Reopen(true);
   }
@@ -118,6 +127,8 @@ class RotatingFile {
   std::size_t max_size_;
   std::size_t max_files_;
   std::size_t current_size_;
+  bool copy_and_truncate_;  // copy and truncate the file instead of rename, for
+                            // "tail -f" support
   FileWriter file_writer_;
 };
 
