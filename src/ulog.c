@@ -358,7 +358,7 @@ void logger_log_with_header(struct ulog_s *logger, enum ulog_level_e level,
   if (flush) {
     logger_flush(logger, &log_buffer);
 
-    if (level >= ULOG_LEVEL_ERROR && logger->flush_cb_) {
+    if (level == ULOG_LEVEL_FATAL && logger->flush_cb_) {
       logger->flush_cb_(logger->user_data_);
     }
   }
