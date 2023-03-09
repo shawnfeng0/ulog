@@ -386,8 +386,7 @@ void logger_log_with_header(struct ulog_s *logger, enum ulog_level_e level,
     logger_snprintf(logger, "%s",
                     logger->log_color_enabled_ ? ULOG_STR_GRAY : "");
 
-  // Print '/'
-  if (logger->log_level_enabled_) logger_snprintf(logger, "/");
+  if (logger->log_level_enabled_) logger_snprintf(logger, " ");
 
   // Print '('
   if (logger->log_file_line_enabled_ || logger->log_function_enabled_)
