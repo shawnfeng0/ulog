@@ -15,8 +15,7 @@ int main(int argc, char *argv[]) {
 
   ulog::AsyncRotatingFile async_rotate(
       args_info.fifo_size_arg, args_info.file_path_arg, args_info.file_size_arg,
-      args_info.file_number_arg, args_info.flush_interval_arg,
-      args_info.stdout_flag);
+      args_info.file_number_arg, args_info.flush_interval_arg);
 
   cmdline_parser_free(&args_info); /* release allocated memory */
 
@@ -34,7 +33,10 @@ int main(int argc, char *argv[]) {
   char buffer[10 * 1024];
   while (poll(&fds, 1, -1) >= 0) {
     auto n = read(STDIN_FILENO, buffer, sizeof(buffer));
-    if (n <= 0) break; // End of input
+    if (n <= 0) break;  // End of input
+    if (args_info.stdout_flag) {
+      write(STDOUT_FILENO, buffer, n);
+    }
     async_rotate.InPacket(buffer, n);
   }
   async_rotate.Flush();

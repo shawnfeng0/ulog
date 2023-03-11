@@ -39,11 +39,12 @@ static void OutputFunc() {
 
 int main() {
   auto &async_rotate = *new ulog::AsyncRotatingFile(
-      65536 * 2, "/tmp/ulog/test.txt", 100 * 1024, 5, 1, true);
+      65536 * 2, "/tmp/ulog/test.txt", 100 * 1024, 5, 1);
 
   // Initial logger
   logger_set_user_data(ULOG_GLOBAL, &async_rotate);
   logger_set_output_callback(ULOG_GLOBAL, [](void *user_data, const char *str) {
+    printf("%s", str);
     auto &async = *(ulog::AsyncRotatingFile *)(user_data);
     return (int)async.InPacket(str, strlen(str));
   });

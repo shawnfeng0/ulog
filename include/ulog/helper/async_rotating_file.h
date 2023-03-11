@@ -2,8 +2,7 @@
 // Created by fs on 2020-05-26.
 //
 
-#ifndef ULOG_INCLUDE_ULOG_HELPER_ASYNC_ROTATING_FILE_H_
-#define ULOG_INCLUDE_ULOG_HELPER_ASYNC_ROTATING_FILE_H_
+#pragma once
 
 #include <atomic>
 #include <ctime>
@@ -30,10 +29,8 @@ class AsyncRotatingFile {
    */
   AsyncRotatingFile(size_t fifo_size, std::string filename,
                     std::size_t max_file_size, std::size_t max_files,
-                    std::time_t max_flush_period_sec = 0,
-                    bool should_print = false)
-      : should_print_(should_print),
-        fifo_(fifo_size),
+                    std::time_t max_flush_period_sec = 0)
+      : fifo_(fifo_size),
         rotating_file_(std::move(filename), max_file_size, max_files),
         flush_period_sec_(max_flush_period_sec) {
     auto async_thread_function = [&]() {
@@ -45,10 +42,6 @@ class AsyncRotatingFile {
         });
         if (len > 0) {
           rotating_file_.SinkIt(data, len);
-          if (should_print_) {
-            data[len] = '\0';  // Generate C string
-            printf("%s", data);
-          }
         }
 
         // Flush
@@ -100,7 +93,6 @@ class AsyncRotatingFile {
   bool is_idle() const { return fifo_.empty(); }
 
  private:
-  const bool should_print_;
   FifoPowerOfTwo fifo_;
   RotatingFile rotating_file_;
   std::unique_ptr<std::thread> async_thread_;
@@ -114,5 +106,3 @@ class AsyncRotatingFile {
 };
 
 }  // namespace ulog
-
-#endif  // ULOG_INCLUDE_ULOG_HELPER_ASYNC_ROTATING_FILE_H_
