@@ -123,11 +123,6 @@ void logger_log_with_header(struct ulog_s *logger, enum ulog_level_e level,
                             bool newline, bool flush, const char *fmt, ...);
 
 /**
- * Determine if the current color output is on
- */
-bool logger_color_is_enabled(struct ulog_s *logger);
-
-/**
  * Get time of clock_id::CLOCK_MONOTONIC
  * @return Returns the system startup time, in microseconds.
  */
@@ -332,13 +327,13 @@ inline void print(struct ulog_buffer_s *log_buffer, bool color,
   })
 #endif
 
-#define ULOG_OUT_TOKEN(logger, token)                                      \
-  ({                                                                       \
-    struct ulog_buffer_s log_buffer;                                       \
-    loggger_buffer_init(&log_buffer);                                      \
-    ULOG_OUT_TOKEN_IMPLEMENT(&log_buffer, logger_color_is_enabled(logger), \
-                             token);                                       \
-    LOGGER_LOCAL_DEBUG(logger, "%s", log_buffer.log_out_buf_);             \
+#define ULOG_OUT_TOKEN(logger, token)                                   \
+  ({                                                                    \
+    struct ulog_buffer_s log_buffer;                                    \
+    loggger_buffer_init(&log_buffer);                                   \
+    ULOG_OUT_TOKEN_IMPLEMENT(                                           \
+        &log_buffer, logger_check_format(logger, ULOG_F_COLOR), token); \
+    LOGGER_LOCAL_DEBUG(logger, "%s", log_buffer.log_out_buf_);          \
   })
 
 #define ULOG_EXPAND(...) __VA_ARGS__
@@ -422,10 +417,10 @@ inline void print(struct ulog_buffer_s *log_buffer, bool color,
       log_buffer, color, __VA_ARGS__))
 
 #define ULOG_FORMAT_FOR_TIME_CODE(logger, format, unit)            \
-  logger_color_is_enabled(logger) ? ULOG_STR_GREEN                 \
+  logger_check_format(logger, ULOG_F_COLOR) ? ULOG_STR_GREEN       \
       "time " ULOG_STR_RED "{ " ULOG_STR_BLUE "%s%s " ULOG_STR_RED \
       "} => " ULOG_STR_GREEN "%" format ULOG_STR_RED unit          \
-                                  : "time { %s%s } => %" format unit
+                                            : "time { %s%s } => %" format unit
 
 #define ULOG_TIME_CODE(logger, ...)                                       \
   ({                                                                      \
@@ -453,13 +448,13 @@ inline void print(struct ulog_buffer_s *log_buffer, bool color,
       place4
 
 #define ULOG_HEX_DUMP_FORMAT(logger)                                           \
-  logger_color_is_enabled(logger) ? ULOG_STR_GREEN                             \
+  logger_check_format(logger, ULOG_F_COLOR)                                    \
+      ? ULOG_STR_GREEN                                                         \
       "hex_dump" ULOG_GEN_COLOR_FORMAT_FOR_HEX_DUMP("(", "data", ":", "%s")    \
           ULOG_GEN_COLOR_FORMAT_FOR_HEX_DUMP(", ", "length", ":", "%" PRIuMAX) \
               ULOG_GEN_COLOR_FORMAT_FOR_HEX_DUMP(                              \
                   ", ", "width", ":", "%" PRIuMAX ULOG_STR_RED ") =>")         \
-                                  : "hex_dump(data:%s, length:%" PRIuMAX       \
-                                    ", width:%" PRIuMAX ")"
+      : "hex_dump(data:%s, length:%" PRIuMAX ", width:%" PRIuMAX ")"
 
 #define ULOG_HEX_DUMP(logger, data, length, width)                         \
   ({                                                                       \

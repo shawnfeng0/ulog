@@ -84,40 +84,28 @@ void logger_set_output_level(struct ulog_s *logger, enum ulog_level_e level);
  */
 void logger_enable_output(struct ulog_s *logger, bool enable);
 
-/**
- * Enable or disable color output, which is enabled by default
- */
-void logger_enable_color(struct ulog_s *logger, bool enable);
+#define ULOG_F_COLOR 1 << 0       // Enable color output (default=on)
+#define ULOG_F_NUMBER 1 << 1      // Enable line number output (default=off)
+#define ULOG_F_TIME 1 << 2        // Enable time output (default=on)
+#define ULOG_F_PROCESS_ID 1 << 3  // Enable process id output (default=on)
+#define ULOG_F_LEVEL 1 << 4       // Enable log level output (default=on)
+#define ULOG_F_FILE_LINE 1 << 5   // Enable file line output (default=on)
+#define ULOG_F_FUNCTION 1 << 6    // Enable function name output (default=on)
 
 /**
- * Enable or disable log number output, disabled by default
+ * Enable log format, can use (ULOG_F_XXX | ULOG_F_XXX) combination
  */
-void logger_enable_number_output(struct ulog_s *logger, bool enable);
+void logger_format_enable(struct ulog_s *logger, int32_t format);
 
 /**
- * Enable or disable log time output, enabled by default
+ * Disable log format, can use (ULOG_F_XXX | ULOG_F_XXX) combination
  */
-void logger_enable_time_output(struct ulog_s *logger, bool enable);
+void logger_format_disable(struct ulog_s *logger, int32_t format);
 
 /**
- * Enable or disable process and thread id output, enabled by default
+ * Check if the log format is enabled
  */
-void logger_enable_process_id_output(struct ulog_s *logger, bool enable);
-
-/**
- * Enable or disable log level output, enabled by default
- */
-void logger_enable_level_output(struct ulog_s *logger, bool enable);
-
-/**
- * Enable or disable log file line output, enabled by default
- */
-void logger_enable_file_line_output(struct ulog_s *logger, bool enable);
-
-/**
- * Enable or disable log function name output, enabled by default
- */
-void logger_enable_function_output(struct ulog_s *logger, bool enable);
+bool logger_check_format(struct ulog_s *logger, int32_t format);
 
 #ifdef __cplusplus
 }

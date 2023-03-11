@@ -9,6 +9,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#define ULOG_DEFAULT_FORMAT                                       \
+  (ULOG_F_COLOR | ULOG_F_TIME | ULOG_F_LEVEL | ULOG_F_FILE_LINE | \
+   ULOG_F_FUNCTION | ULOG_F_PROCESS_ID)
+
 enum {
   INDEX_LEVEL_COLOR,
   INDEX_LEVEL_MARK,
@@ -57,15 +61,9 @@ struct ulog_s {
   ulog_flush_callback flush_cb_;
 
   // Format configuration
-  bool log_output_enabled_;
-  bool log_process_id_enabled_;
-  bool log_color_enabled_;
-  bool log_number_enabled_;
-  bool log_time_enabled_;
-  bool log_level_enabled_;
-  bool log_file_line_enabled_;
-  bool log_function_enabled_;
   enum ulog_level_e log_level_;
+  uint8_t format_;
+  bool log_output_enabled_;
 };
 
 // Will be exported externally
@@ -77,14 +75,8 @@ static struct ulog_s global_logger_instance_ = {
     .output_cb_ = logger_printf,
     .flush_cb_ = NULL,
 
-    .log_process_id_enabled_ = true,
+    .format_ = ULOG_DEFAULT_FORMAT,
     .log_output_enabled_ = true,
-    .log_color_enabled_ = true,
-    .log_number_enabled_ = false,
-    .log_time_enabled_ = true,
-    .log_level_enabled_ = true,
-    .log_file_line_enabled_ = true,
-    .log_function_enabled_ = true,
     .log_level_ = ULOG_LEVEL_TRACE,
 };
 
@@ -106,13 +98,7 @@ struct ulog_s *logger_create() {
   logger->flush_cb_ = NULL;
 
   logger->log_output_enabled_ = true;
-  logger->log_process_id_enabled_ = true;
-  logger->log_color_enabled_ = true;
-  logger->log_number_enabled_ = false;
-  logger->log_time_enabled_ = true;
-  logger->log_level_enabled_ = true;
-  logger->log_file_line_enabled_ = true;
-  logger->log_function_enabled_ = true;
+  logger->format_ = ULOG_DEFAULT_FORMAT;
   logger->log_level_ = ULOG_LEVEL_TRACE;
   return logger;
 }
@@ -148,36 +134,16 @@ void logger_enable_output(struct ulog_s *logger, bool enable) {
   (void)(logger && (logger->log_output_enabled_ = enable));
 }
 
-void logger_enable_color(struct ulog_s *logger, bool enable) {
-  (void)(logger && (logger->log_color_enabled_ = enable));
+void logger_format_enable(struct ulog_s *logger, int32_t format) {
+  (void)(logger && (logger->format_ |= format));
 }
 
-bool logger_color_is_enabled(struct ulog_s *logger) {
-  return logger && logger->log_color_enabled_;
+void logger_format_disable(struct ulog_s *logger, int32_t format) {
+  (void)(logger && (logger->format_ &= ~format));
 }
 
-void logger_enable_number_output(struct ulog_s *logger, bool enable) {
-  (void)(logger && (logger->log_number_enabled_ = enable));
-}
-
-void logger_enable_time_output(struct ulog_s *logger, bool enable) {
-  (void)(logger && (logger->log_time_enabled_ = enable));
-}
-
-void logger_enable_process_id_output(struct ulog_s *logger, bool enable) {
-  (void)(logger && (logger->log_process_id_enabled_ = enable));
-}
-
-void logger_enable_level_output(struct ulog_s *logger, bool enable) {
-  (void)(logger && (logger->log_level_enabled_ = enable));
-}
-
-void logger_enable_file_line_output(struct ulog_s *logger, bool enable) {
-  (void)(logger && (logger->log_file_line_enabled_ = enable));
-}
-
-void logger_enable_function_output(struct ulog_s *logger, bool enable) {
-  (void)(logger && (logger->log_function_enabled_ = enable));
+bool logger_check_format(struct ulog_s *logger, int32_t format) {
+  return logger && (logger->format_ & format);
 }
 
 void logger_set_output_level(struct ulog_s *logger, enum ulog_level_e level) {
@@ -280,19 +246,18 @@ void logger_log_with_header(struct ulog_s *logger, enum ulog_level_e level,
   loggger_buffer_init(&log_buffer);
 
   // Color
-  if (logger->log_number_enabled_ || logger->log_time_enabled_ ||
-      logger->log_level_enabled_)
+  if (logger_check_format(logger, ULOG_F_NUMBER | ULOG_F_TIME | ULOG_F_LEVEL))
     logger_snprintf(&log_buffer, "%s",
-                    logger->log_color_enabled_
+                    logger_check_format(logger, ULOG_F_COLOR)
                         ? level_infos[level][INDEX_LEVEL_COLOR]
                         : "");
 
   // Print serial number
-  if (logger->log_number_enabled_)
+  if (logger_check_format(logger, ULOG_F_NUMBER))
     logger_snprintf(&log_buffer, "#%06" PRIu32 " ", logger->log_evt_num_++);
 
   // Print time
-  if (logger->log_time_enabled_) {
+  if (logger_check_format(logger, ULOG_F_TIME)) {
     uint64_t time_ms = logger_real_time_us() / 1000;
     time_t time_s = (time_t)(time_ms / 1000);
     struct tm lt = *localtime(&time_s);
@@ -302,56 +267,61 @@ void logger_log_with_header(struct ulog_s *logger, enum ulog_level_e level,
   }
 
   // Print process and thread id
-  if (logger->log_process_id_enabled_)
+  if (logger_check_format(logger, ULOG_F_PROCESS_ID))
     logger_snprintf(&log_buffer, "%" PRId32 "-%" PRId32 " ",
                     (int32_t)logger_get_pid(), (int32_t)logger_get_tid());
 
   // Print level
-  if (logger->log_level_enabled_)
+  if (logger_check_format(logger, ULOG_F_LEVEL))
     logger_snprintf(&log_buffer, "%s", level_infos[level][INDEX_LEVEL_MARK]);
 
   // Print gray color
-  if (logger->log_level_enabled_ || logger->log_file_line_enabled_ ||
-      logger->log_function_enabled_)
-    logger_snprintf(&log_buffer, "%s",
-                    logger->log_color_enabled_ ? ULOG_STR_GRAY : "");
+  if (logger_check_format(logger,
+                          ULOG_F_LEVEL | ULOG_F_FILE_LINE | ULOG_F_FUNCTION))
+    logger_snprintf(
+        &log_buffer, "%s",
+        logger_check_format(logger, ULOG_F_COLOR) ? ULOG_STR_GRAY : "");
 
-  if (logger->log_level_enabled_) logger_snprintf(&log_buffer, " ");
+  if (logger_check_format(logger, ULOG_F_LEVEL))
+    logger_snprintf(&log_buffer, " ");
 
   // Print '('
-  if (logger->log_file_line_enabled_ || logger->log_function_enabled_)
+  if (logger_check_format(logger, ULOG_F_FILE_LINE | ULOG_F_FUNCTION))
     logger_snprintf(&log_buffer, "(");
 
   // Print file and line
-  if (logger->log_file_line_enabled_)
+  if (logger_check_format(logger, ULOG_F_FILE_LINE))
     logger_snprintf(&log_buffer, "%s:%" PRIu32, file, line);
 
   // Print function
-  if (logger->log_function_enabled_)
+  if (logger_check_format(logger, ULOG_F_FUNCTION))
     logger_snprintf(&log_buffer, "%s%s",
-                    logger->log_file_line_enabled_ ? " " : "", func);
+                    logger_check_format(logger, ULOG_F_FILE_LINE) ? " " : "",
+                    func);
 
   // Print ')'
-  if (logger->log_file_line_enabled_ || logger->log_function_enabled_)
+  if (logger_check_format(logger, ULOG_F_FILE_LINE | ULOG_F_FUNCTION))
     logger_snprintf(&log_buffer, ")");
 
   // Print ' '
-  if (logger->log_level_enabled_ || logger->log_file_line_enabled_ ||
-      logger->log_function_enabled_)
+  if (logger_check_format(logger,
+                          ULOG_F_LEVEL | ULOG_F_FILE_LINE | ULOG_F_FUNCTION))
     logger_snprintf(&log_buffer, " ");
 
   // Print log info
-  logger_snprintf(
-      &log_buffer, "%s",
-      logger->log_color_enabled_ ? level_infos[level][INDEX_LEVEL_COLOR] : "");
+  logger_snprintf(&log_buffer, "%s",
+                  logger_check_format(logger, ULOG_F_COLOR)
+                      ? level_infos[level][INDEX_LEVEL_COLOR]
+                      : "");
 
   va_list ap;
   va_start(ap, fmt);
   logger_vsnprintf(&log_buffer, fmt, ap);
   va_end(ap);
 
-  logger_snprintf(&log_buffer, "%s",
-                  logger->log_color_enabled_ ? ULOG_STR_RESET : "");
+  logger_snprintf(
+      &log_buffer, "%s",
+      logger_check_format(logger, ULOG_F_COLOR) ? ULOG_STR_RESET : "");
 
   if (newline) logger_snprintf(&log_buffer, "\r\n");
 
