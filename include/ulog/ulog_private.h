@@ -416,31 +416,24 @@ inline void print(struct ulog_buffer_s *log_buffer, bool color,
   ULOG_EXPAND(ULOG_LOG_TOKEN_AUX(log_buffer, color, _1, __VA_ARGS__)( \
       log_buffer, color, __VA_ARGS__))
 
-#define ULOG_FORMAT_FOR_TIME_CODE(logger, format, unit)            \
-  logger_check_format(logger, ULOG_F_COLOR) ? ULOG_STR_GREEN       \
-      "time " ULOG_STR_RED "{ " ULOG_STR_BLUE "%s%s " ULOG_STR_RED \
-      "} => " ULOG_STR_GREEN "%" format ULOG_STR_RED unit          \
-                                            : "time { %s%s } => %" format unit
+#define ULOG_FORMAT_FOR_TIME_CODE(logger, string_format, time_format, unit) \
+  logger_check_format(logger, ULOG_F_COLOR) ? ULOG_STR_GREEN                \
+      "time " ULOG_STR_RED "{ " ULOG_STR_BLUE string_format ULOG_STR_RED    \
+      " } => " ULOG_STR_GREEN time_format ULOG_STR_RED unit                 \
+                                            : "time { " string_format       \
+                                              " } => " time_format unit
 
-#define ULOG_TIME_CODE(logger, ...)                                       \
-  ({                                                                      \
-    const int ULOG_UNIQUE(LENGTH_MAX) = 32;                               \
-    uint64_t ULOG_UNIQUE(start) = logger_monotonic_time_us();             \
-    __VA_ARGS__;                                                          \
-    uint64_t ULOG_UNIQUE(end) = logger_monotonic_time_us();               \
-    uint32_t ULOG_UNIQUE(diff) = (ULOG_UNIQUE(end) - ULOG_UNIQUE(start)); \
-    char ULOG_UNIQUE(func_str)[ULOG_UNIQUE(LENGTH_MAX)];                  \
-    const char ULOG_UNIQUE(raw)[] = #__VA_ARGS__;                         \
-    memset(ULOG_UNIQUE(func_str), 0, ULOG_UNIQUE(LENGTH_MAX));            \
-    strncpy(ULOG_UNIQUE(func_str), ULOG_UNIQUE(raw),                      \
-            ULOG_UNIQUE(LENGTH_MAX) - 1);                                 \
-    LOGGER_DEBUG(ULOG_FORMAT_FOR_TIME_CODE(logger, PRIu32, "us"),         \
-                 ULOG_UNIQUE(func_str),                                   \
-                 strncmp(ULOG_UNIQUE(raw), ULOG_UNIQUE(func_str),         \
-                         ULOG_UNIQUE(LENGTH_MAX))                         \
-                     ? "..."                                              \
-                     : "",                                                \
-                 ULOG_UNIQUE(diff));                                      \
+#define ULOG_TIME_CODE(logger, ...)                                          \
+  ({                                                                         \
+    uint64_t ULOG_UNIQUE(start) = logger_monotonic_time_us();                \
+    __VA_ARGS__;                                                             \
+    uint64_t ULOG_UNIQUE(diff) =                                             \
+        logger_monotonic_time_us() - ULOG_UNIQUE(start);                     \
+    const char *ULOG_UNIQUE(code_str) = #__VA_ARGS__;                        \
+    LOGGER_DEBUG(                                                            \
+        ULOG_FORMAT_FOR_TIME_CODE(logger, "%.64s%s", "%" PRIu64, "us"),      \
+        ULOG_UNIQUE(code_str),                                               \
+        strlen(ULOG_UNIQUE(code_str)) > 64 ? "..." : "", ULOG_UNIQUE(diff)); \
   })
 
 #define ULOG_GEN_COLOR_FORMAT_FOR_HEX_DUMP(place1, place2, place3, place4)    \
