@@ -2,6 +2,9 @@
 
 #include <cstddef>
 #include <cstdlib>
+#include <exception>
+#include <stdexcept>
+
 /*
    Copyright (c) 2003 Simon Cooke, All Rights Reserved
 
@@ -12,61 +15,42 @@
    feel warm and fuzzy inside. spectecjr@gmail.com
 
 */
-
 #define OUT
 
 class BipBuffer {
  private:
-  char* pBuffer;
-  int ixa;
-  int sza;
-  int ixb;
-  int szb;
-  int buflen;
-  int ixResrv;
-  int szResrv;
+  char* const buffer_start_ptr_;
+  size_t buffer_size_;
+  size_t a_start_{0};
+  size_t a_size_{0};
+  size_t b_start_{0};
+  size_t b_size_{0};
+  size_t reserve_start_{0};
+  size_t reserve_size_{0};
+  bool is_allocated_memory_;
 
  public:
-  BipBuffer()
-      : pBuffer(NULL),
-        ixa(0),
-        sza(0),
-        ixb(0),
-        szb(0),
-        buflen(0),
-        ixResrv(0),
-        szResrv(0) {}
+  explicit BipBuffer(size_t buffer_size)
+      : buffer_start_ptr_((char*)::malloc(buffer_size)),
+        buffer_size_(buffer_size) {
+    if (buffer_start_ptr_ == nullptr)
+      throw std::runtime_error{"malloc failed!"};
+    is_allocated_memory_ = true;
+  }
+
+  explicit BipBuffer(char* pre_allocated_buffer, size_t buffer_size)
+      : buffer_start_ptr_(pre_allocated_buffer), buffer_size_(buffer_size) {
+    if (buffer_start_ptr_ == nullptr)
+      throw std::runtime_error{"buffer_start_ptr_ == nullptr!"};
+    is_allocated_memory_ = false;
+  }
 
   ~BipBuffer() {
     // We don't call FreeBuffer, because we don't need to reset our variables -
     // our object is dying
-    if (pBuffer != NULL) {
-      free(pBuffer);
+    if (is_allocated_memory_) {
+      free((void*)buffer_start_ptr_);
     }
-  }
-
-  // Allocate Buffer
-  //
-  // Allocates a buffer in virtual memory, to the nearest page size (rounded up)
-  //
-  // Parameters:
-  //   int buffersize                size of buffer to allocate, in bytes
-  //   (default: 4096)
-  //
-  // Returns:
-  //   bool                        true if successful, false if buffer cannot be
-  //   allocated
-
-  bool AllocateBuffer(int buffersize = 4096) {
-    if (buffersize <= 0) return false;
-
-    if (pBuffer != NULL) FreeBuffer();
-
-    pBuffer = (char*)::malloc(buffersize);
-    if (pBuffer == NULL) return false;
-
-    buflen = buffersize;
-    return true;
   }
 
   ///
@@ -77,27 +61,9 @@ class BipBuffer {
   /// returning the buffer to a completely empty state ready for new
   /// allocations.
   ///
-
-  void Clear() { ixa = sza = ixb = szb = ixResrv = szResrv = 0; }
-
-  // Free Buffer
-  //
-  // Frees a previously allocated buffer, resetting all internal pointers to 0.
-  //
-  // Parameters:
-  //   none
-  //
-  // Returns:
-  //   void
-
-  void FreeBuffer() {
-    if (pBuffer == NULL) return;
-
-    ixa = sza = ixb = szb = buflen = 0;
-
-    ::free(pBuffer);
-
-    pBuffer = NULL;
+  void Clear() {
+    a_start_ = a_size_ = b_start_ = b_size_ = reserve_start_ = reserve_size_ =
+        0;
   }
 
   // Reserve
@@ -116,40 +82,40 @@ class BipBuffer {
   //   Can return any value from 1 to size in reserved.
   //   Will return NULL if a previous reservation has not been committed.
 
-  char* Reserve(int size, OUT int& reserved) {
+  char* Reserve(size_t size, OUT size_t& reserved) {
     // We always allocate on B if B exists; this means we have two blocks and
     // our buffer is filling.
-    if (szb) {
-      int freespace = GetBFreeSpace();
+    if (b_size_) {
+      auto free_space = GetBFreeSpace();
 
-      if (size < freespace) freespace = size;
+      if (size < free_space) free_space = size;
 
-      if (freespace == 0) return NULL;
+      if (free_space == 0) return nullptr;
 
-      szResrv = freespace;
-      reserved = freespace;
-      ixResrv = ixb + szb;
-      return pBuffer + ixResrv;
+      reserve_size_ = free_space;
+      reserved = free_space;
+      reserve_start_ = b_start_ + b_size_;
+      return buffer_start_ptr_ + reserve_start_;
     } else {
       // Block b does not exist, so we can check if the space AFTER a is bigger
       // than the space before A, and allocate the bigger one.
 
-      int freespace = GetSpaceAfterA();
-      if (freespace >= ixa) {
-        if (freespace == 0) return NULL;
-        if (size < freespace) freespace = size;
+      auto free_space = GetSpaceAfterA();
+      if (free_space >= a_start_) {
+        if (free_space == 0) return nullptr;
+        if (size < free_space) free_space = size;
 
-        szResrv = freespace;
-        reserved = freespace;
-        ixResrv = ixa + sza;
-        return pBuffer + ixResrv;
+        reserve_size_ = free_space;
+        reserved = free_space;
+        reserve_start_ = a_start_ + a_size_;
+        return buffer_start_ptr_ + reserve_start_;
       } else {
-        if (ixa == 0) return NULL;
-        if (ixa < size) size = ixa;
-        szResrv = size;
+        if (a_start_ == 0) return nullptr;
+        if (a_start_ < size) size = a_start_;
+        reserve_size_ = size;
         reserved = size;
-        ixResrv = 0;
-        return pBuffer;
+        reserve_start_ = 0;
+        return buffer_start_ptr_;
       }
     }
   }
@@ -168,40 +134,39 @@ class BipBuffer {
   //   data, and release the rest of the space. Committing a size of 0 will
   //   release the reservation.
   //
-
-  void Commit(int size) {
+  void Commit(size_t size) {
     if (size == 0) {
       // decommit any reservation
-      szResrv = ixResrv = 0;
+      reserve_size_ = reserve_start_ = 0;
       return;
     }
 
     // If we try to commit more space than we asked for, clip to the size we
     // asked for.
 
-    if (size > szResrv) {
-      size = szResrv;
+    if (size > reserve_size_) {
+      size = reserve_size_;
     }
 
     // If we have no blocks being used currently, we create one in A.
 
-    if (sza == 0 && szb == 0) {
-      ixa = ixResrv;
-      sza = size;
+    if (a_size_ == 0 && b_size_ == 0) {
+      a_start_ = reserve_start_;
+      a_size_ = size;
 
-      ixResrv = 0;
-      szResrv = 0;
+      reserve_start_ = 0;
+      reserve_size_ = 0;
       return;
     }
 
-    if (ixResrv == sza + ixa) {
-      sza += size;
+    if (reserve_start_ == a_size_ + a_start_) {
+      a_size_ += size;
     } else {
-      szb += size;
+      b_size_ += size;
     }
 
-    ixResrv = 0;
-    szResrv = 0;
+    reserve_start_ = 0;
+    reserve_size_ = 0;
   }
 
   // GetContiguousBlock
@@ -216,14 +181,14 @@ class BipBuffer {
   //   char*                    pointer to the first contiguous block, or NULL
   //   if empty.
 
-  char* GetContiguousBlock(OUT int& size) {
-    if (sza == 0) {
+  char* GetContiguousBlock(OUT size_t& size) {
+    if (a_size_ == 0) {
       size = 0;
-      return NULL;
+      return nullptr;
     }
 
-    size = sza;
-    return pBuffer + ixa;
+    size = a_size_;
+    return buffer_start_ptr_ + a_start_;
   }
 
   // DecommitBlock
@@ -235,16 +200,15 @@ class BipBuffer {
   //
   // Returns:
   //   nothing
-
-  void DecommitBlock(int size) {
-    if (size >= sza) {
-      ixa = ixb;
-      sza = szb;
-      ixb = 0;
-      szb = 0;
+  void DecommitBlock(size_t size) {
+    if (size >= a_size_) {
+      a_start_ = b_start_;
+      a_size_ = b_size_;
+      b_start_ = 0;
+      b_size_ = 0;
     } else {
-      sza -= size;
-      ixa += size;
+      a_size_ -= size;
+      a_start_ += size;
     }
   }
 
@@ -257,8 +221,7 @@ class BipBuffer {
   //
   // Returns:
   //   int                    total amount of committed data in the buffer
-
-  int GetCommittedSize() const { return sza + szb; }
+  size_t GetCommittedSize() const { return a_size_ + b_size_; }
 
   // GetReservationSize
   //
@@ -272,8 +235,7 @@ class BipBuffer {
   //
   // Notes:
   //   A return value of 0 indicates that no space has been reserved
-
-  int GetReservationSize() const { return szResrv; }
+  size_t GetReservationSize() const { return reserve_size_; }
 
   // GetBufferSize
   //
@@ -284,23 +246,10 @@ class BipBuffer {
   //
   // Returns:
   //   int                    total size of buffer
-
-  int GetBufferSize() const { return buflen; }
-
-  // IsInitialized
-  //
-  // Queries whether or not the buffer has been allocated
-  //
-  // Parameters:
-  //   none
-  //
-  // Returns:
-  //   bool                    true if the buffer has been allocated
-
-  bool IsInitialized() const { return pBuffer != NULL; }
+  size_t GetBufferSize() const { return buffer_size_; }
 
  private:
-  int GetSpaceAfterA() const { return buflen - ixa - sza; }
+  size_t GetSpaceAfterA() const { return buffer_size_ - a_start_ - a_size_; }
 
-  int GetBFreeSpace() const { return ixa - ixb - szb; }
+  size_t GetBFreeSpace() const { return a_start_ - b_start_ - b_size_; }
 };
