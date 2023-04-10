@@ -21,13 +21,14 @@ class BipBuffer {
  private:
   char* const buffer_start_ptr_;
   size_t buffer_size_;
-  size_t a_start_{0};
+  bool is_allocated_memory_;
+
+  size_t a_start_{0}; // a_start_ is always read_index_
   size_t a_size_{0};
-  size_t b_start_{0};
   size_t b_size_{0};
+
   size_t reserve_start_{0};
   size_t reserve_size_{0};
-  bool is_allocated_memory_;
 
  public:
   explicit BipBuffer(size_t buffer_size)
@@ -53,19 +54,6 @@ class BipBuffer {
     }
   }
 
-  ///
-  /// \brief Clears the buffer of any allocations.
-  ///
-  /// Clears the buffer of any allocations or reservations. Note; it
-  /// does not wipe the buffer memory; it merely resets all pointers,
-  /// returning the buffer to a completely empty state ready for new
-  /// allocations.
-  ///
-  void Clear() {
-    a_start_ = a_size_ = b_start_ = b_size_ = reserve_start_ = reserve_size_ =
-        0;
-  }
-
   // Reserve
   //
   // Reserves space in the buffer for a memory write operation
@@ -81,7 +69,6 @@ class BipBuffer {
   //   Will return NULL for the pointer if no space can be allocated.
   //   Can return any value from 1 to size in reserved.
   //   Will return NULL if a previous reservation has not been committed.
-
   char* Reserve(size_t size, OUT size_t& reserved) {
     // We always allocate on B if B exists; this means we have two blocks and
     // our buffer is filling.
@@ -94,7 +81,7 @@ class BipBuffer {
 
       reserve_size_ = free_space;
       reserved = free_space;
-      reserve_start_ = b_start_ + b_size_;
+      reserve_start_ = b_size_;
       return buffer_start_ptr_ + reserve_start_;
     } else {
       // Block b does not exist, so we can check if the space AFTER a is bigger
@@ -110,7 +97,6 @@ class BipBuffer {
         reserve_start_ = a_start_ + a_size_;
         return buffer_start_ptr_ + reserve_start_;
       } else {
-        if (a_start_ == 0) return nullptr;
         if (a_start_ < size) size = a_start_;
         reserve_size_ = size;
         reserved = size;
@@ -135,28 +121,10 @@ class BipBuffer {
   //   release the reservation.
   //
   void Commit(size_t size) {
-    if (size == 0) {
-      // decommit any reservation
-      reserve_size_ = reserve_start_ = 0;
-      return;
-    }
-
     // If we try to commit more space than we asked for, clip to the size we
     // asked for.
-
     if (size > reserve_size_) {
       size = reserve_size_;
-    }
-
-    // If we have no blocks being used currently, we create one in A.
-
-    if (a_size_ == 0 && b_size_ == 0) {
-      a_start_ = reserve_start_;
-      a_size_ = size;
-
-      reserve_start_ = 0;
-      reserve_size_ = 0;
-      return;
     }
 
     if (reserve_start_ == a_size_ + a_start_) {
@@ -180,13 +148,7 @@ class BipBuffer {
   // Returns:
   //   char*                    pointer to the first contiguous block, or NULL
   //   if empty.
-
   char* GetContiguousBlock(OUT size_t& size) {
-    if (a_size_ == 0) {
-      size = 0;
-      return nullptr;
-    }
-
     size = a_size_;
     return buffer_start_ptr_ + a_start_;
   }
@@ -201,10 +163,9 @@ class BipBuffer {
   // Returns:
   //   nothing
   void DecommitBlock(size_t size) {
-    if (size >= a_size_) {
-      a_start_ = b_start_;
+    if (size == a_size_) {
+      a_start_ = 0;
       a_size_ = b_size_;
-      b_start_ = 0;
       b_size_ = 0;
     } else {
       a_size_ -= size;
@@ -251,5 +212,8 @@ class BipBuffer {
  private:
   size_t GetSpaceAfterA() const { return buffer_size_ - a_start_ - a_size_; }
 
-  size_t GetBFreeSpace() const { return a_start_ - b_start_ - b_size_; }
+  size_t GetBFreeSpace() const {
+    auto b_space_size = a_start_;
+    return b_space_size - b_size_;
+  }
 };
