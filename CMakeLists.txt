@@ -22,6 +22,7 @@ if (ULOG_BUILD_EXAMPLES)
 endif ()
 
 if (ULOG_BUILD_TESTS)
+    enable_testing()
     add_subdirectory(tests)
 endif ()
 
