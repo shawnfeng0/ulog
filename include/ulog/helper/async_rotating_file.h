@@ -10,7 +10,7 @@
 #include <string>
 #include <utility>
 
-#include "ulog/helper/fifo_power_of_two.h"
+#include "ulog/helper/queue/fifo_power_of_two.h"
 #include "ulog/helper/rotating_file.h"
 
 namespace ulog {
