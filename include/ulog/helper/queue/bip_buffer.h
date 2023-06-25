@@ -85,11 +85,14 @@ class BipBuffer {
   void Commit(size_t size) {
     // only written from push thread
     const auto write = write_index_.load(std::memory_order_relaxed);
+    const auto last = last_index_.load(std::memory_order_relaxed);
 
     if (write_wrapped_) {
       last_index_.store(write, std::memory_order_relaxed);
       write_index_.store(size, std::memory_order_release);
     } else {
+      if (last < write + size)
+        last_index_.store(write + size, std::memory_order_relaxed);
       write_index_.store(write + size, std::memory_order_release);
     }
   }
