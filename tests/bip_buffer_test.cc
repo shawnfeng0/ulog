@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <random>
 #include <thread>
 
 TEST(BipBuffer, IsInRange) {
@@ -30,15 +31,18 @@ TEST(BipBuffer, IsInRange) {
   ASSERT_EQ(IsInRange(UINT32_MAX - 1, 2, 1), false);
 }
 
-static void single_producer_single_consumer(uint32_t write_step,
-                                            uint32_t buffer_size) {
-  const uint32_t limit = buffer_size * 32;
+static void single_producer_single_consumer(uint32_t buffer_size) {
+  const uint32_t limit = buffer_size * 8192;
   BipBuffer<uint32_t> buffer(buffer_size);
 
   std::thread write_thread{[&] {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<uint32_t> dis(
+        1, std::max<uint32_t>(buffer_size / 10, 2));
     uint32_t write_count = 0;
     while (write_count < limit) {
-      size_t size = write_step;
+      size_t size = dis(gen);
       auto data = buffer.Reserve(size);
       if (data == nullptr) {
         std::this_thread::yield();
@@ -67,21 +71,11 @@ static void single_producer_single_consumer(uint32_t write_step,
 
   write_thread.join();
   read_thread.join();
-  printf("Finished test: write_step: %u, buffer_size: %u, limit: %u\n",
-         write_step, buffer_size, limit);
+  printf("Finished test: buffer_size: %u, limit: %u\n", buffer_size, limit);
 }
 
 TEST(BipBufferTestSingle, singl_producer_single_consumer) {
-  single_producer_single_consumer(1, 1 << 8);
-  single_producer_single_consumer(2, 1 << 8);
-  single_producer_single_consumer(10, 1 << 8);
-  single_producer_single_consumer(16, 1 << 8);
-
-  single_producer_single_consumer(1, 1 << 16);
-  single_producer_single_consumer(2, 1 << 16);
-  single_producer_single_consumer(5, 1 << 16);
-  single_producer_single_consumer(256, 1 << 16);
-  single_producer_single_consumer(1000, 1 << 16);
-  single_producer_single_consumer(4000, 1 << 16);
-  single_producer_single_consumer(4096, 1 << 16);
+  for (uint32_t i = 4; i < 8; ++i) {
+    single_producer_single_consumer(1 << i);
+  }
 }
