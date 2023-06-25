@@ -2,8 +2,7 @@
 // Created by fs on 2/5/20.
 //
 
-#ifndef ULOG_INCLUDE_ULOG_FIFOPOWEROF2_H_
-#define ULOG_INCLUDE_ULOG_FIFOPOWEROF2_H_
+#pragma once
 
 #include <pthread.h>
 
@@ -11,6 +10,8 @@
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+
+#include "power_of_two.h"
 
 namespace ulog {
 
@@ -37,7 +38,7 @@ class FifoPowerOfTwo {
     // round down to the next power of 2, since our 'let the indices wrap'
     // technique works only in this case.
     // The kernel is roundup_pow_of_two, maybe it's wrong.
-    mask_ = RoundDownPowOfTwo(num_elements) - 1;
+    mask_ = ulog::queue::RoundDownPowOfTwo(num_elements) - 1;
   }
 
   explicit FifoPowerOfTwo(size_t num_elements, size_t element_size = 1)
@@ -47,7 +48,7 @@ class FifoPowerOfTwo {
 
     // round up to the next power of 2, since our 'let the indices wrap'
     // technique works only in this case.
-    num_elements = RoundUpPowOfTwo(num_elements);
+    num_elements = queue::RoundUpPowOfTwo(num_elements);
 
     data_ = new unsigned char[num_elements * element_size_];
 
@@ -71,8 +72,8 @@ class FifoPowerOfTwo {
   }
 
   template <typename Predicate>
-  size_t InputWaitUntil(const void *buf, size_t num_elements, int32_t timeout_ms,
-                     Predicate until_condition) {
+  size_t InputWaitUntil(const void *buf, size_t num_elements,
+                        int32_t timeout_ms, Predicate until_condition) {
     if (!buf) {
       return 0;
     }
@@ -159,7 +160,7 @@ class FifoPowerOfTwo {
 
   template <typename Predicate>
   size_t OutputWaitUntil(void *out_buf, size_t num_elements, int32_t timeout_ms,
-                      Predicate until_condition) {
+                         Predicate until_condition) {
     if (!out_buf) {
       return 0;
     }
@@ -308,39 +309,6 @@ class FifoPowerOfTwo {
   static inline T max(T x, T y) {
     return x > y ? x : y;
   }
-
-  template <typename T>
-  static inline auto RoundPowOfTwo(T n) -> decltype(n) {
-    uint64_t value = n;
-
-    // Fill 1
-    value |= value >> 1U;
-    value |= value >> 2U;
-    value |= value >> 4U;
-    value |= value >> 8U;
-    value |= value >> 16U;
-    value |= value >> 32U;
-
-    // Unable to round-up, take the value of round-down
-    if (decltype(n)(value + 1) == 0) {
-      value >>= 1U;
-    }
-
-    return value + 1;
-  }
-
-  static inline auto RoundUpPowOfTwo(uint32_t n) -> decltype(n) {
-    if (n == 0) return 1;
-
-    // Avoid is already a power of 2
-    return RoundPowOfTwo<decltype(n)>(n - 1);
-  }
-
-  static inline auto RoundDownPowOfTwo(uint32_t n) -> decltype(n) {
-    return RoundPowOfTwo<decltype(n)>(n >> 1U);
-  }
 };
 
 }  // namespace ulog
-
-#endif  // ULOG_INCLUDE_ULOG_FIFOPOWEROF2_H_

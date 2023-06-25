@@ -2,7 +2,7 @@
 // Created by shawnfeng on 23-3-31.
 //
 
-#include "ulog/helper/bip_buffer.h"
+#include "ulog/helper/queue/bip_buffer.h"
 
 #include <gtest/gtest.h>
 
