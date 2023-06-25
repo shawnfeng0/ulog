@@ -43,6 +43,7 @@ static inline int logger_get_pid() {
 
 // Get and thread id
 #if defined(__APPLE__)
+#include <pthread.h>
 static inline long logger_get_tid() {
   return pthread_mach_thread_np(pthread_self());
 }
