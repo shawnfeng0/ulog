@@ -9,14 +9,13 @@
 
 #include "power_of_two.h"
 
-#define BIPBUFFER2_DEBUG 0
-
 namespace ulog {
+
 template <typename T = char>
 class BipBuffer2 {
  public:
   explicit BipBuffer2(size_t num_elements)
-      : read_index_(0), write_index_(0), last_index_(0) {
+      : read_index_(0), write_index_(0), last_index_(0), wrapped_(false) {
     if (num_elements < 2)
       num_elements = 2;
     else {
@@ -24,6 +23,7 @@ class BipBuffer2 {
       // technique works only in this case.
       num_elements = queue::RoundUpPowOfTwo(num_elements);
     }
+    mask_ = num_elements - 1;
     buffer_.resize(num_elements);
   }
 
@@ -38,34 +38,24 @@ class BipBuffer2 {
     const auto read = read_index_.load(std::memory_order_relaxed);
     const auto write = write_index_.load(std::memory_order_relaxed);
 
-#if BIPBUFFER2_DEBUG == 1
-    printf("Reserve: read: %u, write: %u, size: %u\r\n", read, write, size);
-#endif
-
-    const auto cur_write = write & mask();
-    const auto cur_read = read & mask();
-
-    if (cur_write < cur_read) {
-      const auto writable = cur_read - cur_write;
-      return (writable > size) ? &buffer_[cur_write] : nullptr;
-
-    } else {  // cur_write >= cur_read
-      // read and write are inside the same block
-      const auto tail_writable = this->size() - cur_write;
-      const auto head_writable = cur_read;
-
-      if (tail_writable > size) {
-        return &buffer_[cur_write];
-
-      } else if (head_writable > size) {
-        last_index_.store(write, std::memory_order_relaxed);
-        write_index_.store(next_buffer(write), std::memory_order_release);
-        return &buffer_[0];
-
-      } else {
-        return nullptr;
-      }
+    const auto new_pos = write + size;
+    if (new_pos - read > this->size()) {
+      return nullptr;
     }
+
+    // Both new position and write_index are in the same range
+    if ((new_pos & mask()) >= size) {
+      wrapped_ = false;
+      return &buffer_[write & mask()];
+    }
+
+    // new_pos is in the next block
+    if ((read & mask()) >= size) {
+      wrapped_ = true;
+      return &buffer_[0];
+    }
+
+    return nullptr;
   }
 
   /**
@@ -84,12 +74,17 @@ class BipBuffer2 {
     printf("Commit: write: %u, size: %u\r\n", write, size);
 #endif
 
-    // Whenever we wrap around, we update the last variable to ensure logical
-    // consistency.
-    if (((write + size) & mask()) == 0) {
-      last_index_.store(write + size, std::memory_order_relaxed);
+    if (wrapped_) {
+      last_index_.store(write, std::memory_order_relaxed);
+      write_index_.store(next_buffer(write) + size, std::memory_order_release);
+    } else {
+      // Whenever we wrap around, we update the last variable to ensure logical
+      // consistency.
+      if (((write + size) & mask()) == 0) {
+        last_index_.store(write + size, std::memory_order_relaxed);
+      }
+      write_index_.store(write + size, std::memory_order_release);
     }
-    write_index_.store(write + size, std::memory_order_release);
   }
 
   /**
@@ -101,44 +96,38 @@ class BipBuffer2 {
   T* Read(size_t* size) {
     const auto write = write_index_.load(std::memory_order_acquire);
     const auto last = last_index_.load(std::memory_order_relaxed);
-    auto read = read_index_.load(std::memory_order_relaxed);
-
-#if BIPBUFFER2_DEBUG == 1
-    printf("Read: read: %u, write: %u, last: %u\r\n", read, write, last);
-#endif
+    const auto read = read_index_.load(std::memory_order_relaxed);
 
     if (read == write) {
-      *size = 0;
       return nullptr;
     }
 
+    const auto cur_write = write & mask();
+    const auto cur_read = read & mask();
+
+    // read and write are still in the same block
+    if (cur_read < cur_write) {
+      *size = write - read;
+      return &buffer_[cur_read];
+    }
+
+    // read and write are in different blocks, read the current remaining data
+    if (read != last) {
+      *size = last - read;
+      return &buffer_[cur_read];
+    }
+
     // The current block has been read, "write" has reached the next block
-    if (read == last) {
-      const auto write_block_pos = write & ~mask();
-      const auto read_block_pos = read & ~mask();
-      if (read_block_pos != write_block_pos) {
-        read = write_block_pos;
-        read_index_.store(write_block_pos, std::memory_order_relaxed);
-      }
+    const auto cur_block_start = write & ~mask();
+    // Move the read index, which can make room for the write
+    read_index_.store(cur_block_start, std::memory_order_relaxed);
+
+    if (!cur_write) {
+      return nullptr;
     }
 
-    // If last is from the previous round, a maximum value should be
-    // calculated, in fact it should be a negative value. We only care about
-    // numbers larger than read_index.
-    const auto distance_from_last = last - read;
-    const auto distance_from_write = write - read;
-    const auto readable_size =
-        distance_from_last < distance_from_write && distance_from_last != 0
-            ? distance_from_last
-            : distance_from_write;
-
-    if (readable_size > 0) {
-      *size = readable_size;
-      return &buffer_[read & mask()];
-    }
-
-    *size = 0;
-    return nullptr;
+    *size = cur_write;
+    return &buffer_[0];
   }
 
   /**
@@ -153,22 +142,18 @@ class BipBuffer2 {
    */
   void Release(size_t size) {
     auto read = read_index_.load(std::memory_order_relaxed);
-
-#if BIPBUFFER2_DEBUG == 1
-    printf("Release: read: %u, size: %u\r\n", read, size);
-#endif
-
     read_index_.store(read + size, std::memory_order_release);
   }
 
  private:
   size_t size() const { return buffer_.size(); }
-  size_t mask() const { return size() - 1; }
+  inline size_t mask() const { return mask_; }
   size_t inline next_buffer(size_t index) const {
     return (index & ~mask()) + size();
   }
 
   std::vector<T> buffer_;
+  size_t mask_;
 
   // for reader thread
   std::atomic<size_t> read_index_;
@@ -176,5 +161,6 @@ class BipBuffer2 {
   // for writer thread
   std::atomic<size_t> write_index_;
   std::atomic<size_t> last_index_;
+  bool wrapped_;
 };
 }  // namespace ulog
