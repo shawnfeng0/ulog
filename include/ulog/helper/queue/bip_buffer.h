@@ -13,11 +13,7 @@ template <typename T = char>
 class BipBuffer {
  public:
   explicit BipBuffer(size_t buffer_size)
-      : buffer_(buffer_size),
-        read_index_(0),
-        write_index_(0),
-        last_index_(0),
-        write_wrapped_(false) {}
+      : buffer_(buffer_size), out_(0), in_(0), last_(0), wrapped_(false) {}
 
   ~BipBuffer() = default;
 
@@ -26,35 +22,35 @@ class BipBuffer {
    * @param size size of space to reserve
    * @return data pointer if successful, otherwise nullptr
    */
-  T* Reserve(size_t size) {
-    const auto read = read_index_.load(std::memory_order_acquire);
-    const auto write = write_index_.load(std::memory_order_relaxed);
+  T* TryReserve(size_t size) {
+    const auto out = out_.load(std::memory_order_acquire);
+    const auto in = in_.load(std::memory_order_relaxed);
 
-    if (write < read) {
+    if (in < out) {
       // |********|_____size____||*********|___________|
       // ^0       ^write         ^read     ^last       ^size
-      if (write + size < read) {
-        write_wrapped_ = false;
-        return &buffer_[write];
+      if (in + size < out) {
+        wrapped_ = false;
+        return &buffer_[in];
       } else {
         return nullptr;
       }
 
-    } else if (write + size <= buffer_.size()) {
+    } else if (in + size <= buffer_.size()) {
       // Check trailing space first
       // |__________|*************|______size______|
       // ^0         ^read         ^write           ^size
       // or
       // |__________|_____________size_____________|
       // ^0         ^read/write                    ^size
-      write_wrapped_ = false;
-      return &buffer_[write];
+      wrapped_ = false;
+      return &buffer_[in];
 
-    } else if (read > size) {
+    } else if (out > size) {
       // Check leading space
       // |______size______|*************|__________|
       // ^0               ^read         ^write     ^size
-      write_wrapped_ = true;
+      wrapped_ = true;
       return &buffer_[0];
 
     } else {
@@ -68,20 +64,19 @@ class BipBuffer {
    *
    * NOTE:
    * The validity of the size is not checked, it needs to be within the range
-   * returned by the Reserve function.
+   * returned by the TryReserve function.
    */
   void Commit(size_t size) {
     // only written from push thread
-    const auto write = write_index_.load(std::memory_order_relaxed);
-    const auto last = last_index_.load(std::memory_order_relaxed);
+    const auto in = in_.load(std::memory_order_relaxed);
+    const auto last = last_.load(std::memory_order_relaxed);
 
-    if (write_wrapped_) {
-      last_index_.store(write, std::memory_order_relaxed);
-      write_index_.store(size, std::memory_order_release);
+    if (wrapped_) {
+      last_.store(in, std::memory_order_relaxed);
+      in_.store(size, std::memory_order_release);
     } else {
-      if (last < write + size)
-        last_index_.store(write + size, std::memory_order_relaxed);
-      write_index_.store(write + size, std::memory_order_release);
+      if (last < in + size) last_.store(in + size, std::memory_order_relaxed);
+      in_.store(in + size, std::memory_order_release);
     }
   }
 
@@ -91,21 +86,21 @@ class BipBuffer {
    * @param size returns the size of the contiguous block
    * @return pointer to the contiguous block
    */
-  T* Read(size_t* size) {
-    const auto write = write_index_.load(std::memory_order_acquire);
-    const auto last = last_index_.load(std::memory_order_relaxed);
-    auto read = read_index_.load(std::memory_order_relaxed);
+  T* TryRead(size_t* size) {
+    const auto in = in_.load(std::memory_order_acquire);
+    const auto last = last_.load(std::memory_order_relaxed);
+    auto out = out_.load(std::memory_order_relaxed);
 
-    if (read == write) return nullptr;
-    if (read == last && read != 0) {
-      read = 0;
-      read_index_.store(read, std::memory_order_release);
+    if (out == in) return nullptr;
+    if (out == last && out != 0) {
+      out = 0;
+      out_.store(out, std::memory_order_release);
     }
 
-    auto read_limit = read <= write ? write : last;
-    *size = read_limit - read;
+    auto out_limit = out <= in ? in : last;
+    *size = out_limit - out;
 
-    return (*size == 0) ? nullptr : &buffer_[read];
+    return (*size == 0) ? nullptr : &buffer_[out];
   }
 
   /**
@@ -115,23 +110,21 @@ class BipBuffer {
    * Note:
    *
    * The validity of the size is not checked, it needs to be within the range
-   * returned by the Read function.
+   * returned by the TryRead function.
    *
    */
-  void Release(size_t size) {
-    read_index_.fetch_add(size, std::memory_order_acq_rel);
-  }
+  void Release(size_t size) { out_.fetch_add(size, std::memory_order_acq_rel); }
 
  private:
   std::vector<T> buffer_;
 
-  // for reader thread
-  std::atomic<size_t> read_index_;
+  // for producer thread
+  std::atomic<size_t> out_;
 
-  // for writer thread
-  std::atomic<size_t> write_index_;
-  std::atomic<size_t> last_index_;
-  bool write_wrapped_;
+  // for consumer thread
+  std::atomic<size_t> in_;
+  std::atomic<size_t> last_;
+  bool wrapped_;
 };
 
 }  // namespace ulog
