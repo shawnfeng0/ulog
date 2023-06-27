@@ -8,8 +8,8 @@
 #include <random>
 #include <thread>
 
-#include "ulog/helper/queue/bip_buffer.h"
-#include "ulog/helper/queue/bip_buffer2.h"
+#include "ulog/helper/queue/spsc_bip_buffer.h"
+#include "ulog/helper/queue/spsc_bip_buffer2.h"
 #include "ulog/ulog.h"
 
 TEST(BipBuffer, IsInRange) {
