@@ -46,7 +46,7 @@ static void spsc(uint32_t buffer_size) {
     uint32_t write_count = 0;
     while (write_count < limit) {
       size_t size = dis(gen);
-      auto data = buffer.Reserve(size);
+      auto data = buffer.TryReserve(size);
       if (data == nullptr) {
         std::this_thread::yield();
         continue;
@@ -60,7 +60,7 @@ static void spsc(uint32_t buffer_size) {
     uint32_t read_count = 0;
     while (read_count < limit) {
       size_t size;
-      auto data = buffer.Read(&size);
+      auto data = buffer.TryRead(&size);
       if (data == nullptr) {
         std::this_thread::yield();
         continue;
