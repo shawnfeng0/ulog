@@ -15,7 +15,7 @@ template <typename T = char>
 class BipBuffer2 {
  public:
   explicit BipBuffer2(size_t num_elements)
-      : read_index_(0), write_index_(0), last_index_(0), wrapped_(false) {
+      : out_(0), in_(0), last_(0), wrapped_(false) {
     if (num_elements < 2)
       num_elements = 2;
     else {
@@ -34,23 +34,23 @@ class BipBuffer2 {
    * @param size size of space to reserve
    * @return data pointer if successful, otherwise nullptr
    */
-  T* Reserve(size_t size) {
-    const auto read = read_index_.load(std::memory_order_relaxed);
-    const auto write = write_index_.load(std::memory_order_relaxed);
+  T *TryReserve(size_t size) {
+    const auto out = out_.load(std::memory_order_relaxed);
+    const auto in = in_.load(std::memory_order_relaxed);
 
-    const auto new_pos = write + size;
-    if (new_pos - read > this->size()) {
+    const auto new_pos = in + size;
+    if (new_pos - out > this->size()) {
       return nullptr;
     }
 
     // Both new position and write_index are in the same range
     if ((new_pos & mask()) >= size) {
       wrapped_ = false;
-      return &buffer_[write & mask()];
+      return &buffer_[in & mask()];
     }
 
     // new_pos is in the next block
-    if ((read & mask()) >= size) {
+    if ((out & mask()) >= size) {
       wrapped_ = true;
       return &buffer_[0];
     }
@@ -64,26 +64,22 @@ class BipBuffer2 {
    *
    * NOTE:
    * The validity of the size is not checked, it needs to be within the range
-   * returned by the Reserve function.
+   * returned by the TryReserve function.
    */
   void Commit(size_t size) {
     // only written from push thread
-    const auto write = write_index_.load(std::memory_order_relaxed);
-
-#if BIPBUFFER2_DEBUG == 1
-    printf("Commit: write: %u, size: %u\r\n", write, size);
-#endif
+    const auto in = in_.load(std::memory_order_relaxed);
 
     if (wrapped_) {
-      last_index_.store(write, std::memory_order_relaxed);
-      write_index_.store(next_buffer(write) + size, std::memory_order_release);
+      last_.store(in, std::memory_order_relaxed);
+      in_.store(next_buffer(in) + size, std::memory_order_release);
     } else {
       // Whenever we wrap around, we update the last variable to ensure logical
       // consistency.
-      if (((write + size) & mask()) == 0) {
-        last_index_.store(write + size, std::memory_order_relaxed);
+      if (((in + size) & mask()) == 0) {
+        last_.store(in + size, std::memory_order_relaxed);
       }
-      write_index_.store(write + size, std::memory_order_release);
+      in_.store(in + size, std::memory_order_release);
     }
   }
 
@@ -93,40 +89,40 @@ class BipBuffer2 {
    * @param size returns the size of the contiguous block
    * @return pointer to the contiguous block
    */
-  T* Read(size_t* size) {
-    const auto write = write_index_.load(std::memory_order_acquire);
-    const auto last = last_index_.load(std::memory_order_relaxed);
-    const auto read = read_index_.load(std::memory_order_relaxed);
+  T *TryRead(size_t *size) {
+    const auto in = in_.load(std::memory_order_acquire);
+    const auto last = last_.load(std::memory_order_relaxed);
+    const auto out = out_.load(std::memory_order_relaxed);
 
-    if (read == write) {
+    if (out == in) {
       return nullptr;
     }
 
-    const auto cur_write = write & mask();
-    const auto cur_read = read & mask();
+    const auto cur_in = in & mask();
+    const auto cur_out = out & mask();
 
     // read and write are still in the same block
-    if (cur_read < cur_write) {
-      *size = write - read;
-      return &buffer_[cur_read];
+    if (cur_out < cur_in) {
+      *size = in - out;
+      return &buffer_[cur_out];
     }
 
     // read and write are in different blocks, read the current remaining data
-    if (read != last) {
-      *size = last - read;
-      return &buffer_[cur_read];
+    if (out != last) {
+      *size = last - out;
+      return &buffer_[cur_out];
     }
 
     // The current block has been read, "write" has reached the next block
-    const auto cur_block_start = write & ~mask();
+    const auto cur_block_start = in & ~mask();
     // Move the read index, which can make room for the write
-    read_index_.store(cur_block_start, std::memory_order_relaxed);
+    out_.store(cur_block_start, std::memory_order_relaxed);
 
-    if (!cur_write) {
+    if (!cur_in) {
       return nullptr;
     }
 
-    *size = cur_write;
+    *size = cur_in;
     return &buffer_[0];
   }
 
@@ -137,17 +133,19 @@ class BipBuffer2 {
    * Note:
    *
    * The validity of the size is not checked, it needs to be within the range
-   * returned by the Read function.
+   * returned by the TryRead function.
    *
    */
   void Release(size_t size) {
-    auto read = read_index_.load(std::memory_order_relaxed);
-    read_index_.store(read + size, std::memory_order_release);
+    auto out = out_.load(std::memory_order_relaxed);
+    out_.store(out + size, std::memory_order_release);
   }
 
  private:
   size_t size() const { return buffer_.size(); }
+
   inline size_t mask() const { return mask_; }
+
   size_t inline next_buffer(size_t index) const {
     return (index & ~mask()) + size();
   }
@@ -156,11 +154,11 @@ class BipBuffer2 {
   size_t mask_;
 
   // for reader thread
-  std::atomic<size_t> read_index_;
+  std::atomic<size_t> out_;
 
   // for writer thread
-  std::atomic<size_t> write_index_;
-  std::atomic<size_t> last_index_;
+  std::atomic<size_t> in_;
+  std::atomic<size_t> last_;
   bool wrapped_;
 };
 }  // namespace ulog
