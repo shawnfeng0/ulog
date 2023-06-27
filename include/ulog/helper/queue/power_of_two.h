@@ -43,5 +43,19 @@ static inline auto RoundDownPowOfTwo(uint32_t n) -> decltype(n) {
   return RoundPowOfTwo<decltype(n)>(n >> 1U);
 }
 
+/**
+ * @brief Check if value is in range [left, right], considering the wraparound
+ * case when right < left (overflow)
+ */
+static inline bool IsInRange(unsigned left, unsigned value, unsigned right) {
+  if (right >= left) {
+    // Normal
+    return (left <= value) && (value <= right);
+  } else {
+    // Maybe the data overflowed and a wraparound occurred
+    return (left <= value) || (value <= right);
+  }
+}
+
 }  // namespace queue
 }  // namespace ulog

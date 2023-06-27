@@ -7,19 +7,7 @@
 #include <stdexcept>
 #include <vector>
 
-/**
- * @brief Check if value is in range [left, right], considering the wraparound
- * case when right < left (overflow)
- */
-static inline bool IsInRange(unsigned left, unsigned value, unsigned right) {
-  if (right >= left) {
-    // Normal
-    return (left <= value) && (value <= right);
-  } else {
-    // Maybe the data overflowed and a wraparound occurred
-    return (left <= value) || (value <= right);
-  }
-}
+namespace ulog {
 
 template <typename T = char>
 class BipBuffer {
@@ -109,9 +97,9 @@ class BipBuffer {
     auto read = read_index_.load(std::memory_order_relaxed);
 
     if (read == write) return nullptr;
-    if (read == last) {
-      read_index_.store(0, std::memory_order_release);
+    if (read == last && read != 0) {
       read = 0;
+      read_index_.store(read, std::memory_order_release);
     }
 
     auto read_limit = read <= write ? write : last;
@@ -145,3 +133,5 @@ class BipBuffer {
   std::atomic<size_t> last_index_;
   bool write_wrapped_;
 };
+
+}  // namespace ulog
