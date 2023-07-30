@@ -38,13 +38,13 @@ class BipBuffer2 {
     const auto out = out_.load(std::memory_order_relaxed);
     const auto in = in_.load(std::memory_order_relaxed);
 
-    const auto new_pos = in + size;
-    if (new_pos - out > this->size()) {
+    const auto unused = this->size() - (in - out);
+    if (unused < size) {
       return nullptr;
     }
 
-    // Both new position and write_index are in the same range
-    if ((new_pos & mask()) >= size) {
+    // The current block has enough free space
+    if (this->size() - (in & mask()) >= size) {
       wrapped_ = false;
       return &buffer_[in & mask()];
     }
@@ -76,10 +76,11 @@ class BipBuffer2 {
     } else {
       // Whenever we wrap around, we update the last variable to ensure logical
       // consistency.
-      if (((in + size) & mask()) == 0) {
-        last_.store(in + size, std::memory_order_relaxed);
+      const auto new_pos = in + size;
+      if ((new_pos & mask()) == 0) {
+        last_.store(new_pos, std::memory_order_relaxed);
       }
-      in_.store(in + size, std::memory_order_release);
+      in_.store(new_pos, std::memory_order_release);
     }
   }
 
@@ -115,7 +116,7 @@ class BipBuffer2 {
 
     // The current block has been read, "write" has reached the next block
     const auto cur_block_start = in & ~mask();
-    // Move the read index, which can make room for the write
+    // Move the read index, which can make room for the writer
     out_.store(cur_block_start, std::memory_order_relaxed);
 
     if (!cur_in) {
