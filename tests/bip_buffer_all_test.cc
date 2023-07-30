@@ -25,10 +25,10 @@ static void spsc(uint32_t buffer_size) {
     uint32_t write_count = 0;
     while (write_count < limit) {
       size_t size = dis(gen);
-      auto data = buffer.TryReserve(size);
-      if (data == nullptr) {
+
+      decltype(buffer.TryReserve(size)) data;
+      while ((data = buffer.TryReserve(size)) == nullptr) {
         std::this_thread::yield();
-        continue;
       }
       for (size_t i = 0; i < size; ++i) data[i] = write_count++;
       buffer.Commit(size);
