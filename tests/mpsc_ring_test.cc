@@ -40,7 +40,7 @@ static void spsc(uint32_t buffer_size) {
     ulog::umq::Consumer<uint32_t> consumer(&buffer);
     uint32_t read_count = 0;
     while (read_count < limit) {
-      size_t size;
+      uint32_t size;
       auto data = consumer.TryRead(&size);
       if (data == nullptr) {
         std::this_thread::yield();
