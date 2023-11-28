@@ -13,16 +13,12 @@
 namespace ulog {
 namespace umq {
 
-template <typename T>
 class Producer;
-
-template <typename T>
 class Consumer;
 
-template <typename T = char>
 class Umq {
-  friend class Producer<T>;
-  friend class Consumer<T>;
+  friend class Producer;
+  friend class Consumer;
   using size_type = size_t;
 
  public:
@@ -50,7 +46,7 @@ class Umq {
     return (index & ~mask()) + size();
   }
 
-  std::vector<T> buffer_;
+  std::vector<uint8_t> buffer_;
   size_t mask_;
 
   std::atomic<size_t> cons_head_;
@@ -59,10 +55,9 @@ class Umq {
   std::atomic<size_t> prod_last_;
 };
 
-template <typename T>
 class Producer {
  public:
-  explicit Producer(Umq<T> *queue) : ring_(queue), wrapped_(false){}
+  explicit Producer(Umq *queue) : ring_(queue), wrapped_(false) {}
 
   ~Producer() = default;
 
@@ -71,7 +66,7 @@ class Producer {
    * @param size size of space to reserve
    * @return data pointer if successful, otherwise nullptr
    */
-  T *TryReserve(size_t size) {
+  void *TryReserve(size_t size) {
     const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
     const auto in = ring_->prod_tail_.load(std::memory_order_relaxed);
 
@@ -122,14 +117,13 @@ class Producer {
   }
 
  private:
-  Umq<T> *ring_;
+  Umq *ring_;
   bool wrapped_;
 };
 
-template <typename T>
 class Consumer {
  public:
-  explicit Consumer(Umq<T> *queue) : ring_(queue) {}
+  explicit Consumer(Umq *queue) : ring_(queue) {}
 
   ~Consumer() = default;
 
@@ -139,7 +133,7 @@ class Consumer {
    * @param size returns the size of the contiguous block
    * @return pointer to the contiguous block
    */
-  T *TryRead(size_t *size) {
+  void *TryRead(size_t *size) {
     const auto in = ring_->prod_tail_.load(std::memory_order_acquire);
     const auto last = ring_->prod_last_.load(std::memory_order_relaxed);
     const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
@@ -189,12 +183,12 @@ class Consumer {
   void Release(size_t size) {
     auto out = ring_->cons_head_.load(std::memory_order_relaxed);
     const auto cur_out = out & ring_->mask();
-    std::memset(&ring_->buffer_[cur_out], 0, size * sizeof(T));
+    std::memset(&ring_->buffer_[cur_out], 0, size);
     ring_->cons_head_.store(out + size, std::memory_order_release);
   }
 
  private:
-  Umq<T> *ring_;
+  Umq *ring_;
 };
 
 }  // namespace umq

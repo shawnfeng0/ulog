@@ -14,10 +14,10 @@
 
 static void spsc(uint32_t buffer_size) {
   const uint32_t limit = buffer_size * 8192;
-  ulog::umq::Umq<uint32_t> buffer(buffer_size);
+  ulog::umq::Umq buffer(buffer_size);
 
   std::thread write_thread{[&] {
-    ulog::umq::Producer<uint32_t> producer(&buffer);
+    ulog::umq::Producer producer(&buffer);
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<uint32_t> dis(
@@ -25,7 +25,7 @@ static void spsc(uint32_t buffer_size) {
     uint32_t write_count = 0;
     while (write_count < limit) {
       size_t size = dis(gen);
-      auto data = producer.TryReserve(size);
+      auto data = (uint8_t*)producer.TryReserve(size);
       if (data == nullptr) {
         std::this_thread::yield();
         continue;
@@ -36,17 +36,17 @@ static void spsc(uint32_t buffer_size) {
   }};
 
   std::thread read_thread{[&] {
-    ulog::umq::Consumer<uint32_t> consumer(&buffer);
+    ulog::umq::Consumer consumer(&buffer);
     uint32_t read_count = 0;
     while (read_count < limit) {
       size_t size;
-      auto data = consumer.TryRead(&size);
+      auto data = (uint8_t*)consumer.TryRead(&size);
       if (data == nullptr) {
         std::this_thread::yield();
         continue;
       }
       for (size_t i = 0; i < size; ++i) {
-        ASSERT_EQ(data[i], read_count++);
+        ASSERT_EQ(data[i], (read_count++) % 256);
       }
       consumer.Release(size);
     }
