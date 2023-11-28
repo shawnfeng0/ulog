@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <memory>
 #include <stdexcept>
 #include <vector>
 
@@ -32,13 +33,13 @@ class Umq {
       num_elements = queue::RoundUpPowOfTwo(num_elements);
     }
     mask_ = num_elements - 1;
-    buffer_.resize(num_elements);
+    data_ = std::make_unique<uint8_t[]>(mask_ + 1);
   }
 
   ~Umq() = default;
 
  private:
-  size_t size() const { return buffer_.size(); }
+  size_t size() const { return mask_ + 1; }
 
   inline size_t mask() const { return mask_; }
 
@@ -46,7 +47,7 @@ class Umq {
     return (index & ~mask()) + size();
   }
 
-  std::vector<uint8_t> buffer_;
+  std::unique_ptr<uint8_t[]> data_;  // the buffer holding the data
   size_t mask_;
 
   std::atomic<size_t> cons_head_;
@@ -78,13 +79,13 @@ class Producer {
     // Both new position and write_index are in the same range
     if ((new_pos & ring_->mask()) >= size) {
       wrapped_ = false;
-      return &ring_->buffer_[in & ring_->mask()];
+      return &ring_->data_[in & ring_->mask()];
     }
 
     // new_pos is in the next block
     if ((out & ring_->mask()) >= size) {
       wrapped_ = true;
-      return &ring_->buffer_[0];
+      return &ring_->data_[0];
     }
 
     return nullptr;
@@ -148,13 +149,13 @@ class Consumer {
     // read and write are still in the same block
     if (cur_out < cur_in) {
       *size = in - out;
-      return &ring_->buffer_[cur_out];
+      return &ring_->data_[cur_out];
     }
 
     // read and write are in different blocks, read the current remaining data
     if (out != last) {
       *size = last - out;
-      return &ring_->buffer_[cur_out];
+      return &ring_->data_[cur_out];
     }
 
     // The current block has been read, "write" has reached the next block
@@ -167,7 +168,7 @@ class Consumer {
     }
 
     *size = cur_in;
-    return &ring_->buffer_[0];
+    return &ring_->data_[0];
   }
 
   /**
@@ -183,7 +184,7 @@ class Consumer {
   void Release(size_t size) {
     auto out = ring_->cons_head_.load(std::memory_order_relaxed);
     const auto cur_out = out & ring_->mask();
-    std::memset(&ring_->buffer_[cur_out], 0, size);
+    std::memset(&ring_->data_[cur_out], 0, size);
     ring_->cons_head_.store(out + size, std::memory_order_release);
   }
 
