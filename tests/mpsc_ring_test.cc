@@ -31,7 +31,7 @@ static void spsc(uint32_t buffer_size) {
         continue;
       }
       for (size_t i = 0; i < size; ++i) data[i] = write_count++;
-      producer.Commit(size);
+      producer.Commit();
     }
   }};
 
@@ -40,7 +40,7 @@ static void spsc(uint32_t buffer_size) {
     uint32_t read_count = 0;
     while (read_count < limit) {
       size_t size;
-      auto data = (uint8_t*)consumer.TryRead(&size);
+      auto data = (uint8_t*)consumer.TryReadOnePacket(&size);
       if (data == nullptr) {
         std::this_thread::yield();
         continue;
@@ -48,7 +48,7 @@ static void spsc(uint32_t buffer_size) {
       for (size_t i = 0; i < size; ++i) {
         ASSERT_EQ(data[i], (read_count++) % 256);
       }
-      consumer.Release(size);
+      consumer.ReleasePacket(size);
     }
   }};
 

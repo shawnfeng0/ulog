@@ -17,10 +17,21 @@ namespace umq {
 class Producer;
 class Consumer;
 
+struct PacketHeader {
+  union {
+    struct {
+      uint32_t size : 30;
+      uint32_t submitted : 1;
+      uint32_t discarded : 1;
+    } header;
+    uint32_t header_all;
+  };
+  uint8_t data[0];
+};
+
 class Umq {
   friend class Producer;
   friend class Consumer;
-  using size_type = size_t;
 
  public:
   explicit Umq(size_t num_elements)
@@ -58,7 +69,7 @@ class Umq {
 
 class Producer {
  public:
-  explicit Producer(Umq *queue) : ring_(queue), wrapped_(false) {}
+  explicit Producer(Umq *queue) : ring_(queue) {}
 
   ~Producer() = default;
 
@@ -71,39 +82,41 @@ class Producer {
     const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
     const auto in = ring_->prod_tail_.load(std::memory_order_relaxed);
 
-    const auto new_pos = in + size;
+    auto real_size = size + sizeof(PacketHeader);
+
+    const auto new_pos = in + real_size;
     if (new_pos - out > ring_->size()) {
       return nullptr;
     }
 
+    uint8_t *data_ptr = nullptr;
     // Both new position and write_index are in the same range
-    if ((new_pos & ring_->mask()) >= size) {
-      wrapped_ = false;
-      return &ring_->data_[in & ring_->mask()];
+    if ((new_pos & ring_->mask()) >= real_size) {
+      data_ptr = &ring_->data_[in & ring_->mask()];
+    } else if ((out & ring_->mask()) >= real_size) {
+      // new_pos is in the next block
+      data_ptr = &ring_->data_[0];
+    } else {
+      // not enough space
+      return nullptr;
     }
-
-    // new_pos is in the next block
-    if ((out & ring_->mask()) >= size) {
-      wrapped_ = true;
-      return &ring_->data_[0];
-    }
-
-    return nullptr;
+    pending_packet_ = reinterpret_cast<PacketHeader *>(data_ptr);
+    pending_packet_->header.size = size;
+    return &pending_packet_->data[0];
   }
 
   /**
    * Commits the data to the buffer, so that it can be read out.
-   * @param size the size of the data to be committed
-   *
-   * NOTE:
-   * The validity of the size is not checked, it needs to be within the range
-   * returned by the TryReserve function.
    */
-  void Commit(size_t size) {
+  void Commit() {
     // only written from push thread
     const auto in = ring_->prod_tail_.load(std::memory_order_relaxed);
 
-    if (wrapped_) {
+    pending_packet_->header.submitted = true;
+    auto size = pending_packet_->header.size + sizeof(PacketHeader);
+
+    // wrap around the ring buffer
+    if (&pending_packet_->data[0] == &ring_->data_[0]) {
       ring_->prod_last_.store(in, std::memory_order_relaxed);
       ring_->prod_tail_.store(ring_->next_buffer(in) + size,
                               std::memory_order_release);
@@ -119,7 +132,7 @@ class Producer {
 
  private:
   Umq *ring_;
-  bool wrapped_;
+  PacketHeader *pending_packet_{nullptr};
 };
 
 class Consumer {
@@ -134,7 +147,7 @@ class Consumer {
    * @param size returns the size of the contiguous block
    * @return pointer to the contiguous block
    */
-  void *TryRead(size_t *size) {
+  void *TryReadOnePacket(size_t *size) {
     const auto in = ring_->prod_tail_.load(std::memory_order_acquire);
     const auto last = ring_->prod_last_.load(std::memory_order_relaxed);
     const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
@@ -178,10 +191,10 @@ class Consumer {
    * Note:
    *
    * The validity of the size is not checked, it needs to be within the range
-   * returned by the TryRead function.
+   * returned by the TryReadOnePacket function.
    *
    */
-  void Release(size_t size) {
+  void ReleasePacket(size_t size) {
     auto out = ring_->cons_head_.load(std::memory_order_relaxed);
     const auto cur_out = out & ring_->mask();
     std::memset(&ring_->data_[cur_out], 0, size);
