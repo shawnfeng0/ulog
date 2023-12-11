@@ -159,14 +159,14 @@ class Consumer {
     const auto cur_in = in & ring_->mask();
     const auto cur_out = out & ring_->mask();
 
+    uint8_t *data_ptr = nullptr;
     // read and write are still in the same block
     if (cur_out < cur_in) {
       *size = in - out;
       return &ring_->data_[cur_out];
     }
-
-    // read and write are in different blocks, read the current remaining data
     if (out != last) {
+      // read and write are in different blocks, read the current remaining data
       *size = last - out;
       return &ring_->data_[cur_out];
     }
@@ -176,7 +176,7 @@ class Consumer {
     // Move the read index, which can make room for the write
     ring_->cons_head_.store(cur_block_start, std::memory_order_relaxed);
 
-    if (!cur_in) {
+    if (cur_in == 0U) {
       return nullptr;
     }
 
@@ -203,6 +203,7 @@ class Consumer {
 
  private:
   Umq *ring_;
+  PacketHeader *reading_packet_{nullptr};
 };
 
 }  // namespace umq
