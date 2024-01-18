@@ -2,12 +2,10 @@
 
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <exception>
 #include <memory>
-#include <stdexcept>
-#include <vector>
 
 #include "power_of_two.h"
 
@@ -17,16 +15,24 @@ namespace umq {
 class Producer;
 class Consumer;
 
-struct PacketHeader {
-  union {
-    struct {
-      uint32_t size : 30;
-      uint32_t submitted : 1;
-      uint32_t discarded : 1;
-    } header;
-    uint32_t header_all;
-  };
+struct Packet {
+  uint32_t size : 30;
+  uint32_t submitted : 1;
+  uint32_t discarded : 1;
   uint8_t data[0];
+};
+
+union PacketPtr {
+  explicit PacketPtr(void *ptr) : ptr_(ptr) {}
+  auto operator->() const -> Packet * { return header; }
+  auto operator=(void *ptr) -> PacketPtr & {
+    this->ptr_ = ptr;
+    return *this;
+  }
+
+ private:
+  Packet *header;
+  __attribute__((unused)) void *ptr_;
 };
 
 class Umq {
@@ -82,7 +88,7 @@ class Producer {
     const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
     const auto in = ring_->prod_tail_.load(std::memory_order_relaxed);
 
-    auto real_size = size + sizeof(PacketHeader);
+    auto real_size = size + sizeof(Packet);
 
     const auto new_pos = in + real_size;
     if (new_pos - out > ring_->size()) {
@@ -100,8 +106,8 @@ class Producer {
       // not enough space
       return nullptr;
     }
-    pending_packet_ = reinterpret_cast<PacketHeader *>(data_ptr);
-    pending_packet_->header.size = size;
+    pending_packet_ = data_ptr;
+    pending_packet_->size = size;
     return &pending_packet_->data[0];
   }
 
@@ -112,8 +118,8 @@ class Producer {
     // only written from push thread
     const auto in = ring_->prod_tail_.load(std::memory_order_relaxed);
 
-    pending_packet_->header.submitted = true;
-    auto size = pending_packet_->header.size + sizeof(PacketHeader);
+    pending_packet_->submitted = true;
+    auto size = pending_packet_->size + sizeof(Packet);
 
     // wrap around the ring buffer
     if (&pending_packet_->data[0] == &ring_->data_[0]) {
@@ -132,7 +138,7 @@ class Producer {
 
  private:
   Umq *ring_;
-  PacketHeader *pending_packet_{nullptr};
+  PacketPtr pending_packet_{nullptr};
 };
 
 class Consumer {
@@ -147,7 +153,7 @@ class Consumer {
    * @param size returns the size of the contiguous block
    * @return pointer to the contiguous block
    */
-  void *TryReadOnePacket(size_t *size) {
+  void *TryReadOnePacket(size_t *out_size) {
     const auto in = ring_->prod_tail_.load(std::memory_order_acquire);
     const auto last = ring_->prod_last_.load(std::memory_order_relaxed);
     const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
@@ -162,12 +168,13 @@ class Consumer {
     uint8_t *data_ptr = nullptr;
     // read and write are still in the same block
     if (cur_out < cur_in) {
-      *size = in - out;
-      return &ring_->data_[cur_out];
+      size_t const total_size = in - out;
+      reading_packet_ =
+          reinterpret_cast<Packet *>((void *)(&ring_->data_[cur_out]));
     }
     if (out != last) {
       // read and write are in different blocks, read the current remaining data
-      *size = last - out;
+      size_t const total_size = last - out;
       return &ring_->data_[cur_out];
     }
 
@@ -180,7 +187,7 @@ class Consumer {
       return nullptr;
     }
 
-    *size = cur_in;
+    size_t const total_size = cur_in;
     return &ring_->data_[0];
   }
 
@@ -203,8 +210,7 @@ class Consumer {
 
  private:
   Umq *ring_;
-  PacketHeader *reading_packet_{nullptr};
+  Packet *reading_packet_{nullptr};
 };
-
 }  // namespace umq
 }  // namespace ulog

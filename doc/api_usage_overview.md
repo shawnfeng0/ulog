@@ -24,7 +24,7 @@ void logger_destroy(struct ulog_s **logger_ptr);
 void logger_set_user_data(struct ulog_s *logger, void *user_data);
 
 // Set the callback function for log output, the log is output through this function
-typedef int (*ulog_output_callback)(void *user_data, const char *ptr);
+typedef int (*ulog_output_callback)(void *user_data, const char *ptr_);
 void logger_set_output_callback(struct ulog_s *logger, ulog_output_callback output_callback);
 
 // Set the callback function of log flush, which is executed when the log level is error
