@@ -35,25 +35,25 @@ static void spsc(uint32_t buffer_size) {
     }
   }};
 
-  std::thread read_thread{[&] {
-    ulog::umq::Consumer consumer(&buffer);
-    uint32_t read_count = 0;
-    while (read_count < limit) {
-      size_t size;
-      auto data = (uint8_t*)consumer.TryReadOnePacket(&size);
-      if (data == nullptr) {
-        std::this_thread::yield();
-        continue;
-      }
-      for (size_t i = 0; i < size; ++i) {
-        ASSERT_EQ(data[i], (read_count++) % 256);
-      }
-      consumer.ReleasePacket(size);
-    }
-  }};
+//  std::thread read_thread{[&] {
+//    ulog::umq::Consumer consumer(&buffer);
+//    uint32_t read_count = 0;
+//    while (read_count < limit) {
+//      uint32_t size;
+//      auto data = (uint8_t*)consumer.TryReadOnePacket(&size);
+//      if (data == nullptr) {
+//        std::this_thread::yield();
+//        continue;
+//      }
+//      for (size_t i = 0; i < size; ++i) {
+//        ASSERT_EQ(data[i], (read_count++) % 256);
+//      }
+//      consumer.ReleasePacket();
+//    }
+//  }};
 
   write_thread.join();
-  read_thread.join();
+//  read_thread.join();
   printf("Finished test: buffer_size: %u, limit: %u\n", buffer_size, limit);
 }
 

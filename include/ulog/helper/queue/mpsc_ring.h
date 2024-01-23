@@ -13,6 +13,7 @@ namespace ulog {
 namespace umq {
 
 class Producer;
+
 class Consumer;
 
 struct Packet {
@@ -24,7 +25,9 @@ struct Packet {
 
 union PacketPtr {
   explicit PacketPtr(void *ptr) : ptr_(ptr) {}
+
   auto operator->() const -> Packet * { return header; }
+
   auto operator=(void *ptr) -> PacketPtr & {
     this->ptr_ = ptr;
     return *this;
@@ -153,42 +156,32 @@ class Consumer {
    * @param size returns the size of the contiguous block
    * @return pointer to the contiguous block
    */
-  void *TryReadOnePacket(size_t *out_size) {
+  void *TryReadOnePacket(uint32_t *out_size) {
     const auto in = ring_->prod_tail_.load(std::memory_order_acquire);
     const auto last = ring_->prod_last_.load(std::memory_order_relaxed);
     const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
 
-    if (out == in) {
+    // no data
+    if (in == out || in == last) {
       return nullptr;
     }
 
-    const auto cur_in = in & ring_->mask();
-    const auto cur_out = out & ring_->mask();
-
-    uint8_t *data_ptr = nullptr;
-    // read and write are still in the same block
-    if (cur_out < cur_in) {
-      size_t const total_size = in - out;
-      reading_packet_ =
-          reinterpret_cast<Packet *>((void *)(&ring_->data_[cur_out]));
-    }
-    if (out != last) {
-      // read and write are in different blocks, read the current remaining data
-      size_t const total_size = last - out;
-      return &ring_->data_[cur_out];
-    }
-
-    // The current block has been read, "write" has reached the next block
-    const auto cur_block_start = in & ~ring_->mask();
-    // Move the read index, which can make room for the write
-    ring_->cons_head_.store(cur_block_start, std::memory_order_relaxed);
-
-    if (cur_in == 0U) {
+    PacketPtr reading_packet(&ring_->data_[out & ring_->mask()]);
+    if (!reading_packet->submitted) {
       return nullptr;
     }
+    reading_packet_ = reading_packet;
+    *out_size = reading_packet_->size;
+    return &reading_packet_->data[0];
 
-    size_t const total_size = cur_in;
-    return &ring_->data_[0];
+    //    // The current block has been read, "write" has reached the next
+    //    block const auto cur_block_start = in & ~ring_->mask();
+    //    // Move the read index, which can make room for the write
+    //    ring_->cons_head_.store(cur_block_start, std::memory_order_relaxed);
+
+    //    if (cur_in == 0U) {
+    //      return nullptr;
+    //    }
   }
 
   /**
@@ -201,16 +194,23 @@ class Consumer {
    * returned by the TryReadOnePacket function.
    *
    */
-  void ReleasePacket(size_t size) {
-    auto out = ring_->cons_head_.load(std::memory_order_relaxed);
+  void ReleasePacket() {
+    auto size = reading_packet_->size + sizeof(Packet);
+    const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
+    const auto last = ring_->prod_last_.load(std::memory_order_relaxed);
     const auto cur_out = out & ring_->mask();
     std::memset(&ring_->data_[cur_out], 0, size);
-    ring_->cons_head_.store(out + size, std::memory_order_release);
+    if (out + size == last) {
+      ring_->cons_head_.store(ring_->next_buffer(out),
+                              std::memory_order_release);
+    } else {
+      ring_->cons_head_.store(out + size, std::memory_order_release);
+    }
   }
 
  private:
   Umq *ring_;
-  Packet *reading_packet_{nullptr};
+  PacketPtr reading_packet_{nullptr};
 };
 }  // namespace umq
 }  // namespace ulog
