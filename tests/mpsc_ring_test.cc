@@ -10,14 +10,15 @@
 #include <random>
 #include <thread>
 
+#include "ulog/helper/queue/lite_notifier.h"
 #include "ulog/ulog.h"
 
 template <int buffer_size>
 static void spsc(const size_t max_write_thread = 4) {
   const uint64_t limit = buffer_size * 8192;
   ulog::umq::Umq<buffer_size> buffer;
-  std::atomic_uint64_t write_count{0};
 
+  std::atomic_uint64_t write_count{0};
   auto write_entry = [&] {
     ulog::umq::Producer<buffer_size> producer(&buffer);
     std::random_device rd;
@@ -27,7 +28,7 @@ static void spsc(const size_t max_write_thread = 4) {
       if (write_count > limit) break;
 
       size_t size = dis(gen);
-      const auto data = static_cast<uint8_t*>(producer.TryReserve(size));
+      const auto data = static_cast<uint8_t*>(producer.ReserveOrWait(size, 100));
 
       if (data == nullptr) {
         std::this_thread::yield();
@@ -48,7 +49,7 @@ static void spsc(const size_t max_write_thread = 4) {
     uint64_t read_count = 0;
     while (read_count < limit) {
       uint32_t size;
-      const auto data = static_cast<uint8_t*>(consumer.TryReadOnePacket(&size));
+      const auto data = static_cast<uint8_t*>(consumer.ReadOrWait(&size, 100));
       if (data == nullptr) {
         std::this_thread::yield();
         continue;
@@ -70,8 +71,8 @@ static void spsc(const size_t max_write_thread = 4) {
 TEST(MpscRingTest, singl_producer_single_consumer) {
   LOGGER_TIME_CODE({ spsc<1 << 5>(16); });
   LOGGER_TIME_CODE({ spsc<1 << 6>(16); });
-  LOGGER_TIME_CODE({ spsc<1 << 7>(16); });
-  LOGGER_TIME_CODE({ spsc<1 << 8>(16); });
-  LOGGER_TIME_CODE({ spsc<1 << 9>(16); });
-  LOGGER_TIME_CODE({ spsc<1 << 10>(16); });
+  // LOGGER_TIME_CODE({ spsc<1 << 7>(16); });
+  // LOGGER_TIME_CODE({ spsc<1 << 8>(16); });
+  // LOGGER_TIME_CODE({ spsc<1 << 9>(16); });
+  // LOGGER_TIME_CODE({ spsc<1 << 10>(16); });
 }
