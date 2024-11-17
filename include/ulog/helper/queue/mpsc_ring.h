@@ -35,10 +35,20 @@ template <int buffer_size>
 class Consumer;
 
 struct Packet {
+  static constexpr size_t kSizeMask = (1 << 30) - 1;
+  static constexpr size_t kMaxDataSize = kSizeMask;
+
+  void set_size(const uint32_t size) { attr.store(size, std::memory_order_relaxed); }
+  uint32_t size() const { return attr.load(std::memory_order_relaxed) & kSizeMask; }
+
+  void mark_discarded() { attr.fetch_or(1 << 30, std::memory_order_release); }
+  bool discarded() const { return attr.load(std::memory_order_relaxed) & (1 << 30); }
+
+  void mark_submitted() { attr.fetch_or(1 << 31, std::memory_order_release); }
+  bool submitted() const { return attr.load(std::memory_order_relaxed) & (1 << 31); }
+
   uint32_t magic;
-  uint32_t data_size : 30;
-  uint32_t discarded : 1;
-  uint32_t submitted : 1;
+  std::atomic_uint32_t attr;
   uint8_t data[0];
 } __attribute__((aligned(8)));
 
@@ -89,9 +99,6 @@ class Umq {
     const auto cur_last = last & mask();
     const auto cur_out = out & mask();
 
-    // |ff|c4|bb|ff|c4|bb|
-    //  ^in        ^out
-    //               ^last
     printf("in: %zd(%zd), last: %zd(%zd), out: %zd(%zd)\n", in, cur_in, last, cur_last, out, cur_out);
     for (size_t i = 0; i < buffer_size; i++) {
       printf("|%02x", data_[i]);
@@ -133,50 +140,62 @@ class Producer {
   /**
    * Try to reserve space of size size
    * @param size size of space to reserve
+   * @param retry_times The number of retries when competing with other producers
    * @return data pointer if successful, otherwise nullptr
    */
-  void *TryReserve(size_t size) {
-    const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
-    const auto in = ring_->prod_tail_.load(std::memory_order_relaxed);
-
+  void *TryReserve(const size_t size, size_t retry_times = 128) {
     const auto packet_size = sizeof(Packet) + align8(size);
-    const auto pos = in + packet_size;
 
-    // Not enough space
-    if (pos - out > ring_->size()) {
-      return nullptr;
-    }
+    auto in = ring_->prod_tail_.load(std::memory_order_relaxed);
+    do {
+      const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
+      const auto pos = in + packet_size;
 
-    const auto relate_pos = pos & ring_->mask();
-    // Both new position and write_index are in the same range
-    // 0--_____________________________0--_____________________________
-    //    ^in               ^new
-    // OR
-    // 0--_____________________________0--_____________________________
-    //    ^in                          ^new
-    if (relate_pos >= packet_size || relate_pos == 0) {
-      pending_packet_ = &ring_->data_[in & ring_->mask()];
-      ring_->prod_tail_.store(pos, std::memory_order_relaxed);
-
-      // Whenever we wrap around, we update the last variable to ensure logical
-      // consistency.
-      if (relate_pos == 0) {
-        ring_->prod_last_.store(pos, std::memory_order_release);
+      // Not enough space
+      if (pos - out > ring_->size()) {
+        return nullptr;
       }
-    } else if ((out & ring_->mask()) >= packet_size) {
-      // new_pos is in the next block
-      // 0__________------------------___0__________------------------___
-      //            ^out              ^in
-      // packet: ------
-      pending_packet_ = &ring_->data_[0];
-      ring_->prod_tail_.store(ring_->next_buffer(in) + packet_size, std::memory_order_relaxed);
-      ring_->prod_last_.store(in, std::memory_order_release);
-    } else {
+
+      const auto relate_pos = pos & ring_->mask();
+      // Both new position and write_index are in the same range
+      // 0--_____________________________0--_____________________________
+      //    ^in               ^new
+      // OR
+      // 0--_____________________________0--_____________________________
+      //    ^in                          ^new
+      if (relate_pos >= packet_size || relate_pos == 0) {
+        if (!ring_->prod_tail_.compare_exchange_weak(in, pos, std::memory_order_release)) {
+          continue;
+        }
+
+        // Whenever we wrap around, we update the last variable to ensure logical
+        // consistency.
+        if (relate_pos == 0) {
+          ring_->prod_last_.store(pos, std::memory_order_release);
+        }
+        pending_packet_ = &ring_->data_[in & ring_->mask()];
+        break;
+      }
+
+      if ((out & ring_->mask()) >= packet_size) {
+        // new_pos is in the next block
+        // 0__________------------------___0__________------------------___
+        //            ^out              ^in
+        // packet: ------
+        if (!ring_->prod_tail_.compare_exchange_weak(in, ring_->next_buffer(in) + packet_size,
+                                                     std::memory_order_relaxed)) {
+          continue;
+        }
+        ring_->prod_last_.store(in, std::memory_order_release);
+        pending_packet_ = &ring_->data_[0];
+        break;
+      }
       // Neither the end of the current range nor the head of the next range is enough
       return nullptr;
-    }
+    } while (retry_times--);
+
     pending_packet_->magic = 0xefbeefbe;
-    pending_packet_->data_size = size;
+    pending_packet_->set_size(size);
     return &pending_packet_->data[0];
   }
 
@@ -185,7 +204,7 @@ class Producer {
    */
   void Commit() {
     if (pending_packet_) {
-      pending_packet_->submitted = true;
+      pending_packet_->mark_submitted();
       pending_packet_ = nullptr;
     }
   }
@@ -272,7 +291,7 @@ class Consumer {
     const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
     const auto last = ring_->prod_last_.load(std::memory_order_relaxed);
 
-    const auto packet_size = sizeof(Packet) + align8(reading_packet->data_size);
+    const auto packet_size = sizeof(Packet) + align8(reading_packet->size());
     std::memset(reading_packet.get(), 0, packet_size);
 
     if (out + packet_size == last) {
@@ -284,17 +303,17 @@ class Consumer {
 
   void *CheckPacket(void *ptr, uint32_t *out_size) {
     const PacketPtr reading_packet(ptr);
-    if (reading_packet->discarded) {
+    if (reading_packet->discarded()) {
       ReleasePacket(reading_packet);
       return nullptr;
     }
 
-    if (!reading_packet->submitted) {
+    if (!reading_packet->submitted()) {
       return nullptr;
     }
 
     reading_packet_ = reading_packet;
-    *out_size = reading_packet_->data_size;
+    *out_size = reading_packet_->size();
     return &reading_packet_->data[0];
   }
 

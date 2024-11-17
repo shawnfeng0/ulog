@@ -13,28 +13,35 @@
 #include "ulog/ulog.h"
 
 template <int buffer_size>
-static void spsc() {
+static void spsc(const size_t max_write_thread = 4) {
   const uint64_t limit = buffer_size * 8192;
   ulog::umq::Umq<buffer_size> buffer;
+  std::atomic_uint64_t write_count{0};
 
-  std::thread write_thread{[&] {
+  auto write_entry = [&] {
     ulog::umq::Producer<buffer_size> producer(&buffer);
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<uint32_t> dis(
-        1, std::max<uint32_t>(buffer_size / 10, 2));
-    uint64_t write_count = 0;
-    while (write_count < limit) {
+    std::uniform_int_distribution<uint32_t> dis(1, std::max<uint32_t>(buffer_size / 100, 2));
+    while (true) {
+      if (write_count > limit) break;
+
       size_t size = dis(gen);
-      auto data = static_cast<uint8_t*>(producer.TryReserve(size));
+      const auto data = static_cast<uint8_t*>(producer.TryReserve(size));
+
       if (data == nullptr) {
         std::this_thread::yield();
         continue;
       }
-      for (size_t i = 0; i < size; ++i) data[i] = (write_count++) & 0xff;
+
+      write_count += size;
+      for (size_t i = 0; i < size; ++i) data[i] = reinterpret_cast<uint64_t>(data - i) & 0xff;
       producer.Commit();
     }
-  }};
+  };
+
+  std::vector<std::thread> write_thread;
+  for (size_t i = 0; i < max_write_thread; ++i) write_thread.emplace_back(write_entry);
 
   std::thread read_thread{[&] {
     ulog::umq::Consumer<buffer_size> consumer(&buffer);
@@ -46,28 +53,25 @@ static void spsc() {
         std::this_thread::yield();
         continue;
       }
+
+      read_count += size;
       for (size_t i = 0; i < size; ++i) {
-        const auto count = (read_count++) & 0xff;
-        ASSERT_EQ(data[i], count);
-        // if (data[i] != count) {
-        //   printf("data: 0x%x, count: 0x%x\n", data[i], count);
-        //   consumer.Debug();
-        // }
+        ASSERT_EQ(data[i], reinterpret_cast<uint64_t>(data - i) & 0xff);
       }
       consumer.ReleasePacket();
     }
   }};
 
-  write_thread.join();
+  for (auto& t : write_thread) t.join();
   read_thread.join();
   printf("Finished test: buffer_size: %u, limit: %" PRIu64 "\n", buffer_size, limit);
 }
 
 TEST(MpscRingTest, singl_producer_single_consumer) {
-  LOGGER_TIME_CODE({ spsc<1 << 5>(); });
-  LOGGER_TIME_CODE({ spsc<1 << 6>(); });
-  LOGGER_TIME_CODE({ spsc<1 << 7>(); });
-  LOGGER_TIME_CODE({ spsc<1 << 8>(); });
-  LOGGER_TIME_CODE({ spsc<1 << 9>(); });
-  LOGGER_TIME_CODE({ spsc<1 << 10>(); });
+  LOGGER_TIME_CODE({ spsc<1 << 5>(16); });
+  LOGGER_TIME_CODE({ spsc<1 << 6>(16); });
+  LOGGER_TIME_CODE({ spsc<1 << 7>(16); });
+  LOGGER_TIME_CODE({ spsc<1 << 8>(16); });
+  LOGGER_TIME_CODE({ spsc<1 << 9>(16); });
+  LOGGER_TIME_CODE({ spsc<1 << 10>(16); });
 }

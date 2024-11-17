@@ -2,9 +2,6 @@
 
 #include <atomic>
 #include <cstddef>
-#include <cstdlib>
-#include <exception>
-#include <stdexcept>
 #include <vector>
 
 namespace ulog {
@@ -18,11 +15,11 @@ class BipBuffer {
   ~BipBuffer() = default;
 
   /**
-   * Try to reserve space of size size
+   * Try to reserve space of size
    * @param size size of space to reserve
    * @return data pointer if successful, otherwise nullptr
    */
-  T* TryReserve(size_t size) {
+  T* TryReserve(const size_t size) {
     const auto out = out_.load(std::memory_order_acquire);
     const auto in = in_.load(std::memory_order_relaxed);
 
@@ -32,11 +29,10 @@ class BipBuffer {
       if (in + size < out) {
         wrapped_ = false;
         return &buffer_[in];
-      } else {
-        return nullptr;
       }
-
-    } else if (in + size <= buffer_.size()) {
+      return nullptr;
+    }
+    if (in + size <= buffer_.size()) {
       // Check trailing space first
       // |__________|*************|______size______|
       // ^0         ^read         ^write           ^size
@@ -45,17 +41,15 @@ class BipBuffer {
       // ^0         ^read/write                    ^size
       wrapped_ = false;
       return &buffer_[in];
-
-    } else if (out > size) {
+    }
+    if (out > size) {
       // Check leading space
       // |______size______|*************|__________|
       // ^0               ^read         ^write     ^size
       wrapped_ = true;
       return &buffer_[0];
-
-    } else {
-      return nullptr;
     }
+    return nullptr;
   }
 
   /**
@@ -66,7 +60,7 @@ class BipBuffer {
    * The validity of the size is not checked, it needs to be within the range
    * returned by the TryReserve function.
    */
-  void Commit(size_t size) {
+  void Commit(const size_t size) {
     // only written from push thread
     const auto in = in_.load(std::memory_order_relaxed);
     const auto last = last_.load(std::memory_order_relaxed);
@@ -97,7 +91,7 @@ class BipBuffer {
       out_.store(out, std::memory_order_release);
     }
 
-    auto out_limit = out <= in ? in : last;
+    const auto out_limit = out <= in ? in : last;
     *size = out_limit - out;
 
     return (*size == 0) ? nullptr : &buffer_[out];
@@ -113,7 +107,7 @@ class BipBuffer {
    * returned by the TryRead function.
    *
    */
-  void Release(size_t size) { out_.fetch_add(size, std::memory_order_acq_rel); }
+  void Release(const size_t size) { out_.fetch_add(size, std::memory_order_acq_rel); }
 
  private:
   std::vector<T> buffer_;
