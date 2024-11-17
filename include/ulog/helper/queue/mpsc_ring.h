@@ -1,15 +1,17 @@
 #pragma once
 
-#include <inttypes.h>
 #include <unistd.h>
 
 #include <atomic>
+#include <cinttypes>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+
+#include "lite_notifier.h"
 
 // The basic principle of circular queue implementation:
 // A - B is the position of A relative to B
@@ -128,6 +130,9 @@ class Umq {
 
   std::atomic<size_t> prod_tail_;
   std::atomic<size_t> prod_last_;
+
+  LiteNotifier prod_notifier_;
+  LiteNotifier cons_notifier_;
 };
 
 template <int buffer_size>
@@ -138,12 +143,24 @@ class Producer {
   ~Producer() = default;
 
   /**
-   * Try to reserve space of size size
+   * Reserve space of size, automatically retry until timeout
    * @param size size of space to reserve
-   * @param retry_times The number of retries when competing with other producers
+   * @param timeout_ms The maximum waiting time if there is insufficient space in the queue
    * @return data pointer if successful, otherwise nullptr
    */
-  void *TryReserve(const size_t size, size_t retry_times = 128) {
+  void *ReserveOrWait(const size_t size, const uint32_t timeout_ms) {
+    void *ptr;
+    ring_->cons_notifier_.wait_for(std::chrono::milliseconds(timeout_ms),
+                                   [&] { return (ptr = Reserve(size)) != nullptr; });
+    return ptr;
+  }
+
+  /**
+   * Try to reserve space of size
+   * @param size size of space to reserve
+   * @return data pointer if successful, otherwise nullptr
+   */
+  void *Reserve(const size_t size) {
     const auto packet_size = sizeof(Packet) + align8(size);
 
     auto in = ring_->prod_tail_.load(std::memory_order_relaxed);
@@ -192,7 +209,7 @@ class Producer {
       }
       // Neither the end of the current range nor the head of the next range is enough
       return nullptr;
-    } while (retry_times--);
+    } while (true);
 
     pending_packet_->magic = 0xefbeefbe;
     pending_packet_->set_size(size);
@@ -203,10 +220,11 @@ class Producer {
    * Commits the data to the buffer, so that it can be read out.
    */
   void Commit() {
-    if (pending_packet_) {
-      pending_packet_->mark_submitted();
-      pending_packet_ = nullptr;
-    }
+    if (!pending_packet_) return;
+
+    pending_packet_->mark_submitted();
+    pending_packet_ = nullptr;
+    ring_->prod_notifier_.notify_when_blocking();
   }
 
  private:
@@ -223,8 +241,21 @@ class Consumer {
   void Debug() { ring_->Debug(); }
 
   /**
-   * Gets a pointer to the contiguous block in the buffer, and returns the size
-   * of that block.
+   * Gets a pointer to the contiguous block in the buffer, and returns the size of that block. automatically retry until
+   * timeout
+   * @param out_size returns the size of the contiguous block
+   * @param timeout_ms The maximum waiting time
+   * @return pointer to the contiguous block
+   */
+  void *ReadOrWait(uint32_t *out_size, const uint32_t timeout_ms) {
+    void *ptr;
+    ring_->prod_notifier_.wait_for(std::chrono::milliseconds(timeout_ms),
+                                   [&] { return (ptr = TryReadOnePacket(out_size)) != nullptr; });
+    return ptr;
+  }
+
+  /**
+   * Gets a pointer to the contiguous block in the buffer, and returns the size of that block.
    * @param out_size returns the size of the contiguous block
    * @return pointer to the contiguous block
    */
@@ -282,7 +313,6 @@ class Consumer {
    *
    * The validity of the size is not checked, it needs to be within the range
    * returned by the TryReadOnePacket function.
-   *
    */
   void ReleasePacket() { ReleasePacket(reading_packet_); }
 
@@ -299,6 +329,7 @@ class Consumer {
     } else {
       ring_->cons_head_.store(out + packet_size, std::memory_order_release);
     }
+    ring_->cons_notifier_.notify_when_blocking();
   }
 
   void *CheckPacket(void *ptr, uint32_t *out_size) {
