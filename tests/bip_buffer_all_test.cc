@@ -14,15 +14,14 @@
 
 template <typename T>
 static void spsc(uint32_t buffer_size) {
-  const uint32_t limit = buffer_size * 8192;
+  const uint64_t limit = buffer_size * 8192;
   T buffer(buffer_size);
 
   std::thread write_thread{[&] {
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<uint32_t> dis(
-        1, std::max<uint32_t>(buffer_size / 10, 2));
-    uint32_t write_count = 0;
+    std::uniform_int_distribution<uint32_t> dis(1, std::max<uint32_t>(buffer_size / 100, 2));
+    uint64_t write_count = 0;
     while (write_count < limit) {
       size_t size = dis(gen);
 
@@ -36,7 +35,7 @@ static void spsc(uint32_t buffer_size) {
   }};
 
   std::thread read_thread{[&] {
-    uint32_t read_count = 0;
+    uint64_t read_count = 0;
     while (read_count < limit) {
       size_t size;
       auto data = buffer.TryRead(&size);
@@ -53,12 +52,23 @@ static void spsc(uint32_t buffer_size) {
 
   write_thread.join();
   read_thread.join();
-  printf("Finished test: buffer_size: %u, limit: %u\n", buffer_size, limit);
+  printf("Finished test: buffer_size: %u, limit: %" PRIu64 "\n", buffer_size, limit);
 }
 
 TEST(BipBufferTestSingle, singl_producer_single_consumer) {
-  for (uint32_t i = 4; i < 10; ++i) {
-    LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << i); });
-    LOGGER_TIME_CODE({ spsc<ulog::BipBuffer2<uint32_t>>(1 << i); });
-  }
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 4); });
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 5); });
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 6); });
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 7); });
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 8); });
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 9); });
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 10); });
+
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer2<uint32_t>>(1 << 4); });
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer2<uint32_t>>(1 << 5); });
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer2<uint32_t>>(1 << 6); });
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer2<uint32_t>>(1 << 7); });
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer2<uint32_t>>(1 << 8); });
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer2<uint32_t>>(1 << 9); });
+  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer2<uint32_t>>(1 << 10); });
 }

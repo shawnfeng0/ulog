@@ -2,9 +2,6 @@
 
 #include <atomic>
 #include <cstddef>
-#include <cstdlib>
-#include <exception>
-#include <stdexcept>
 #include <vector>
 
 #include "power_of_two.h"
@@ -66,7 +63,7 @@ class BipBuffer2 {
    * The validity of the size is not checked, it needs to be within the range
    * returned by the TryReserve function.
    */
-  void Commit(size_t size) {
+  void Commit(const size_t size) {
     // only written from push thread
     const auto in = in_.load(std::memory_order_relaxed);
 
@@ -137,17 +134,17 @@ class BipBuffer2 {
    * returned by the TryRead function.
    *
    */
-  void Release(size_t size) {
-    auto out = out_.load(std::memory_order_relaxed);
+  void Release(const size_t size) {
+    const auto out = out_.load(std::memory_order_relaxed);
     out_.store(out + size, std::memory_order_release);
   }
 
  private:
   size_t size() const { return buffer_.size(); }
 
-  inline size_t mask() const { return mask_; }
+  size_t mask() const { return mask_; }
 
-  size_t inline next_buffer(size_t index) const {
+  size_t next_buffer(const size_t index) const {
     return (index & ~mask()) + size();
   }
 
