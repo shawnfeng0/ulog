@@ -324,7 +324,7 @@ void logger_log_with_header(struct ulog_s *logger, enum ulog_level_e level,
       &log_buffer, "%s",
       logger_check_format(logger, ULOG_F_COLOR) ? ULOG_STR_RESET : "");
 
-  if (newline) logger_snprintf(&log_buffer, "\r\n");
+  if (newline) logger_snprintf(&log_buffer, "\n");
 
   if (flush) {
     logger_flush(logger, &log_buffer);
