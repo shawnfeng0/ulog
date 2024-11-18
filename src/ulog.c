@@ -200,7 +200,7 @@ uintptr_t logger_hex_dump(struct ulog_s *logger, const void *data,
     for (size_t i = 0; i < width && i < length; i++)
       logger_snprintf(&log_buffer, "%c",
                       isprint(data_cur[i]) ? data_cur[i] : '.');
-    logger_snprintf(&log_buffer, "|\r\n");
+    logger_snprintf(&log_buffer, "|\n");
 
     // The output fails, in order to avoid output confusion, the rest will not
     // be output
@@ -214,9 +214,9 @@ uintptr_t logger_hex_dump(struct ulog_s *logger, const void *data,
   }
 
   if (out_break) {
-    logger_snprintf(&log_buffer, "hex dump is break!\r\n");
+    logger_snprintf(&log_buffer, "hex dump is break!\n");
   } else if (tail_addr_out) {
-    logger_snprintf(&log_buffer, "%08" PRIxPTR "\r\n",
+    logger_snprintf(&log_buffer, "%08" PRIxPTR "\n",
                     data_cur - data_raw + base_address);
   }
   logger_flush(logger, &log_buffer);
@@ -324,7 +324,7 @@ void logger_log_with_header(struct ulog_s *logger, enum ulog_level_e level,
       &log_buffer, "%s",
       logger_check_format(logger, ULOG_F_COLOR) ? ULOG_STR_RESET : "");
 
-  if (newline) logger_snprintf(&log_buffer, "\r\n");
+  if (newline) logger_snprintf(&log_buffer, "\n");
 
   if (flush) {
     logger_flush(logger, &log_buffer);

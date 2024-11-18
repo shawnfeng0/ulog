@@ -7,8 +7,28 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.5.0...HEAD
 
+## [0.5.0] - 2024-11-20
+
+[0.5.0]: https://github.com/ShawnFeng0/ulog/compare/v0.4.2...v0.5.0
+
+### Added
+
+### Changed
+
+* Delete log lock function
+* flush: Automatically execute flush only when logging at FATAL level
+* Format modification uses a unified function: logger_check_format/logger_format_disable/logger_format_enable
+* Remove the stdout function for file storage
+* CI: Change the CI provider from travis-ci to github workflows 
+* Use "\n" instead of "\r\n" for line breaks
+* format: Level and debug information are separated by " " instead of "/"
+
+### Fixed
+
+* remove() does not need to be executed when file is rotated
+ 
 ## [0.4.2] - 2023-02-09
 
 [0.4.2]: https://github.com/ShawnFeng0/ulog/compare/v0.4.1...v0.4.2
