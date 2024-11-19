@@ -1,3 +1,5 @@
+add_subdirectory(benchmarks)
+
 # ulog build test
 add_executable(ulog_test ulog_test.c)
 target_link_libraries(ulog_test ulog)
