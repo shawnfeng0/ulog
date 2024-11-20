@@ -28,6 +28,13 @@ static void mpsc(const size_t max_write_thread, const size_t publish_count) {
       if (data == nullptr) {
         continue;
       }
+      constexpr uint8_t data_source[] =
+          "asdfqwerasdfqwerasdfqwerasdfqweasdfqwerasdfqwerasdfqweasdfqwerasdfqwerasdfqweasdfqwerasdfqwerasdfqweasdfqwer"
+          "as"
+          "dfqwerasdfqweasdfqwerasdfqwerasdfqweasdfqwerasdfqwerasdfqweasdfqwerasdfqwerasdfqweasdfqwerasdfqwerasdfqwerrr"
+          "rr"
+          "sdfeeraerasdfqwersdfqwerrerasdfqwer";
+      memcpy(data, data_source, size);
       producer.Commit();
     }
   };
@@ -40,7 +47,7 @@ static void mpsc(const size_t max_write_thread, const size_t publish_count) {
     uint64_t total_num = 0;
     uint32_t size;
     while (consumer.ReadOrWait(&size, 500)) {
-      total_num += 1;
+      total_num += size;
       consumer.ReleasePacket();
     }
     LOGGER_MULTI_TOKEN(buffer_size, total_num);
@@ -75,9 +82,9 @@ static void fifo_mpsc(const size_t max_write_thread, const size_t publish_count)
 
   std::thread{[=] {
     uint64_t total_num = 0;
-    uint8_t data_recv[10 * 1024];
-    while (buffer->OutputWaitIfEmpty(data_recv, sizeof(data_recv), 500)) {
-      total_num += 1;
+    uint8_t data_recv[100 * 1024];
+    while (auto size = buffer->OutputWaitIfEmpty(data_recv, sizeof(data_recv), 500)) {
+      total_num += size;
     }
     LOGGER_MULTI_TOKEN(buffer_size, total_num);
   }}.detach();
@@ -86,7 +93,7 @@ static void fifo_mpsc(const size_t max_write_thread, const size_t publish_count)
 }
 
 int main() {
-  // LOGGER_TIME_CODE({ mpsc<64 * 1024>(128, 10 * 1024); });
-  LOGGER_TIME_CODE({ fifo_mpsc<64 * 1024>(128, 10 * 1024); });
+  LOGGER_TIME_CODE({ mpsc<64 * 1024>(32, 10 * 1024); });
+  // LOGGER_TIME_CODE({ fifo_mpsc<64 * 1024>(32, 10 * 1024); });
   pthread_exit(nullptr);
 }
