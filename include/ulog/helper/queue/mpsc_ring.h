@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ulog/ulog.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -10,6 +11,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <string>
+#include <thread>
 
 #include "lite_notifier.h"
 
@@ -77,7 +80,7 @@ class Umq {
   friend class Consumer<buffer_size>;
 
  public:
-  explicit Umq(/*size_t num_elements*/) : cons_head_(0), prod_tail_(0), prod_last_(0) {
+  explicit Umq(/*size_t num_elements*/) : cons_head_(0), prod_head_(0), prod_last_(0) {
     // if (num_elements < 2) {
     // num_elements = 2;
     // } else {
@@ -93,25 +96,35 @@ class Umq {
   ~Umq() = default;
 
   void Debug() {
-    const auto in = prod_tail_.load(std::memory_order_acquire);
-    const auto last = prod_last_.load(std::memory_order_relaxed);
-    const auto out = cons_head_.load(std::memory_order_relaxed);
+    const auto prod_head = prod_head_.load(std::memory_order_acquire);
+    const auto prod_tail = prod_tail_.load(std::memory_order_acquire);
+    const auto prod_last = prod_last_.load(std::memory_order_relaxed);
+    const auto cons_head = cons_head_.load(std::memory_order_relaxed);
 
-    const auto cur_in = in & mask();
-    const auto cur_last = last & mask();
-    const auto cur_out = out & mask();
+    const auto cur_p_head = prod_head & mask();
+    const auto cur_p_tail = prod_tail & mask();
+    const auto cur_p_last = prod_last & mask();
+    const auto cur_c_head = cons_head & mask();
 
-    printf("in: %zd(%zd), last: %zd(%zd), out: %zd(%zd)\n", in, cur_in, last, cur_last, out, cur_out);
+    printf("prod_head: %zd(%zd), prod_tail: %zd(%zd), prod_last: %zd(%zd), cons_head: %zd(%zd)\n", prod_head,
+           cur_p_head, prod_tail, cur_p_tail, prod_last, cur_p_last, cons_head, cur_c_head);
+
     for (size_t i = 0; i < buffer_size; i++) {
       printf("|%02x", data_[i]);
     }
     printf("|\n");
 
-    for (size_t i = 0; i < buffer_size; i++) printf("%s", i == cur_in ? "^in" : "   ");
+    for (size_t i = 0; i < buffer_size; i++)
+      printf("%s", i == cur_p_head ? ("^prod_head:" + std::to_string(prod_head)).c_str() : "   ");
     printf("\n");
-    for (size_t i = 0; i < buffer_size; i++) printf("%s", i == cur_last ? "^last" : "   ");
+    for (size_t i = 0; i < buffer_size; i++)
+      printf("%s", i == cur_p_head ? ("^prod_tail:" + std::to_string(prod_tail)).c_str() : "   ");
     printf("\n");
-    for (size_t i = 0; i < buffer_size; i++) printf("%s", i == cur_out ? "^out" : "   ");
+    for (size_t i = 0; i < buffer_size; i++)
+      printf("%s", i == cur_p_last ? ("^prod_last:" + std::to_string(prod_last)).c_str() : "   ");
+    printf("\n");
+    for (size_t i = 0; i < buffer_size; i++)
+      printf("%s", i == cur_c_head ? ("^cons_head:" + std::to_string(cons_head)).c_str() : "   ");
     printf("\n");
   }
 
@@ -123,12 +136,13 @@ class Umq {
   size_t next_buffer(const size_t index) const { return (index & ~mask()) + size(); }
 
   // std::unique_ptr<uint8_t[]> data_;  // the buffer holding the data
-  uint8_t data_[buffer_size];  // the buffer holding the data
+  uint8_t data_[buffer_size]{};  // the buffer holding the data
   size_t mask_ = buffer_size - 1;
 
   std::atomic<size_t> cons_head_;
 
-  std::atomic<size_t> prod_tail_;
+  std::atomic<size_t> prod_tail_{};
+  std::atomic<size_t> prod_head_;
   std::atomic<size_t> prod_last_;
 
   LiteNotifier prod_notifier_;
@@ -163,17 +177,17 @@ class Producer {
   void *Reserve(const size_t size) {
     const auto packet_size = sizeof(Packet) + align8(size);
 
-    auto in = ring_->prod_tail_.load(std::memory_order_relaxed);
+    head_ = ring_->prod_head_.load(std::memory_order_relaxed);
     do {
-      const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
-      const auto pos = in + packet_size;
+      const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
+      next_ = head_ + packet_size;
 
       // Not enough space
-      if (pos - out > ring_->size()) {
+      if (next_ - cons_head > ring_->size()) {
         return nullptr;
       }
 
-      const auto relate_pos = pos & ring_->mask();
+      const auto relate_pos = next_ & ring_->mask();
       // Both new position and write_index are in the same range
       // 0--_____________________________0--_____________________________
       //    ^in               ^new
@@ -181,29 +195,29 @@ class Producer {
       // 0--_____________________________0--_____________________________
       //    ^in                          ^new
       if (relate_pos >= packet_size || relate_pos == 0) {
-        if (!ring_->prod_tail_.compare_exchange_weak(in, pos, std::memory_order_release)) {
+        if (!ring_->prod_head_.compare_exchange_weak(head_, next_, std::memory_order_release)) {
           continue;
         }
 
         // Whenever we wrap around, we update the last variable to ensure logical
         // consistency.
         if (relate_pos == 0) {
-          ring_->prod_last_.store(pos, std::memory_order_release);
+          ring_->prod_last_.store(next_, std::memory_order_release);
         }
-        pending_packet_ = &ring_->data_[in & ring_->mask()];
+        pending_packet_ = &ring_->data_[head_ & ring_->mask()];
         break;
       }
 
-      if ((out & ring_->mask()) >= packet_size) {
+      if ((cons_head & ring_->mask()) >= packet_size) {
         // new_pos is in the next block
         // 0__________------------------___0__________------------------___
         //            ^out              ^in
         // packet: ------
-        if (!ring_->prod_tail_.compare_exchange_weak(in, ring_->next_buffer(in) + packet_size,
-                                                     std::memory_order_relaxed)) {
+        next_ = ring_->next_buffer(head_) + packet_size;
+        if (!ring_->prod_head_.compare_exchange_weak(head_, next_, std::memory_order_relaxed)) {
           continue;
         }
-        ring_->prod_last_.store(in, std::memory_order_release);
+        ring_->prod_last_.store(head_, std::memory_order_release);
         pending_packet_ = &ring_->data_[0];
         break;
       }
@@ -221,15 +235,28 @@ class Producer {
    */
   void Commit() {
     if (!pending_packet_) return;
-
     pending_packet_->mark_submitted();
     pending_packet_ = nullptr;
+
+    // Try to commit the data, if the commit fails, yield the CPU to other producer and try again
+    int retry = 256;
+    while (ring_->prod_tail_.load(std::memory_order_relaxed) != head_) {
+      std::this_thread::yield();
+    }
+
+    // Retry failed, wait for other producers commit
+    ring_->prod_notifier_.wait([&] { return ring_->prod_tail_.load(std::memory_order_relaxed) == head_; });
+    ring_->prod_tail_.store(next_, std::memory_order_release);
+
+    // Notify the consumer that there is data to read or the producer has committed
     ring_->prod_notifier_.notify_when_blocking();
   }
 
  private:
   Umq<buffer_size> *ring_;
   PacketPtr pending_packet_{nullptr};
+  decltype(ring_->prod_head_.load()) head_;
+  decltype(ring_->prod_head_.load()) next_;
 };
 
 template <int buffer_size>
@@ -250,7 +277,7 @@ class Consumer {
   void *ReadOrWait(uint32_t *out_size, const uint32_t timeout_ms) {
     void *ptr;
     ring_->prod_notifier_.wait_for(std::chrono::milliseconds(timeout_ms),
-                                   [&] { return (ptr = TryReadOnePacket(out_size)) != nullptr; });
+                                   [&] { return (ptr = TryRead(out_size)) != nullptr; });
     return ptr;
   }
 
@@ -259,53 +286,48 @@ class Consumer {
    * @param out_size returns the size of the contiguous block
    * @return pointer to the contiguous block
    */
-  void *TryReadOnePacket(uint32_t *out_size) {
-    const auto in = ring_->prod_tail_.load(std::memory_order_acquire);
-    const auto last = ring_->prod_last_.load(std::memory_order_relaxed);
-    const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
+  void *TryRead(uint32_t *out_size) {
+    const auto prod_tail = ring_->prod_tail_.load(std::memory_order_acquire);
+    const auto prod_last = ring_->prod_last_.load(std::memory_order_relaxed);
+    const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
 
     // no data
-    if (out == in) {
+    if (cons_head == prod_tail) {
       return nullptr;
     }
 
-    const auto cur_in = in & ring_->mask();
-    const auto cur_out = out & ring_->mask();
+    const auto cur_prod_tail = prod_tail & ring_->mask();
+    const auto cur_cons_head = cons_head & ring_->mask();
 
     // read and write are still in the same block
     // 0__________------------------___0__________------------------___
-    //            ^cur_out          ^cur_in
-    if (cur_out < cur_in) {
-      return CheckPacket(&ring_->data_[cur_out], out_size);
+    //            ^cons_head        ^prod_tail
+    if (cur_cons_head < cur_prod_tail) {
+      *out_size = cur_size_ = cur_prod_tail - cur_cons_head;
+      return &ring_->data_[cur_cons_head];
     }
 
     // read and write are in different blocks, read the current remaining data
     // 0---_______________skip-skip-ski0---_______________skip-skip-ski
-    //     ^cur_in        ^out             ^in
-    //                    ^last
-    // OR
-    // 0-------------------------------0-------------------------------
-    // ^out                            ^in
-    // ^last
-    if (out == last && cur_out != 0) {
+    //     ^prod_tail     ^cons_head       ^prod_tail
+    //                    ^prod_last
+    if (cons_head == prod_last && cur_cons_head != 0) {
       // The current block has been read, "write" has reached the next block
       // Move the read index, which can make room for the writer
-      ring_->cons_head_.store(ring_->next_buffer(out), std::memory_order_release);
+      ring_->cons_head_.store(ring_->next_buffer(cons_head), std::memory_order_release);
 
-      if (cur_in == 0) {  // TODO: impossible, need delete
-        // 0__________________skip-skip-ski0__________________skip-skip-ski
-        // ^cur_in            ^out         ^in
-        //                    ^last
-        printf("Maybe bug, in: %" PRIu64 "\n", in);
-        return nullptr;
-      }
-
-      return CheckPacket(&ring_->data_[0], out_size);
+      *out_size = cur_size_ = cur_prod_tail;
+      return &ring_->data_[0];
     }
+
     // 0---___------------skip-skip-ski0---___------------skip-skip-ski
     //        ^out        ^last            ^in
     //
-    return CheckPacket(&ring_->data_[cur_out], out_size);
+    // if (prod_last < cons_head) {
+    //   ring_->Debug();
+    // }
+    *out_size = cur_size_ = prod_last - cons_head;
+    return &ring_->data_[0];
   }
 
   /**
@@ -314,42 +336,14 @@ class Consumer {
    * The validity of the size is not checked, it needs to be within the range
    * returned by the TryReadOnePacket function.
    */
-  void ReleasePacket() { ReleasePacket(reading_packet_); }
-
- private:
-  void ReleasePacket(const PacketPtr &reading_packet) {
-    const auto out = ring_->cons_head_.load(std::memory_order_relaxed);
-    const auto last = ring_->prod_last_.load(std::memory_order_relaxed);
-
-    const auto packet_size = sizeof(Packet) + align8(reading_packet->size());
-    std::memset(reading_packet.get(), 0, packet_size);
-
-    if (out + packet_size == last) {
-      ring_->cons_head_.store(ring_->next_buffer(out), std::memory_order_release);
-    } else {
-      ring_->cons_head_.store(out + packet_size, std::memory_order_release);
-    }
+  void ReleasePacket() {
+    ring_->cons_head_.fetch_add(cur_size_, std::memory_order_release);
     ring_->cons_notifier_.notify_when_blocking();
   }
 
-  void *CheckPacket(void *ptr, uint32_t *out_size) {
-    const PacketPtr reading_packet(ptr);
-    if (reading_packet->discarded()) {
-      ReleasePacket(reading_packet);
-      return nullptr;
-    }
-
-    if (!reading_packet->submitted()) {
-      return nullptr;
-    }
-
-    reading_packet_ = reading_packet;
-    *out_size = reading_packet_->size();
-    return &reading_packet_->data[0];
-  }
-
+ private:
   Umq<buffer_size> *ring_;
-  PacketPtr reading_packet_{nullptr};
+  size_t cur_size_{0};
 };
 }  // namespace umq
 }  // namespace ulog
