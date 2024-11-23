@@ -20,9 +20,9 @@ class LiteNotifier {
     if (p()) return;
 
     std::unique_lock<std::mutex> lk(mtx_);
-    ++waiter_count_;
+    waiter_count_.fetch_add(1, std::memory_order_relaxed);
     cv_.wait(lk, [&] { return p(); });
-    --waiter_count_;
+    waiter_count_.fetch_sub(1, std::memory_order_relaxed);
   }
 
   template <typename Predicate>
@@ -30,14 +30,14 @@ class LiteNotifier {
     if (p()) return true;
 
     std::unique_lock<std::mutex> lk(mtx_);
-    ++waiter_count_;
+    waiter_count_.fetch_add(1, std::memory_order_relaxed);
     auto ret = cv_.wait_for(lk, timeout, [&] { return p(); });
-    --waiter_count_;
+    waiter_count_.fetch_sub(1, std::memory_order_relaxed);
     return ret;
   }
 
   void notify_when_blocking() {
-    if (waiter_count_ > 0) {
+    if (waiter_count_.load(std::memory_order_relaxed) > 0) {
       std::unique_lock<std::mutex> lk(mtx_);
       cv_.notify_all();
     }

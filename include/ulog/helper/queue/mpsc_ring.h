@@ -28,6 +28,13 @@
 // -: Positions already occupied by other producers
 // _: Positions not occupied by producers
 
+// Experience in lock-free queue design:
+// 1. When using yield() and loop calls like the disruptor, when the number of competing threads exceeds the number of
+// CPUs , using yield() may not necessarily schedule to the target thread, and there will be a serious performance
+// degradation , even worse than the traditional locking method.The use of yield() should be minimized.
+// 2. Using cache lines to fill the frequently used write_index and read_index variables can indeed increase performance
+// by about 15 %.
+
 namespace ulog {
 namespace umq {
 
@@ -58,20 +65,21 @@ struct Packet {
 } __attribute__((aligned(8)));
 
 union PacketPtr {
-  explicit PacketPtr(void *ptr) : ptr_(ptr) {}
+  explicit PacketPtr(uint8_t *ptr = nullptr) : ptr_(ptr) {}
 
-  explicit operator bool() const noexcept { return ptr_ != nullptr; }
-  auto operator->() const -> Packet * { return header; }
-
-  auto get() const -> void * { return this->ptr_; }
-  PacketPtr &operator=(void *ptr) {
+  PacketPtr &operator=(uint8_t *ptr) {
     ptr_ = ptr;
     return *this;
   }
 
+  explicit operator bool() const noexcept { return ptr_ != nullptr; }
+  auto operator->() const -> Packet * { return header; }
+  auto get() const -> uint8_t * { return this->ptr_; }
+  PacketPtr next() const { return PacketPtr(ptr_ + (sizeof(Packet) + align8(header->size()))); }
+
  private:
   Packet *header;
-  __attribute__((unused)) void *ptr_;
+  __attribute__((unused)) uint8_t *ptr_;
 };
 
 template <int buffer_size>
@@ -96,8 +104,8 @@ class Umq {
   ~Umq() = default;
 
   void Debug() {
-    const auto prod_head = prod_head_.load(std::memory_order_acquire);
-    const auto prod_tail = prod_tail_.load(std::memory_order_acquire);
+    const auto prod_head = prod_head_.load(std::memory_order_relaxed);
+    const auto prod_tail = prod_tail_.load(std::memory_order_relaxed);
     const auto prod_last = prod_last_.load(std::memory_order_relaxed);
     const auto cons_head = cons_head_.load(std::memory_order_relaxed);
 
@@ -139,12 +147,15 @@ class Umq {
   uint8_t data_[buffer_size]{};  // the buffer holding the data
   size_t mask_ = buffer_size - 1;
 
+  uint8_t pad0[64]{};  // Using cache line filling technology can improve performance by 15%
   std::atomic<size_t> cons_head_;
 
+  uint8_t pad1[64]{};
   std::atomic<size_t> prod_tail_{};
   std::atomic<size_t> prod_head_;
   std::atomic<size_t> prod_last_;
 
+  uint8_t pad2[64]{};
   LiteNotifier prod_notifier_;
   LiteNotifier cons_notifier_;
 };
@@ -162,8 +173,8 @@ class Producer {
    * @param timeout_ms The maximum waiting time if there is insufficient space in the queue
    * @return data pointer if successful, otherwise nullptr
    */
-  void *ReserveOrWait(const size_t size, const uint32_t timeout_ms) {
-    void *ptr;
+  uint8_t *ReserveOrWait(const size_t size, const uint32_t timeout_ms) {
+    uint8_t *ptr;
     ring_->cons_notifier_.wait_for(std::chrono::milliseconds(timeout_ms),
                                    [&] { return (ptr = Reserve(size)) != nullptr; });
     return ptr;
@@ -174,20 +185,20 @@ class Producer {
    * @param size size of space to reserve
    * @return data pointer if successful, otherwise nullptr
    */
-  void *Reserve(const size_t size) {
+  uint8_t *Reserve(const size_t size) {
     const auto packet_size = sizeof(Packet) + align8(size);
 
-    head_ = ring_->prod_head_.load(std::memory_order_relaxed);
+    packet_head_ = ring_->prod_head_.load(std::memory_order_relaxed);
     do {
       const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
-      next_ = head_ + packet_size;
+      packet_next_ = packet_head_ + packet_size;
 
       // Not enough space
-      if (next_ - cons_head > ring_->size()) {
+      if (packet_next_ - cons_head > ring_->size()) {
         return nullptr;
       }
 
-      const auto relate_pos = next_ & ring_->mask();
+      const auto relate_pos = packet_next_ & ring_->mask();
       // Both new position and write_index are in the same range
       // 0--_____________________________0--_____________________________
       //    ^in               ^new
@@ -195,16 +206,16 @@ class Producer {
       // 0--_____________________________0--_____________________________
       //    ^in                          ^new
       if (relate_pos >= packet_size || relate_pos == 0) {
-        if (!ring_->prod_head_.compare_exchange_weak(head_, next_, std::memory_order_release)) {
+        if (!ring_->prod_head_.compare_exchange_weak(packet_head_, packet_next_, std::memory_order_relaxed)) {
           continue;
         }
 
         // Whenever we wrap around, we update the last variable to ensure logical
         // consistency.
         if (relate_pos == 0) {
-          ring_->prod_last_.store(next_, std::memory_order_release);
+          ring_->prod_last_.store(packet_next_, std::memory_order_relaxed);
         }
-        pending_packet_ = &ring_->data_[head_ & ring_->mask()];
+        pending_packet_ = &ring_->data_[packet_head_ & ring_->mask()];
         break;
       }
 
@@ -212,12 +223,11 @@ class Producer {
         // new_pos is in the next block
         // 0__________------------------___0__________------------------___
         //            ^out              ^in
-        // packet: ------
-        next_ = ring_->next_buffer(head_) + packet_size;
-        if (!ring_->prod_head_.compare_exchange_weak(head_, next_, std::memory_order_relaxed)) {
+        packet_next_ = ring_->next_buffer(packet_head_) + packet_size;
+        if (!ring_->prod_head_.compare_exchange_weak(packet_head_, packet_next_, std::memory_order_relaxed)) {
           continue;
         }
-        ring_->prod_last_.store(head_, std::memory_order_release);
+        ring_->prod_last_.store(packet_head_, std::memory_order_relaxed);
         pending_packet_ = &ring_->data_[0];
         break;
       }
@@ -237,26 +247,18 @@ class Producer {
     if (!pending_packet_) return;
     pending_packet_->mark_submitted();
     pending_packet_ = nullptr;
-
-    // Try to commit the data, if the commit fails, yield the CPU to other producer and try again
-    int retry = 256;
-    while (ring_->prod_tail_.load(std::memory_order_relaxed) != head_) {
-      std::this_thread::yield();
-    }
-
-    // Retry failed, wait for other producers commit
-    ring_->prod_notifier_.wait([&] { return ring_->prod_tail_.load(std::memory_order_relaxed) == head_; });
-    ring_->prod_tail_.store(next_, std::memory_order_release);
-
-    // Notify the consumer that there is data to read or the producer has committed
+    // prod_tail cannot be modified here:
+    // 1. If you wait for prod_tail to update to the current position, there will be a lot of performance loss
+    // 2. If you don't wait for prod_tail, just do a check and mark? It doesn't work either. Because it is a wait-free
+    // process, in a highly competitive scenario, the queue may have been updated once, and the data is unreliable.
     ring_->prod_notifier_.notify_when_blocking();
   }
 
  private:
   Umq<buffer_size> *ring_;
   PacketPtr pending_packet_{nullptr};
-  decltype(ring_->prod_head_.load()) head_;
-  decltype(ring_->prod_head_.load()) next_;
+  decltype(ring_->prod_head_.load()) packet_head_;
+  decltype(ring_->prod_head_.load()) packet_next_;
 };
 
 template <int buffer_size>
@@ -274,10 +276,10 @@ class Consumer {
    * @param timeout_ms The maximum waiting time
    * @return pointer to the contiguous block
    */
-  void *ReadOrWait(uint32_t *out_size, const uint32_t timeout_ms) {
-    void *ptr;
+  PacketPtr ReadOrWait(size_t *packet_count, const uint32_t timeout_ms) {
+    PacketPtr ptr;
     ring_->prod_notifier_.wait_for(std::chrono::milliseconds(timeout_ms),
-                                   [&] { return (ptr = TryRead(out_size)) != nullptr; });
+                                   [&] { return (ptr = TryRead(packet_count)).get() != nullptr; });
     return ptr;
   }
 
@@ -286,14 +288,13 @@ class Consumer {
    * @param out_size returns the size of the contiguous block
    * @return pointer to the contiguous block
    */
-  void *TryRead(uint32_t *out_size) {
-    const auto prod_tail = ring_->prod_tail_.load(std::memory_order_acquire);
-    const auto prod_last = ring_->prod_last_.load(std::memory_order_relaxed);
+  PacketPtr TryRead(size_t *packet_count) {
+    const auto prod_tail = ring_->prod_head_.load(std::memory_order_acquire);
     const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
 
     // no data
     if (cons_head == prod_tail) {
-      return nullptr;
+      return PacketPtr{nullptr};
     }
 
     const auto cur_prod_tail = prod_tail & ring_->mask();
@@ -303,8 +304,16 @@ class Consumer {
     // 0__________------------------___0__________------------------___
     //            ^cons_head        ^prod_tail
     if (cur_cons_head < cur_prod_tail) {
-      *out_size = cur_size_ = cur_prod_tail - cur_cons_head;
-      return &ring_->data_[cur_cons_head];
+      return CheckRealSize(&ring_->data_[cur_cons_head], cur_prod_tail - cur_cons_head, packet_count);
+    }
+
+    // Due to the update order, prod_head will be updated first and prod_last will be updated later.
+    // prod_head is already in the next set of loops, so you need to make sure prod_last is updated to the position
+    // before prod_head.
+    auto prod_last = ring_->prod_last_.load(std::memory_order_relaxed);
+    while (prod_last - cons_head > ring_->size()) {
+      std::this_thread::yield();
+      prod_last = ring_->prod_last_.load(std::memory_order_relaxed);
     }
 
     // read and write are in different blocks, read the current remaining data
@@ -315,19 +324,12 @@ class Consumer {
       // The current block has been read, "write" has reached the next block
       // Move the read index, which can make room for the writer
       ring_->cons_head_.store(ring_->next_buffer(cons_head), std::memory_order_release);
-
-      *out_size = cur_size_ = cur_prod_tail;
-      return &ring_->data_[0];
+      return CheckRealSize(&ring_->data_[0], cur_prod_tail, packet_count);
     }
 
     // 0---___------------skip-skip-ski0---___------------skip-skip-ski
     //        ^out        ^last            ^in
-    //
-    // if (prod_last < cons_head) {
-    //   ring_->Debug();
-    // }
-    *out_size = cur_size_ = prod_last - cons_head;
-    return &ring_->data_[0];
+    return CheckRealSize(&ring_->data_[cur_cons_head], prod_last - cons_head, packet_count);
   }
 
   /**
@@ -337,13 +339,34 @@ class Consumer {
    * returned by the TryReadOnePacket function.
    */
   void ReleasePacket() {
-    ring_->cons_head_.fetch_add(cur_size_, std::memory_order_release);
+    std::memset(packet_head_, '?', packet_total_size_);
+    ring_->cons_head_.fetch_add(packet_total_size_, std::memory_order_release);
     ring_->cons_notifier_.notify_when_blocking();
   }
 
  private:
+  PacketPtr CheckRealSize(uint8_t *data, const size_t size, size_t *packet_count) {
+    PacketPtr pk;
+    size_t count = 0;
+    for (pk = data; pk.get() < data + size; pk = pk.next()) {
+      if (pk->submitted())
+        count++;
+      else
+        break;
+    }
+
+    packet_total_size_ = pk.get() - data;
+    packet_head_ = data;
+
+    if (count == 0) return PacketPtr(nullptr);
+
+    *packet_count = count;
+    return PacketPtr(data);
+  }
+
   Umq<buffer_size> *ring_;
-  size_t cur_size_{0};
+  size_t packet_total_size_{0};
+  uint8_t *packet_head_{nullptr};
 };
 }  // namespace umq
 }  // namespace ulog

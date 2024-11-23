@@ -434,6 +434,7 @@ inline void print(struct ulog_buffer_s *log_buffer, bool color,
         ULOG_FORMAT_FOR_TIME_CODE(logger, "%.64s%s", "%" PRIu64, "us"),      \
         ULOG_UNIQUE(code_str),                                               \
         strlen(ULOG_UNIQUE(code_str)) > 64 ? "..." : "", ULOG_UNIQUE(diff)); \
+    ULOG_UNIQUE(diff);                                                       \
   })
 
 #define ULOG_GEN_COLOR_FORMAT_FOR_HEX_DUMP(place1, place2, place3, place4)    \
