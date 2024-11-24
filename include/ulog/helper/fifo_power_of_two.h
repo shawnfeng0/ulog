@@ -251,8 +251,11 @@ class FifoPowerOfTwo {
   size_t peak() const { return peak_; }
 
  private:
+  uint8_t pad0[64];
   size_t in_{};                     // data is added at offset (in % size)
+  uint8_t pad1[64];
   size_t out_{};                    // data is extracted from off. (out % size)
+  uint8_t pad2[64];
   unsigned char *data_{};           // the buffer holding the data
   const bool is_allocated_memory_;  // Used to identify whether the internal
                                     // buffer is allocated internally
