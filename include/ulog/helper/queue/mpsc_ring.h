@@ -4,17 +4,16 @@
 #include <unistd.h>
 
 #include <atomic>
-#include <cinttypes>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
 #include <thread>
 
 #include "lite_notifier.h"
+#include "power_of_two.h"
 
 // The basic principle of circular queue implementation:
 // A - B is the position of A relative to B
@@ -40,27 +39,11 @@ namespace umq {
 
 inline unsigned align8(const unsigned size) { return (size + 7) & ~7; }
 
-template <int buffer_size>
 class Producer;
-
-template <int buffer_size>
 class Consumer;
 
 struct Packet {
-  static constexpr size_t kSizeMask = (1 << 30) - 1;
-  static constexpr size_t kMaxDataSize = kSizeMask;
-
-  void set_size(const uint32_t size) { attr.store(size, std::memory_order_relaxed); }
-  uint32_t size() const { return attr.load(std::memory_order_relaxed) & kSizeMask; }
-
-  void mark_discarded() { attr.fetch_or(1 << 30, std::memory_order_release); }
-  bool discarded() const { return attr.load(std::memory_order_relaxed) & (1 << 30); }
-
-  void mark_submitted() { attr.fetch_or(1 << 31, std::memory_order_release); }
-  bool submitted() const { return attr.load(std::memory_order_relaxed) & (1 << 31); }
-
-  uint32_t magic;
-  std::atomic_uint32_t attr;
+  std::atomic_uint32_t size;
   uint8_t data[0];
 } __attribute__((aligned(8)));
 
@@ -75,63 +58,56 @@ union PacketPtr {
   explicit operator bool() const noexcept { return ptr_ != nullptr; }
   auto operator->() const -> Packet * { return header; }
   auto get() const -> uint8_t * { return this->ptr_; }
-  PacketPtr next() const { return PacketPtr(ptr_ + (sizeof(Packet) + align8(header->size()))); }
+  PacketPtr next() const { return PacketPtr(ptr_ + (sizeof(Packet) + align8(header->size))); }
 
  private:
   Packet *header;
   __attribute__((unused)) uint8_t *ptr_;
 };
 
-template <int buffer_size>
 class Umq {
-  friend class Producer<buffer_size>;
-  friend class Consumer<buffer_size>;
+  friend class Producer;
+  friend class Consumer;
 
  public:
-  explicit Umq(/*size_t num_elements*/) : cons_head_(0), prod_head_(0), prod_last_(0) {
-    // if (num_elements < 2) {
-    // num_elements = 2;
-    // } else {
+  explicit Umq(size_t num_elements) : cons_head_(0), prod_head_(0), prod_last_(0) {
+    if (num_elements < 2) num_elements = 2;
+
     // round up to the next power of 2, since our 'let the indices wrap'
     // technique works only in this case.
-    // num_elements = queue::RoundUpPowOfTwo(num_elements);
-    // }
-    // mask_ = num_elements - 1;
-    // data_ = std::make_unique<uint8_t[]>(mask_ + 1);
+    num_elements = queue::RoundUpPowOfTwo(num_elements);
+
+    mask_ = num_elements - 1;
+    data_ = new unsigned char[num_elements];
     std::memset(data_, 0, sizeof(data_));
   }
 
-  ~Umq() = default;
+  ~Umq() { delete[] data_; }
 
   void Debug() {
     const auto prod_head = prod_head_.load(std::memory_order_relaxed);
-    const auto prod_tail = prod_tail_.load(std::memory_order_relaxed);
     const auto prod_last = prod_last_.load(std::memory_order_relaxed);
     const auto cons_head = cons_head_.load(std::memory_order_relaxed);
 
     const auto cur_p_head = prod_head & mask();
-    const auto cur_p_tail = prod_tail & mask();
     const auto cur_p_last = prod_last & mask();
     const auto cur_c_head = cons_head & mask();
 
-    printf("prod_head: %zd(%zd), prod_tail: %zd(%zd), prod_last: %zd(%zd), cons_head: %zd(%zd)\n", prod_head,
-           cur_p_head, prod_tail, cur_p_tail, prod_last, cur_p_last, cons_head, cur_c_head);
+    printf("prod_head: %zd(%zd), prod_last: %zd(%zd), cons_head: %zd(%zd)\n", prod_head, cur_p_head, prod_last,
+           cur_p_last, cons_head, cur_c_head);
 
-    for (size_t i = 0; i < buffer_size; i++) {
+    for (size_t i = 0; i < size(); i++) {
       printf("|%02x", data_[i]);
     }
     printf("|\n");
 
-    for (size_t i = 0; i < buffer_size; i++)
+    for (size_t i = 0; i < size(); i++)
       printf("%s", i == cur_p_head ? ("^prod_head:" + std::to_string(prod_head)).c_str() : "   ");
     printf("\n");
-    for (size_t i = 0; i < buffer_size; i++)
-      printf("%s", i == cur_p_head ? ("^prod_tail:" + std::to_string(prod_tail)).c_str() : "   ");
-    printf("\n");
-    for (size_t i = 0; i < buffer_size; i++)
+    for (size_t i = 0; i < size(); i++)
       printf("%s", i == cur_p_last ? ("^prod_last:" + std::to_string(prod_last)).c_str() : "   ");
     printf("\n");
-    for (size_t i = 0; i < buffer_size; i++)
+    for (size_t i = 0; i < size(); i++)
       printf("%s", i == cur_c_head ? ("^cons_head:" + std::to_string(cons_head)).c_str() : "   ");
     printf("\n");
   }
@@ -143,15 +119,13 @@ class Umq {
 
   size_t next_buffer(const size_t index) const { return (index & ~mask()) + size(); }
 
-  // std::unique_ptr<uint8_t[]> data_;  // the buffer holding the data
-  uint8_t data_[buffer_size]{};  // the buffer holding the data
-  size_t mask_ = buffer_size - 1;
+  uint8_t *data_;  // the buffer holding the data
+  size_t mask_;
 
   uint8_t pad0[64]{};  // Using cache line filling technology can improve performance by 15%
   std::atomic<size_t> cons_head_;
 
   uint8_t pad1[64]{};
-  std::atomic<size_t> prod_tail_{};
   std::atomic<size_t> prod_head_;
   std::atomic<size_t> prod_last_;
 
@@ -160,10 +134,9 @@ class Umq {
   LiteNotifier cons_notifier_;
 };
 
-template <int buffer_size>
 class Producer {
  public:
-  explicit Producer(Umq<buffer_size> *queue) : ring_(queue) {}
+  explicit Producer(Umq *queue) : ring_(queue), packet_size_(0) {}
 
   ~Producer() = default;
 
@@ -235,8 +208,7 @@ class Producer {
       return nullptr;
     } while (true);
 
-    pending_packet_->magic = 0xefbeefbe;
-    pending_packet_->set_size(size);
+    packet_size_ = size;
     return &pending_packet_->data[0];
   }
 
@@ -244,9 +216,7 @@ class Producer {
    * Commits the data to the buffer, so that it can be read out.
    */
   void Commit() {
-    if (!pending_packet_) return;
-    pending_packet_->mark_submitted();
-    pending_packet_ = nullptr;
+    pending_packet_->size = packet_size_;
     // prod_tail cannot be modified here:
     // 1. If you wait for prod_tail to update to the current position, there will be a lot of performance loss
     // 2. If you don't wait for prod_tail, just do a check and mark? It doesn't work either. Because it is a wait-free
@@ -255,16 +225,16 @@ class Producer {
   }
 
  private:
-  Umq<buffer_size> *ring_;
-  PacketPtr pending_packet_{nullptr};
+  Umq *ring_;
+  PacketPtr pending_packet_;
+  size_t packet_size_;
   decltype(ring_->prod_head_.load()) packet_head_;
   decltype(ring_->prod_head_.load()) packet_next_;
 };
 
-template <int buffer_size>
 class Consumer {
  public:
-  explicit Consumer(Umq<buffer_size> *queue) : ring_(queue) {}
+  explicit Consumer(Umq *queue) : ring_(queue) {}
 
   ~Consumer() = default;
   void Debug() { ring_->Debug(); }
@@ -272,7 +242,7 @@ class Consumer {
   /**
    * Gets a pointer to the contiguous block in the buffer, and returns the size of that block. automatically retry until
    * timeout
-   * @param out_size returns the size of the contiguous block
+   * @param packet_count returns the count of the packet
    * @param timeout_ms The maximum waiting time
    * @return pointer to the contiguous block
    */
@@ -285,19 +255,19 @@ class Consumer {
 
   /**
    * Gets a pointer to the contiguous block in the buffer, and returns the size of that block.
-   * @param out_size returns the size of the contiguous block
+   * @param packet_count returns the count of the packet
    * @return pointer to the contiguous block
    */
   PacketPtr TryRead(size_t *packet_count) {
-    const auto prod_tail = ring_->prod_head_.load(std::memory_order_acquire);
+    const auto prod_head = ring_->prod_head_.load(std::memory_order_acquire);
     const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
 
     // no data
-    if (cons_head == prod_tail) {
+    if (cons_head == prod_head) {
       return PacketPtr{nullptr};
     }
 
-    const auto cur_prod_tail = prod_tail & ring_->mask();
+    const auto cur_prod_tail = prod_head & ring_->mask();
     const auto cur_cons_head = cons_head & ring_->mask();
 
     // read and write are still in the same block
@@ -339,7 +309,7 @@ class Consumer {
    * returned by the TryReadOnePacket function.
    */
   void ReleasePacket() {
-    std::memset(packet_head_, '?', packet_total_size_);
+    std::memset(packet_head_, 0, packet_total_size_);
     ring_->cons_head_.fetch_add(packet_total_size_, std::memory_order_release);
     ring_->cons_notifier_.notify_when_blocking();
   }
@@ -349,7 +319,7 @@ class Consumer {
     PacketPtr pk;
     size_t count = 0;
     for (pk = data; pk.get() < data + size; pk = pk.next()) {
-      if (pk->submitted())
+      if (pk->size != 0)
         count++;
       else
         break;
@@ -364,7 +334,7 @@ class Consumer {
     return PacketPtr(data);
   }
 
-  Umq<buffer_size> *ring_;
+  Umq *ring_;
   size_t packet_total_size_{0};
   uint8_t *packet_head_{nullptr};
 };
