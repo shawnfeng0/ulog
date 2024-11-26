@@ -254,6 +254,15 @@ class Producer {
     ring_->prod_notifier_.notify_when_blocking();
   }
 
+  /**
+   * Ensure that all currently written data has been read and processed
+   * @param wait_time The maximum waiting time
+   */
+  void Flush(const std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000)) const {
+    ring_->cons_notifier_.wait_for(wait_time,
+                                   [&]() { return ulog::queue::IsPassed(packet_next_, ring_->cons_head_.load()); });
+  }
+
  private:
   Umq *ring_;
   HeaderPtr pending_packet_;

@@ -39,9 +39,7 @@ static inline auto RoundUpPowOfTwo(uint32_t n) -> decltype(n) {
   return RoundPowOfTwo<decltype(n)>(n - 1);
 }
 
-static inline auto RoundDownPowOfTwo(uint32_t n) -> decltype(n) {
-  return RoundPowOfTwo<decltype(n)>(n >> 1U);
-}
+static inline auto RoundDownPowOfTwo(uint32_t n) -> decltype(n) { return RoundPowOfTwo<decltype(n)>(n >> 1U); }
 
 /**
  * @brief Check if value is in range [left, right], considering the wraparound
@@ -56,6 +54,11 @@ static inline bool IsInRange(unsigned left, unsigned value, unsigned right) {
     return (left <= value) || (value <= right);
   }
 }
+
+/**
+ * @brief Check if the tail has passed the head, considering the wraparound case when tail < head (overflow)
+ */
+static inline bool IsPassed(const uint32_t head, const uint32_t tail) { return tail - head < (1U << 31); }
 
 }  // namespace queue
 }  // namespace ulog
