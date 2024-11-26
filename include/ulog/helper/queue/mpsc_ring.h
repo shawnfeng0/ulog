@@ -1,7 +1,6 @@
 #pragma once
 
 #include <ulog/ulog.h>
-#include <unistd.h>
 
 #include <atomic>
 #include <cstddef>
@@ -37,32 +36,63 @@
 namespace ulog {
 namespace umq {
 
-inline unsigned align8(const unsigned size) { return (size + 7) & ~7; }
+inline unsigned align4(const unsigned size) { return (size + 3) & ~3; }
 
 class Producer;
 class Consumer;
 
-struct Packet {
+struct Header {
   std::atomic_uint32_t size;
   uint8_t data[0];
-} __attribute__((aligned(8)));
+};
 
-union PacketPtr {
-  explicit PacketPtr(uint8_t *ptr = nullptr) : ptr_(ptr) {}
+union HeaderPtr {
+  explicit HeaderPtr(uint8_t *ptr = nullptr) : ptr_(ptr) {}
 
-  PacketPtr &operator=(uint8_t *ptr) {
+  HeaderPtr &operator=(uint8_t *ptr) {
     ptr_ = ptr;
     return *this;
   }
 
   explicit operator bool() const noexcept { return ptr_ != nullptr; }
-  auto operator->() const -> Packet * { return header; }
+  auto operator->() const -> Header * { return header; }
   auto get() const -> uint8_t * { return this->ptr_; }
-  PacketPtr next() const { return PacketPtr(ptr_ + (sizeof(Packet) + align8(header->size))); }
+  HeaderPtr next() const { return HeaderPtr(ptr_ + (sizeof(Header) + align4(header->size))); }
 
  private:
-  Packet *header;
+  Header *header;
   __attribute__((unused)) uint8_t *ptr_;
+};
+
+/**
+ * Data structure used when reading data externally
+ */
+struct Packet {
+  explicit operator bool() const noexcept { return data != nullptr; }
+  size_t size;
+  void *data;
+};
+
+class DataPacket {
+ public:
+  explicit DataPacket(const size_t count = 0, const HeaderPtr packet_head = HeaderPtr{nullptr})
+      : count_(count), packet_head_(packet_head) {}
+
+  explicit operator bool() const noexcept { return count_ > 0; }
+  size_t remain() const { return count_; }
+
+  Packet next() {
+    if (count_ == 0) return {0, nullptr};
+
+    const Packet packet{packet_head_->size, packet_head_->data};
+    packet_head_ = packet_head_.next();
+    count_--;
+    return packet;
+  }
+
+ private:
+  size_t count_;
+  HeaderPtr packet_head_;
 };
 
 class Umq {
@@ -84,7 +114,7 @@ class Umq {
 
   ~Umq() { delete[] data_; }
 
-  void Debug() {
+  void Debug() const {
     const auto prod_head = prod_head_.load(std::memory_order_relaxed);
     const auto prod_last = prod_last_.load(std::memory_order_relaxed);
     const auto cons_head = cons_head_.load(std::memory_order_relaxed);
@@ -159,7 +189,7 @@ class Producer {
    * @return data pointer if successful, otherwise nullptr
    */
   uint8_t *Reserve(const size_t size) {
-    const auto packet_size = sizeof(Packet) + align8(size);
+    const auto packet_size = sizeof(Header) + align4(size);
 
     packet_head_ = ring_->prod_head_.load(std::memory_order_relaxed);
     do {
@@ -215,7 +245,7 @@ class Producer {
   /**
    * Commits the data to the buffer, so that it can be read out.
    */
-  void Commit() {
+  void Commit() const {
     pending_packet_->size = packet_size_;
     // prod_tail cannot be modified here:
     // 1. If you wait for prod_tail to update to the current position, there will be a lot of performance loss
@@ -226,10 +256,10 @@ class Producer {
 
  private:
   Umq *ring_;
-  PacketPtr pending_packet_;
+  HeaderPtr pending_packet_;
   size_t packet_size_;
-  decltype(ring_->prod_head_.load()) packet_head_;
-  decltype(ring_->prod_head_.load()) packet_next_;
+  decltype(ring_->prod_head_.load()) packet_head_{};
+  decltype(ring_->prod_head_.load()) packet_next_{};
 };
 
 class Consumer {
@@ -237,34 +267,32 @@ class Consumer {
   explicit Consumer(Umq *queue) : ring_(queue) {}
 
   ~Consumer() = default;
-  void Debug() { ring_->Debug(); }
+  void Debug() const { ring_->Debug(); }
 
   /**
    * Gets a pointer to the contiguous block in the buffer, and returns the size of that block. automatically retry until
    * timeout
-   * @param packet_count returns the count of the packet
    * @param timeout_ms The maximum waiting time
    * @return pointer to the contiguous block
    */
-  PacketPtr ReadOrWait(size_t *packet_count, const uint32_t timeout_ms) {
-    PacketPtr ptr;
+  DataPacket ReadOrWait(const uint32_t timeout_ms) {
+    DataPacket ptr;
     ring_->prod_notifier_.wait_for(std::chrono::milliseconds(timeout_ms),
-                                   [&] { return (ptr = TryRead(packet_count)).get() != nullptr; });
+                                   [&] { return (ptr = TryRead()).remain() > 0; });
     return ptr;
   }
 
   /**
    * Gets a pointer to the contiguous block in the buffer, and returns the size of that block.
-   * @param packet_count returns the count of the packet
    * @return pointer to the contiguous block
    */
-  PacketPtr TryRead(size_t *packet_count) {
+  DataPacket TryRead() {
     const auto prod_head = ring_->prod_head_.load(std::memory_order_acquire);
     const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
 
     // no data
     if (cons_head == prod_head) {
-      return PacketPtr{nullptr};
+      return DataPacket{};
     }
 
     const auto cur_prod_tail = prod_head & ring_->mask();
@@ -274,7 +302,7 @@ class Consumer {
     // 0__________------------------___0__________------------------___
     //            ^cons_head        ^prod_tail
     if (cur_cons_head < cur_prod_tail) {
-      return CheckRealSize(&ring_->data_[cur_cons_head], cur_prod_tail - cur_cons_head, packet_count);
+      return CheckRealSize(&ring_->data_[cur_cons_head], cur_prod_tail - cur_cons_head);
     }
 
     // Due to the update order, prod_head will be updated first and prod_last will be updated later.
@@ -294,12 +322,12 @@ class Consumer {
       // The current block has been read, "write" has reached the next block
       // Move the read index, which can make room for the writer
       ring_->cons_head_.store(ring_->next_buffer(cons_head), std::memory_order_release);
-      return CheckRealSize(&ring_->data_[0], cur_prod_tail, packet_count);
+      return CheckRealSize(&ring_->data_[0], cur_prod_tail);
     }
 
     // 0---___------------skip-skip-ski0---___------------skip-skip-ski
     //        ^out        ^last            ^in
-    return CheckRealSize(&ring_->data_[cur_cons_head], prod_last - cons_head, packet_count);
+    return CheckRealSize(&ring_->data_[cur_cons_head], prod_last - cons_head);
   }
 
   /**
@@ -308,15 +336,15 @@ class Consumer {
    * The validity of the size is not checked, it needs to be within the range
    * returned by the TryReadOnePacket function.
    */
-  void ReleasePacket() {
+  void ReleasePacket() const {
     std::memset(packet_head_, 0, packet_total_size_);
     ring_->cons_head_.fetch_add(packet_total_size_, std::memory_order_release);
     ring_->cons_notifier_.notify_when_blocking();
   }
 
  private:
-  PacketPtr CheckRealSize(uint8_t *data, const size_t size, size_t *packet_count) {
-    PacketPtr pk;
+  DataPacket CheckRealSize(uint8_t *data, const size_t size) {
+    HeaderPtr pk;
     size_t count = 0;
     for (pk = data; pk.get() < data + size; pk = pk.next()) {
       if (pk->size != 0)
@@ -328,10 +356,9 @@ class Consumer {
     packet_total_size_ = pk.get() - data;
     packet_head_ = data;
 
-    if (count == 0) return PacketPtr(nullptr);
+    if (count == 0) return DataPacket{};
 
-    *packet_count = count;
-    return PacketPtr(data);
+    return DataPacket{count, HeaderPtr(data)};
   }
 
   Umq *ring_;
