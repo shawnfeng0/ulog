@@ -44,13 +44,11 @@ static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, co
   std::thread{[=] {
     ulog::umq::Consumer consumer(umq);
     size_t total_packet = 0;
-    size_t packet_count;
-    uint8_t data_recv[100 * 1024];
-    while (ulog::umq::PacketPtr ptr = consumer.ReadOrWait(&packet_count, 10)) {
-      total_packet += packet_count;
-      for (size_t i = 0; i < packet_count; i++) {
-        memcpy(data_recv, ptr->data, ptr->size);
-        ptr = ptr.next();
+    while (ulog::umq::DataPacket ptr = consumer.ReadOrWait(10)) {
+      total_packet += ptr.remain();
+      while (const auto data = ptr.next()) {
+        uint8_t data_recv[100 * 1024];
+        memcpy(data_recv, data.data, data.size);
       }
       consumer.ReleasePacket();
     }
@@ -100,17 +98,22 @@ int main() {
                         ULOG_F_FUNCTION | ULOG_F_TIME | ULOG_F_PROCESS_ID | ULOG_F_LEVEL | ULOG_F_FILE_LINE);
   logger_set_output_level(ulog_global_logger, ULOG_LEVEL_INFO);
 
-  const size_t publish_count = 10 * 1024;
-  const size_t buffer_size = 64 * 1024;
-  LOGGER_INFO("Algorithm buffer size: %lu", buffer_size);
-  LOGGER_INFO("Number of packet published per thread: %lu", publish_count);
-  LOGGER_INFO("Each packet has 8 ~ 256 bytes.");
-  LOGGER_INFO("%16s %16s %16s", "write_thread", "umq", "kfifo+mutex");
-  for (int thread_count = 1; thread_count <= 200;
-       thread_count = thread_count < 10 ? thread_count <<= 1 : thread_count + 10) {
-    auto mpsc_time = LOGGER_TIME_CODE({ umq_mpsc(buffer_size, thread_count, publish_count); });
-    auto fifo_time = LOGGER_TIME_CODE({ fifo_mpsc(buffer_size, thread_count, publish_count); });
-    LOGGER_INFO("%16d %16lu %16lu", thread_count, mpsc_time, fifo_time);
-  }
+  auto test_func = [](const size_t buffer_size) {
+    constexpr size_t publish_count = 10 * 1024;
+    LOGGER_INFO("Algorithm buffer size: %lu", buffer_size);
+    LOGGER_INFO("Number of packet published per thread: %lu", publish_count);
+    LOGGER_INFO("Each packet has 8 ~ 256 bytes.");
+    LOGGER_INFO("%16s %16s %16s", "write_thread", "umq", "kfifo+mutex");
+    for (int thread_count = 1; thread_count <= 200;
+         thread_count = thread_count < 10 ? thread_count << 1 : thread_count + 10) {
+      auto mpsc_time = LOGGER_TIME_CODE({ umq_mpsc(buffer_size, thread_count, publish_count); });
+      auto fifo_time = LOGGER_TIME_CODE({ fifo_mpsc(buffer_size, thread_count, publish_count); });
+      LOGGER_INFO("%16d %16lu %16lu", thread_count, mpsc_time, fifo_time);
+    }
+  };
+
+  test_func(64 * 1024);
+  test_func(64 * 1024 * 8);
+
   pthread_exit(nullptr);
 }
