@@ -25,3 +25,16 @@ TEST(PowOfTwo, IsInRange) {
   ASSERT_EQ(ulog::queue::IsInRange(UINT32_MAX - 1, 1, 1), true);
   ASSERT_EQ(ulog::queue::IsInRange(UINT32_MAX - 1, 2, 1), false);
 }
+
+TEST(PowOfTwo, IsPassed) {
+  ASSERT_EQ(ulog::queue::IsPassed(1, 1), true);
+
+  ASSERT_EQ(ulog::queue::IsPassed(2, 1), false);
+  ASSERT_EQ(ulog::queue::IsPassed(1, 2), true);
+
+  ASSERT_EQ(ulog::queue::IsPassed(1, 0xFF000000), false);
+  ASSERT_EQ(ulog::queue::IsPassed(0xFF000000, 1), true);
+
+  ASSERT_EQ(ulog::queue::IsPassed(1, 0xFFFFFFFF), false);
+  ASSERT_EQ(ulog::queue::IsPassed(0xFFFFFFFF, 1), true);
+}

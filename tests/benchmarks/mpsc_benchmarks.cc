@@ -36,6 +36,7 @@ static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, co
       memcpy(data, data_source, std::min(sizeof(data_source), size));
       producer.Commit();
     }
+    producer.Flush();
   };
 
   std::vector<std::thread> write_thread;
