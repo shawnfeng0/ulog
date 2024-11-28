@@ -109,7 +109,7 @@ class Umq {
 
     mask_ = num_elements - 1;
     data_ = new unsigned char[num_elements];
-    std::memset(data_, 0, sizeof(data_));
+    std::memset(data_, 0, num_elements);
   }
 
   ~Umq() { delete[] data_; }
