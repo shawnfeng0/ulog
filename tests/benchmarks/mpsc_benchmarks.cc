@@ -12,7 +12,7 @@
 #include "ulog/ulog.h"
 
 static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, const size_t publish_count) {
-  auto* umq = new ulog::umq::Umq(buffer_size);
+  const auto umq = ulog::umq::Umq::Create(buffer_size);
 
   auto write_entry = [=] {
     ulog::umq::Producer producer(umq);
@@ -23,7 +23,7 @@ static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, co
     uint64_t total_num = 0;
     while (total_num++ < publish_count) {
       size_t size = dis(gen);
-      const auto data = static_cast<uint8_t*>(producer.ReserveOrWait(size, 100));
+      const auto data = static_cast<uint8_t*>(producer.ReserveOrWait(size, std::chrono::milliseconds(100)));
       if (data == nullptr) {
         continue;
       }
@@ -45,7 +45,7 @@ static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, co
   std::thread{[=] {
     ulog::umq::Consumer consumer(umq);
     size_t total_packet = 0;
-    while (ulog::umq::DataPacket ptr = consumer.ReadOrWait(10)) {
+    while (ulog::umq::DataPacket ptr = consumer.ReadOrWait(std::chrono::milliseconds(10))) {
       total_packet += ptr.remain();
       while (const auto data = ptr.next()) {
         uint8_t data_recv[100 * 1024];

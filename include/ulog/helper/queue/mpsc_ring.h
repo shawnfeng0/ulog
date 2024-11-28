@@ -95,12 +95,16 @@ class DataPacket {
   HeaderPtr packet_head_;
 };
 
-class Umq {
+class Umq : public std::enable_shared_from_this<Umq> {
   friend class Producer;
   friend class Consumer;
 
+  struct Private {
+    explicit Private() = default;
+  };
+
  public:
-  explicit Umq(size_t num_elements) : cons_head_(0), prod_head_(0), prod_last_(0) {
+  explicit Umq(size_t num_elements, Private) : cons_head_(0), prod_head_(0), prod_last_(0) {
     if (num_elements < 2) num_elements = 2;
 
     // round up to the next power of 2, since our 'let the indices wrap'
@@ -111,8 +115,10 @@ class Umq {
     data_ = new unsigned char[num_elements];
     std::memset(data_, 0, num_elements);
   }
-
   ~Umq() { delete[] data_; }
+
+  // Everyone else has to use this factory function
+  static std::shared_ptr<Umq> Create(size_t num_elements) { return std::make_shared<Umq>(num_elements, Private()); }
 
   void Debug() const {
     const auto prod_head = prod_head_.load(std::memory_order_relaxed);
@@ -166,20 +172,19 @@ class Umq {
 
 class Producer {
  public:
-  explicit Producer(Umq *queue) : ring_(queue), packet_size_(0) {}
+  explicit Producer(const std::shared_ptr<Umq> &ring) : ring_(ring), packet_size_(0) {}
 
   ~Producer() = default;
 
   /**
    * Reserve space of size, automatically retry until timeout
    * @param size size of space to reserve
-   * @param timeout_ms The maximum waiting time if there is insufficient space in the queue
+   * @param timeout The maximum waiting time if there is insufficient space in the queue
    * @return data pointer if successful, otherwise nullptr
    */
-  uint8_t *ReserveOrWait(const size_t size, const uint32_t timeout_ms) {
+  uint8_t *ReserveOrWait(const size_t size, std::chrono::milliseconds timeout) {
     uint8_t *ptr;
-    ring_->cons_notifier_.wait_for(std::chrono::milliseconds(timeout_ms),
-                                   [&] { return (ptr = Reserve(size)) != nullptr; });
+    ring_->cons_notifier_.wait_for(timeout, [&] { return (ptr = Reserve(size)) != nullptr; });
     return ptr;
   }
 
@@ -264,7 +269,7 @@ class Producer {
   }
 
  private:
-  Umq *ring_;
+  std::shared_ptr<Umq> ring_;
   HeaderPtr pending_packet_;
   size_t packet_size_;
   decltype(ring_->prod_head_.load()) packet_head_{};
@@ -273,7 +278,7 @@ class Producer {
 
 class Consumer {
  public:
-  explicit Consumer(Umq *queue) : ring_(queue) {}
+  explicit Consumer(const std::shared_ptr<Umq> &ring) : ring_(ring) {}
 
   ~Consumer() = default;
   void Debug() const { ring_->Debug(); }
@@ -281,14 +286,18 @@ class Consumer {
   /**
    * Gets a pointer to the contiguous block in the buffer, and returns the size of that block. automatically retry until
    * timeout
-   * @param timeout_ms The maximum waiting time
+   * @param timeout The maximum waiting time
+   * @param other_condition Other wake-up conditions
    * @return pointer to the contiguous block
    */
-  DataPacket ReadOrWait(const uint32_t timeout_ms) {
+  template <typename Condition>
+  DataPacket ReadOrWait(const std::chrono::milliseconds timeout, Condition other_condition = []() { return false; }) {
     DataPacket ptr;
-    ring_->prod_notifier_.wait_for(std::chrono::milliseconds(timeout_ms),
-                                   [&] { return (ptr = TryRead()).remain() > 0; });
+    ring_->prod_notifier_.wait_for(timeout, [&] { return (ptr = TryRead()).remain() > 0 || other_condition(); });
     return ptr;
+  }
+  DataPacket ReadOrWait(const std::chrono::milliseconds timeout) {
+    return ReadOrWait(timeout, [] { return false; });
   }
 
   /**
@@ -370,7 +379,7 @@ class Consumer {
     return DataPacket{count, HeaderPtr(data)};
   }
 
-  Umq *ring_;
+  std::shared_ptr<Umq> ring_;
   size_t packet_total_size_{0};
   uint8_t *packet_head_{nullptr};
 };
