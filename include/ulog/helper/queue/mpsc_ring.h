@@ -148,6 +148,24 @@ class Umq : public std::enable_shared_from_this<Umq> {
     printf("\n");
   }
 
+  /**
+   * Ensure that all currently written data has been read and processed
+   * @param wait_time The maximum waiting time
+   */
+  void Flush(const std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000)) {
+    prod_notifier_.notify_when_blocking();
+    const auto prod_head = prod_head_.load();
+    cons_notifier_.wait_for(wait_time, [&]() { return ulog::queue::IsPassed(prod_head, cons_head_.load()); });
+  }
+
+  /**
+   * Notify all waiting threads, so that they can check the status of the queue
+   */
+  void Notify() {
+    prod_notifier_.notify_when_blocking();
+    cons_notifier_.notify_when_blocking();
+  }
+
  private:
   size_t size() const { return mask_ + 1; }
 

@@ -39,7 +39,7 @@ class FileWriter {
     Open(filename_, truncate);
   }
 
-  void Flush() { std::fflush(fd_); }
+  void Flush() const { std::fflush(fd_); }
 
   void Close() {
     if (fd_) std::fclose(fd_);
