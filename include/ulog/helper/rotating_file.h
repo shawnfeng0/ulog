@@ -2,8 +2,7 @@
 // Created by fs on 2020-05-25.
 //
 
-#ifndef ULOG_INCLUDE_ULOG_HELPER_ROTATING_FILE_H_
-#define ULOG_INCLUDE_ULOG_HELPER_ROTATING_FILE_H_
+#pragma once
 
 #include <fstream>
 #include <sstream>
@@ -34,7 +33,7 @@ class RotatingFile {
       Rotate();
     }
   }
-  std::string filename() { return file_writer_.filename(); }
+  std::string filename() const { return file_writer_.filename(); }
 
   void SinkIt(const void *buffer, size_t size) {
     current_size_ += size;
@@ -45,7 +44,7 @@ class RotatingFile {
     file_writer_.Write(buffer, size);
   }
 
-  void Flush() { file_writer_.Flush(); }
+  void Flush() const { file_writer_.Flush(); }
 
  private:
   using filename_t = std::string;
@@ -72,7 +71,7 @@ class RotatingFile {
       // instead of rename
       CopyFile(base_filename_, CalcFilename(base_filename_, 1));
     } else {
-      // "tail -"f may be interrupted when rename is executed, and "tail -F" can
+      // "tail -f" may be interrupted when rename is executed, and "tail -F" can
       // be used instead, but some "-F" implementations (busybox tail) cannot
       // obtain all logs in real time.
       RenameFile(base_filename_, CalcFilename(base_filename_, 1));
@@ -133,5 +132,3 @@ class RotatingFile {
 };
 
 }  // namespace ulog
-
-#endif  // ULOG_INCLUDE_ULOG_HELPER_ROTATING_FILE_H_

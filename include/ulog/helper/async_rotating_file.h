@@ -6,10 +6,10 @@
 
 #include <atomic>
 #include <ctime>
-#include <iostream>
 #include <string>
 #include <utility>
 
+#include "queue/mpsc_ring.h"
 #include "ulog/helper/queue/fifo_power_of_two.h"
 #include "ulog/helper/rotating_file.h"
 
@@ -25,82 +25,58 @@ class AsyncRotatingFile {
    * @param max_files Number of files that can be divided
    * @param max_flush_period_sec Maximum file flush period (some file systems
    * and platforms only refresh once every 60s by default, which is too slow)
-   * @param should_print Can be printed using printf function
    */
-  AsyncRotatingFile(size_t fifo_size, std::string filename,
-                    std::size_t max_file_size, std::size_t max_files,
-                    std::time_t max_flush_period_sec = 0)
-      : fifo_(fifo_size),
-        rotating_file_(std::move(filename), max_file_size, max_files),
-        flush_period_sec_(max_flush_period_sec) {
-    auto async_thread_function = [&]() {
-      uint8_t data[2 * 1024];
+  AsyncRotatingFile(const size_t fifo_size, std::string filename, const std::size_t max_file_size,
+                    const std::size_t max_files, const std::time_t max_flush_period_sec = 0)
+      : umq_(umq::Umq::Create(fifo_size)), rotating_file_(std::move(filename), max_file_size, max_files) {
+    auto async_thread_function = [=, this]() {
       std::time_t last_flush_time = std::time(nullptr);
+      umq::Consumer reader(umq_->shared_from_this());
       while (!should_exit_) {
-        auto len = fifo_.OutputWaitUntil(data, sizeof(data) - 1, 1000, [&] {
-          return !fifo_.empty() || need_flush_;
-        });
-        if (len > 0) {
-          rotating_file_.SinkIt(data, len);
+        umq::DataPacket ptr = reader.ReadOrWait(std::chrono::milliseconds(1000), [&] { return should_exit_.load(); });
+        while (const auto data = ptr.next()) {
+          rotating_file_.SinkIt(data.data, data.size);
         }
+        reader.ReleasePacket();
 
         // Flush
         std::time_t const cur_time = std::time(nullptr);
-        if (need_flush_ || (cur_time - last_flush_time >= flush_period_sec_)) {
-          need_flush_ = false;
+        if (cur_time - last_flush_time >= max_flush_period_sec) {
           last_flush_time = cur_time;
           rotating_file_.Flush();
-          ++flush_count_;
         }
       }
     };
-    async_thread_ =
-        std::unique_ptr<std::thread>{new std::thread{async_thread_function}};
+    async_thread_ = std::unique_ptr<std::thread>{new std::thread{async_thread_function}};
   }
 
   AsyncRotatingFile(const AsyncRotatingFile &) = delete;
   AsyncRotatingFile &operator=(const AsyncRotatingFile &) = delete;
 
+  void Flush() const { umq_->Flush(); }
+
   ~AsyncRotatingFile() {
+    umq_->Flush();
     should_exit_ = true;
-    fifo_.InterruptOutput();
+    umq_->Notify();
     if (async_thread_) async_thread_->join();
   }
 
-  void Flush() {
-    fifo_.Flush();
-
-    // TODO: Use semaphore to realize the flush of waiting for asynchronous
-    // thread
-
-    auto count = flush_count_.load();
-    // Try to lock to ensure that the reading of fifo and writing of files in
-    // the asynchronous thread have been completed
-    do {
-      need_flush_ = true;
-      fifo_.InterruptOutput();
-      std::this_thread::yield();
-    } while (flush_count_ == count);
+  size_t InPacket(const void *buf, const size_t num_elements) const {
+    umq::Producer writer(umq_->shared_from_this());
+    uint8_t *buffer = writer.Reserve(num_elements);
+    if (buffer) {
+      memcpy(buffer, buf, num_elements);
+      writer.Commit();
+      return num_elements;
+    }
+    return 0;
   }
-
-  size_t InPacket(const void *buf, size_t num_elements) {
-    return fifo_.InputPacketOrDrop(buf, num_elements);
-  }
-
-  size_t fifo_size() const { return fifo_.size(); }
-  size_t fifo_num_dropped() const { return fifo_.num_dropped(); }
-  size_t fifo_peak() const { return fifo_.peak(); }
-  bool is_idle() const { return fifo_.empty(); }
 
  private:
-  FifoPowerOfTwo fifo_;
+  std::shared_ptr<umq::Umq> umq_;
   RotatingFile rotating_file_;
   std::unique_ptr<std::thread> async_thread_;
-
-  // For flush
-  std::time_t flush_period_sec_;
-  std::atomic_size_t flush_count_{};
-  std::atomic_bool need_flush_{false};
 
   std::atomic_bool should_exit_{false};
 };
