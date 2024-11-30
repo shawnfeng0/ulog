@@ -31,6 +31,7 @@ class RotatingFile {
     current_size_ = file_writer_.size();  // expensive. called only once
     if (rotate_on_open && current_size_ > 0) {
       Rotate();
+      current_size_ = 0;
     }
   }
   std::string filename() const { return file_writer_.filename(); }

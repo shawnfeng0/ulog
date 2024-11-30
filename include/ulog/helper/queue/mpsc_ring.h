@@ -3,6 +3,8 @@
 #include <ulog/ulog.h>
 
 #include <atomic>
+#include <cassert>
+#include <complex>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -36,15 +38,16 @@
 namespace ulog {
 namespace umq {
 
-inline unsigned align4(const unsigned size) { return (size + 3) & ~3; }
+inline unsigned align8(const unsigned size) { return (size + 7) & ~7; }
 
 class Producer;
 class Consumer;
 
 struct Header {
-  std::atomic_uint32_t size;
+  std::atomic_uint32_t reverse_size;
+  std::atomic_uint32_t data_size;
   uint8_t data[0];
-};
+} __attribute__((aligned(8)));
 
 union HeaderPtr {
   explicit HeaderPtr(uint8_t *ptr = nullptr) : ptr_(ptr) {}
@@ -57,7 +60,7 @@ union HeaderPtr {
   explicit operator bool() const noexcept { return ptr_ != nullptr; }
   auto operator->() const -> Header * { return header; }
   auto get() const -> uint8_t * { return this->ptr_; }
-  HeaderPtr next() const { return HeaderPtr(ptr_ + (sizeof(Header) + align4(header->size))); }
+  HeaderPtr next() const { return HeaderPtr(ptr_ + (sizeof(Header) + align8(header->reverse_size))); }
 
  private:
   Header *header;
@@ -84,7 +87,7 @@ class DataPacket {
   Packet next() {
     if (count_ == 0) return {0, nullptr};
 
-    const Packet packet{packet_head_->size, packet_head_->data};
+    const Packet packet{packet_head_->data_size, packet_head_->data};
     packet_head_ = packet_head_.next();
     count_--;
     return packet;
@@ -155,7 +158,7 @@ class Umq : public std::enable_shared_from_this<Umq> {
   void Flush(const std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000)) {
     prod_notifier_.notify_when_blocking();
     const auto prod_head = prod_head_.load();
-    cons_notifier_.wait_for(wait_time, [&]() { return ulog::queue::IsPassed(prod_head, cons_head_.load()); });
+    cons_notifier_.wait_for(wait_time, [&]() { return queue::IsPassed(prod_head, cons_head_.load()); });
   }
 
   /**
@@ -192,7 +195,11 @@ class Producer {
  public:
   explicit Producer(const std::shared_ptr<Umq> &ring) : ring_(ring), packet_size_(0) {}
 
-  ~Producer() = default;
+  ~Producer() {
+    if (pending_packet_.get()) {
+      Commit(0);
+    }
+  };
 
   /**
    * Reserve space of size, automatically retry until timeout
@@ -200,9 +207,15 @@ class Producer {
    * @param timeout The maximum waiting time if there is insufficient space in the queue
    * @return data pointer if successful, otherwise nullptr
    */
-  uint8_t *ReserveOrWait(const size_t size, std::chrono::milliseconds timeout) {
+  uint8_t *ReserveOrWaitFor(const size_t size, const std::chrono::milliseconds timeout) {
     uint8_t *ptr;
     ring_->cons_notifier_.wait_for(timeout, [&] { return (ptr = Reserve(size)) != nullptr; });
+    return ptr;
+  }
+
+  uint8_t *ReserveOrWait(const size_t size) {
+    uint8_t *ptr;
+    ring_->cons_notifier_.wait([&] { return (ptr = Reserve(size)) != nullptr; });
     return ptr;
   }
 
@@ -212,7 +225,7 @@ class Producer {
    * @return data pointer if successful, otherwise nullptr
    */
   uint8_t *Reserve(const size_t size) {
-    const auto packet_size = sizeof(Header) + align4(size);
+    const auto packet_size = sizeof(Header) + align8(size);
 
     packet_head_ = ring_->prod_head_.load(std::memory_order_relaxed);
     do {
@@ -268,13 +281,19 @@ class Producer {
   /**
    * Commits the data to the buffer, so that it can be read out.
    */
-  void Commit() const {
-    pending_packet_->size = packet_size_;
+  void Commit(const size_t real_size) {
+    assert(real_size <= packet_size_);
+    assert(pending_packet_.get());
+
+    pending_packet_->data_size.store(real_size, std::memory_order_relaxed);
+    pending_packet_->reverse_size.store(packet_size_, std::memory_order_release);
+
     // prod_tail cannot be modified here:
     // 1. If you wait for prod_tail to update to the current position, there will be a lot of performance loss
     // 2. If you don't wait for prod_tail, just do a check and mark? It doesn't work either. Because it is a wait-free
     // process, in a highly competitive scenario, the queue may have been updated once, and the data is unreliable.
     ring_->prod_notifier_.notify_when_blocking();
+    pending_packet_ = nullptr;
   }
 
   /**
@@ -383,7 +402,7 @@ class Consumer {
     HeaderPtr pk;
     size_t count = 0;
     for (pk = data; pk.get() < data + size; pk = pk.next()) {
-      if (pk->size != 0)
+      if (pk->reverse_size != 0)
         count++;
       else
         break;

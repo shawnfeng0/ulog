@@ -56,18 +56,21 @@ class AsyncRotatingFile {
   void Flush() const { umq_->Flush(); }
 
   ~AsyncRotatingFile() {
-    umq_->Flush();
+    umq_->Flush(std::chrono::seconds(5));
     should_exit_ = true;
     umq_->Notify();
     if (async_thread_) async_thread_->join();
   }
 
-  size_t InPacket(const void *buf, const size_t num_elements) const {
+  umq::Producer CreateProducer() const { return umq::Producer(umq_->shared_from_this()); }
+
+  size_t InPacket(const void *buf, const size_t num_elements,
+                  const std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000)) const {
     umq::Producer writer(umq_->shared_from_this());
-    uint8_t *buffer = writer.Reserve(num_elements);
+    uint8_t *buffer = writer.ReserveOrWaitFor(num_elements, wait_time);
     if (buffer) {
       memcpy(buffer, buf, num_elements);
-      writer.Commit();
+      writer.Commit(num_elements);
       return num_elements;
     }
     return 0;
