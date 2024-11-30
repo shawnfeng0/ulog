@@ -2,10 +2,7 @@
 // Created by fs on 2020-05-25.
 //
 
-#ifndef ULOG_INCLUDE_ULOG_HELPER_FILE_WRITER_H_
-#define ULOG_INCLUDE_ULOG_HELPER_FILE_WRITER_H_
-
-#include <thread>
+#pragma once
 
 #include "ulog/helper/file.h"
 
@@ -92,5 +89,3 @@ class FileWriter {
   std::string filename_;
 };
 }  // namespace ulog
-
-#endif  // ULOG_INCLUDE_ULOG_HELPER_FILE_WRITER_H_

@@ -23,7 +23,7 @@ static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, co
     uint64_t total_num = 0;
     while (total_num++ < publish_count) {
       size_t size = dis(gen);
-      const auto data = static_cast<uint8_t*>(producer.ReserveOrWait(size, std::chrono::milliseconds(100)));
+      const auto data = static_cast<uint8_t*>(producer.ReserveOrWaitFor(size, std::chrono::milliseconds(100)));
       if (data == nullptr) {
         continue;
       }
@@ -34,7 +34,7 @@ static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, co
           "rr"
           "sdfeeraerasdfqwersdfqwerrerasdfqwer";
       memcpy(data, data_source, std::min(sizeof(data_source), size));
-      producer.Commit();
+      producer.Commit(size);
     }
     producer.Flush();
   };
