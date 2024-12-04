@@ -72,30 +72,48 @@ union HeaderPtr {
  */
 struct Packet {
   explicit operator bool() const noexcept { return data != nullptr; }
-  size_t size;
-  void *data;
+  size_t size = 0;
+  void *data = nullptr;
 };
 
-class DataPacket {
+class PacketGroup {
  public:
-  explicit DataPacket(const size_t count = 0, const HeaderPtr packet_head = HeaderPtr{nullptr})
-      : count_(count), packet_head_(packet_head) {}
+  explicit PacketGroup(const size_t count = 0, const HeaderPtr packet_head = HeaderPtr{nullptr})
+      : packet_count_(count), packet_head_(packet_head) {}
 
-  explicit operator bool() const noexcept { return count_ > 0; }
-  size_t remain() const { return count_; }
+  size_t remain() const { return packet_count_; }
 
   Packet next() {
-    if (count_ == 0) return {0, nullptr};
+    if (!remain()) return Packet{0, nullptr};
 
     const Packet packet{packet_head_->data_size, packet_head_->data};
     packet_head_ = packet_head_.next();
-    count_--;
+    packet_count_--;
     return packet;
   }
 
  private:
-  size_t count_;
+  size_t packet_count_;
   HeaderPtr packet_head_;
+};
+
+class DataPacket {
+ public:
+  explicit DataPacket(const PacketGroup group0 = PacketGroup{}, const PacketGroup group1 = PacketGroup{})
+      : group0_(group0), group1_(group1) {}
+
+  explicit operator bool() const noexcept { return remain() > 0; }
+  size_t remain() const { return group0_.remain() + group1_.remain(); }
+
+  Packet next() {
+    if (group0_.remain()) return group0_.next();
+    if (group1_.remain()) return group1_.next();
+    return {0, nullptr};
+  }
+
+ private:
+  PacketGroup group0_;
+  PacketGroup group1_;
 };
 
 class Umq : public std::enable_shared_from_this<Umq> {
@@ -199,7 +217,7 @@ class Producer {
     if (pending_packet_.get()) {
       Commit(0);
     }
-  };
+  }
 
   /**
    * Reserve space of size, automatically retry until timeout
@@ -350,14 +368,15 @@ class Consumer {
       return DataPacket{};
     }
 
-    const auto cur_prod_tail = prod_head & ring_->mask();
+    const auto cur_prod_head = prod_head & ring_->mask();
     const auto cur_cons_head = cons_head & ring_->mask();
 
     // read and write are still in the same block
     // 0__________------------------___0__________------------------___
-    //            ^cons_head        ^prod_tail
-    if (cur_cons_head < cur_prod_tail) {
-      return CheckRealSize(&ring_->data_[cur_cons_head], cur_prod_tail - cur_cons_head);
+    //            ^cons_head        ^prod_head
+    if (cur_cons_head < cur_prod_head) {
+      return DataPacket{CheckRealSize(group0_head_ = &ring_->data_[cur_cons_head], cur_prod_head - cur_cons_head,
+                                      &group0_total_size_)};
     }
 
     // Due to the update order, prod_head will be updated first and prod_last will be updated later.
@@ -371,34 +390,55 @@ class Consumer {
 
     // read and write are in different blocks, read the current remaining data
     // 0---_______________skip-skip-ski0---_______________skip-skip-ski
-    //     ^prod_tail     ^cons_head       ^prod_tail
+    //     ^prod_head     ^cons_head       ^prod_head
     //                    ^prod_last
     if (cons_head == prod_last && cur_cons_head != 0) {
       // The current block has been read, "write" has reached the next block
       // Move the read index, which can make room for the writer
-      ring_->cons_head_.store(ring_->next_buffer(cons_head), std::memory_order_release);
-      return CheckRealSize(&ring_->data_[0], cur_prod_tail);
+      ring_->cons_head_.store(ring_->next_buffer(cons_head), std::memory_order_relaxed);
+      return DataPacket{CheckRealSize(group0_head_ = &ring_->data_[0], cur_prod_head, &group0_total_size_)};
     }
 
     // 0---___------------skip-skip-ski0---___------------skip-skip-ski
-    //        ^out        ^last            ^in
-    return CheckRealSize(&ring_->data_[cur_cons_head], prod_last - cons_head);
+    //        ^cons_head  ^prod_last       ^prod_head
+    const size_t expected_size = prod_last - cons_head;
+    const auto group0 = CheckRealSize(group0_head_ = &ring_->data_[cur_cons_head], expected_size, &group0_total_size_);
+
+    // Read the next group only if the current group has been committed
+    const auto group1 = expected_size == group0_total_size_
+                            ? CheckRealSize(group1_head_ = &ring_->data_[0], cur_prod_head, &group1_total_size_)
+                            : PacketGroup{};
+    return DataPacket{group0, group1};
   }
 
   /**
    * Releases data from the buffer, so that more data can be written in.
-   *
-   * The validity of the size is not checked, it needs to be within the range
-   * returned by the TryReadOnePacket function.
    */
-  void ReleasePacket() const {
-    std::memset(packet_head_, 0, packet_total_size_);
-    ring_->cons_head_.fetch_add(packet_total_size_, std::memory_order_release);
+  void ReleasePacket() {
+    if (group0_total_size_) {
+      std::memset(group0_head_, 0, group0_total_size_);
+
+      if (group1_total_size_) {
+        std::memset(group1_head_, 0, group1_total_size_);
+        const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
+        ring_->cons_head_.store(ring_->next_buffer(cons_head) + group1_total_size_, std::memory_order_release);
+
+      } else {
+        ring_->cons_head_.fetch_add(group0_total_size_, std::memory_order_release);
+      }
+
+      group0_head_ = nullptr;
+      group0_total_size_ = 0;
+
+      group1_head_ = nullptr;
+      group1_total_size_ = 0;
+    }
+
     ring_->cons_notifier_.notify_when_blocking();
   }
 
  private:
-  DataPacket CheckRealSize(uint8_t *data, const size_t size) {
+  static PacketGroup CheckRealSize(uint8_t *data, const size_t size, size_t *total_size) {
     HeaderPtr pk;
     size_t count = 0;
     for (pk = data; pk.get() < data + size; pk = pk.next()) {
@@ -408,17 +448,19 @@ class Consumer {
         break;
     }
 
-    packet_total_size_ = pk.get() - data;
-    packet_head_ = data;
+    *total_size = pk.get() - data;
 
-    if (count == 0) return DataPacket{};
+    if (count == 0) return PacketGroup{};
 
-    return DataPacket{count, HeaderPtr(data)};
+    return PacketGroup{count, HeaderPtr(data)};
   }
 
   std::shared_ptr<Umq> ring_;
-  size_t packet_total_size_{0};
-  uint8_t *packet_head_{nullptr};
+  size_t group0_total_size_{0};
+  uint8_t *group0_head_{nullptr};
+
+  size_t group1_total_size_{0};
+  uint8_t *group1_head_{nullptr};
 };
 }  // namespace umq
 }  // namespace ulog
