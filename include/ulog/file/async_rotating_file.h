@@ -9,9 +9,9 @@
 #include <string>
 #include <utility>
 
-#include "ulog/queue/mpsc_ring.h"
-#include "ulog/queue/fifo_power_of_two.h"
 #include "ulog/file/rotating_file.h"
+#include "ulog/queue/fifo_power_of_two.h"
+#include "ulog/queue/mpsc_ring.h"
 
 namespace ulog {
 
@@ -53,7 +53,10 @@ class AsyncRotatingFile {
   AsyncRotatingFile(const AsyncRotatingFile &) = delete;
   AsyncRotatingFile &operator=(const AsyncRotatingFile &) = delete;
 
-  void Flush() const { umq_->Flush(); }
+  void Flush() const {
+    umq_->Flush();
+    rotating_file_.Flush();
+  }
 
   ~AsyncRotatingFile() {
     umq_->Flush(std::chrono::seconds(5));
