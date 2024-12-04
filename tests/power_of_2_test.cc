@@ -3,7 +3,7 @@
 //
 #include <gtest/gtest.h>
 
-#include "ulog/helper/queue/power_of_two.h"
+#include "ulog/queue/power_of_two.h"
 
 TEST(PowOfTwo, IsInRange) {
   ASSERT_EQ(ulog::queue::IsInRange(10, 9, 20), false);

@@ -2,7 +2,7 @@
 // Created by shawnfeng on 23-3-31.
 //
 
-#include "ulog/helper/queue/mpsc_ring.h"
+#include "ulog/queue/mpsc_ring.h"
 
 #include <gtest/gtest.h>
 

@@ -7,8 +7,8 @@
 #include <random>
 #include <thread>
 
-#include "ulog/helper/queue/fifo_power_of_two.h"
-#include "ulog/helper/queue/mpsc_ring.h"
+#include "ulog/queue/fifo_power_of_two.h"
+#include "ulog/queue/mpsc_ring.h"
 #include "ulog/ulog.h"
 
 static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, const size_t publish_count) {

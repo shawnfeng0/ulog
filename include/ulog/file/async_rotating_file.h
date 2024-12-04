@@ -9,9 +9,9 @@
 #include <string>
 #include <utility>
 
-#include "queue/mpsc_ring.h"
-#include "ulog/helper/queue/fifo_power_of_two.h"
-#include "ulog/helper/rotating_file.h"
+#include "ulog/queue/mpsc_ring.h"
+#include "ulog/queue/fifo_power_of_two.h"
+#include "ulog/file/rotating_file.h"
 
 namespace ulog {
 

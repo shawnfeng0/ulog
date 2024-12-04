@@ -5,7 +5,7 @@
 #include <cstdlib>
 
 #include "cmdline.h"
-#include "ulog/helper/async_rotating_file.h"
+#include "ulog/file/async_rotating_file.h"
 #include "ulog/ulog.h"
 
 int main(int argc, char *argv[]) {
