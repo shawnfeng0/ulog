@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <array>
 
 namespace ulog {
 namespace queue {
@@ -58,7 +59,29 @@ static inline bool IsInRange(unsigned left, unsigned value, unsigned right) {
 /**
  * @brief Check if the tail has passed the head, considering the wraparound case when tail < head (overflow)
  */
-static inline bool IsPassed(const uint32_t head, const uint32_t tail) { return tail - head < (1U << 31); }
+static bool IsPassed(const uint32_t head, const uint32_t tail) { return tail - head < (1U << 31); }
+
+static bool IsAllZero(const void* buffer, const size_t size) {
+  static constexpr std::array<uint8_t, 1024> zero{};
+
+  const size_t full_chunks = size / zero.size();
+  const size_t remaining_bytes = size & (zero.size() - 1);
+
+  for (size_t i = 0; i < full_chunks; ++i) {
+    if (memcmp(static_cast<const uint8_t*>(buffer) + i * zero.size(), zero.data(), zero.size()) != 0) {
+      return false;
+    }
+  }
+
+
+  if (remaining_bytes > 0) {
+    if (memcmp(static_cast<const uint8_t*>(buffer) + full_chunks * zero.size(), zero.data(), remaining_bytes) != 0) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 }  // namespace queue
 }  // namespace ulog

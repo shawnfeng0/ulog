@@ -71,6 +71,8 @@ union HeaderPtr {
  * Data structure used when reading data externally
  */
 struct Packet {
+  explicit Packet(const size_t s = 0, void *d = nullptr) : size(s), data(d) {}
+
   explicit operator bool() const noexcept { return data != nullptr; }
   size_t size = 0;
   void *data = nullptr;
@@ -84,7 +86,7 @@ class PacketGroup {
   size_t remain() const { return packet_count_; }
 
   Packet next() {
-    if (!remain()) return Packet{0, nullptr};
+    if (!remain()) return Packet{};
 
     const Packet packet{packet_head_->data_size, packet_head_->data};
     packet_head_ = packet_head_.next();
@@ -108,7 +110,7 @@ class DataPacket {
   Packet next() {
     if (group0_.remain()) return group0_.next();
     if (group1_.remain()) return group1_.next();
-    return {0, nullptr};
+    return Packet{0, nullptr};
   }
 
  private:
@@ -154,18 +156,26 @@ class Umq : public std::enable_shared_from_this<Umq> {
            cur_p_last, cons_head, cur_c_head);
 
     for (size_t i = 0; i < size(); i++) {
-      printf("|%02x", data_[i]);
+      if (data_[i])
+        printf("| %02x ", data_[i]);
+      else
+        printf("| __ ");
+    }
+    printf("|\n");
+
+    for (size_t i = 0; i < size(); i++) {
+      printf("%03lu  ", i);
     }
     printf("|\n");
 
     for (size_t i = 0; i < size(); i++)
-      printf("%s", i == cur_p_head ? ("^prod_head:" + std::to_string(prod_head)).c_str() : "   ");
+      printf("%s", i == cur_p_head ? ("^prod_head:" + std::to_string(prod_head)).c_str() : "     ");
     printf("\n");
     for (size_t i = 0; i < size(); i++)
-      printf("%s", i == cur_p_last ? ("^prod_last:" + std::to_string(prod_last)).c_str() : "   ");
+      printf("%s", i == cur_p_last ? ("^prod_last:" + std::to_string(prod_last)).c_str() : "     ");
     printf("\n");
     for (size_t i = 0; i < size(); i++)
-      printf("%s", i == cur_c_head ? ("^cons_head:" + std::to_string(cons_head)).c_str() : "   ");
+      printf("%s", i == cur_c_head ? ("^cons_head:" + std::to_string(cons_head)).c_str() : "     ");
     printf("\n");
   }
 
@@ -247,7 +257,7 @@ class Producer {
 
     packet_head_ = ring_->prod_head_.load(std::memory_order_relaxed);
     do {
-      const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
+      const auto cons_head = ring_->cons_head_.load(std::memory_order_acquire);
       packet_next_ = packet_head_ + packet_size;
 
       // Not enough space
@@ -263,6 +273,10 @@ class Producer {
       // 0--_____________________________0--_____________________________
       //    ^in                          ^new
       if (relate_pos >= packet_size || relate_pos == 0) {
+        // After being fully read out, it will be marked as all 0 by the reader
+        if (!queue::IsAllZero(&ring_->data_[packet_head_ & ring_->mask()], packet_size)) {
+          return nullptr;
+        }
         if (!ring_->prod_head_.compare_exchange_weak(packet_head_, packet_next_, std::memory_order_relaxed)) {
           continue;
         }
@@ -277,6 +291,9 @@ class Producer {
       }
 
       if ((cons_head & ring_->mask()) >= packet_size) {
+        if (!queue::IsAllZero(&ring_->data_[0], packet_size)) {
+          return nullptr;
+        }
         // new_pos is in the next block
         // 0__________------------------___0__________------------------___
         //            ^out              ^in
@@ -319,6 +336,7 @@ class Producer {
    * @param wait_time The maximum waiting time
    */
   void Flush(const std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000)) const {
+    // TODO: mpmc need modify flush()
     ring_->cons_notifier_.wait_for(wait_time,
                                    [&]() { return ulog::queue::IsPassed(packet_next_, ring_->cons_head_.load()); });
   }
@@ -375,8 +393,10 @@ class Consumer {
     // 0__________------------------___0__________------------------___
     //            ^cons_head        ^prod_head
     if (cur_cons_head < cur_prod_head) {
-      return DataPacket{CheckRealSize(group0_head_ = &ring_->data_[cur_cons_head], cur_prod_head - cur_cons_head,
-                                      &group0_total_size_)};
+      const DataPacket data_packet{CheckRealSize(group0_head_ = &ring_->data_[cur_cons_head],
+                                                 cur_prod_head - cur_cons_head, &group0_total_size_)};
+      ring_->cons_head_.fetch_add(group0_total_size_, std::memory_order_release);
+      return data_packet;
     }
 
     // Due to the update order, prod_head will be updated first and prod_last will be updated later.
@@ -395,8 +415,9 @@ class Consumer {
     if (cons_head == prod_last && cur_cons_head != 0) {
       // The current block has been read, "write" has reached the next block
       // Move the read index, which can make room for the writer
-      ring_->cons_head_.store(ring_->next_buffer(cons_head), std::memory_order_relaxed);
-      return DataPacket{CheckRealSize(group0_head_ = &ring_->data_[0], cur_prod_head, &group0_total_size_)};
+      const DataPacket data_packet{CheckRealSize(group0_head_ = &ring_->data_[0], cur_prod_head, &group0_total_size_)};
+      ring_->cons_head_.store(ring_->next_buffer(cons_head) + group0_total_size_, std::memory_order_relaxed);
+      return data_packet;
     }
 
     // 0---___------------skip-skip-ski0---___------------skip-skip-ski
@@ -404,11 +425,16 @@ class Consumer {
     const size_t expected_size = prod_last - cons_head;
     const auto group0 = CheckRealSize(group0_head_ = &ring_->data_[cur_cons_head], expected_size, &group0_total_size_);
 
-    // Read the next group only if the current group has been committed
-    const auto group1 = expected_size == group0_total_size_
-                            ? CheckRealSize(group1_head_ = &ring_->data_[0], cur_prod_head, &group1_total_size_)
-                            : PacketGroup{};
-    return DataPacket{group0, group1};
+    // The current packet group has been read, continue reading the next packet group
+    if (expected_size == group0_total_size_) {
+      // Read the next group only if the current group has been committed
+      const auto group1 = CheckRealSize(group1_head_ = &ring_->data_[0], cur_prod_head, &group1_total_size_);
+      ring_->cons_head_.store(ring_->next_buffer(cons_head) + group1_total_size_, std::memory_order_release);
+      return DataPacket{group0, group1};
+    }
+
+    ring_->cons_head_.fetch_add(group0_total_size_, std::memory_order_release);
+    return DataPacket{group0};
   }
 
   /**
@@ -417,19 +443,12 @@ class Consumer {
   void ReleasePacket() {
     if (group0_total_size_) {
       std::memset(group0_head_, 0, group0_total_size_);
-
-      if (group1_total_size_) {
-        std::memset(group1_head_, 0, group1_total_size_);
-        const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
-        ring_->cons_head_.store(ring_->next_buffer(cons_head) + group1_total_size_, std::memory_order_release);
-
-      } else {
-        ring_->cons_head_.fetch_add(group0_total_size_, std::memory_order_release);
-      }
-
       group0_head_ = nullptr;
       group0_total_size_ = 0;
+    }
 
+    if (group1_total_size_) {
+      std::memset(group1_head_, 0, group1_total_size_);
       group1_head_ = nullptr;
       group1_total_size_ = 0;
     }
