@@ -257,7 +257,8 @@ class Producer {
 
     packet_head_ = ring_->prod_head_.load(std::memory_order_relaxed);
     do {
-      const auto cons_head = ring_->cons_head_.load(std::memory_order_acquire);
+      const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
+      std::atomic_thread_fence(std::memory_order_acquire);
       packet_next_ = packet_head_ + packet_size;
 
       // Not enough space
@@ -321,7 +322,8 @@ class Producer {
     assert(pending_packet_.get());
 
     pending_packet_->data_size.store(real_size, std::memory_order_relaxed);
-    pending_packet_->reverse_size.store(packet_size_, std::memory_order_release);
+    pending_packet_->reverse_size.store(packet_size_, std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_release);
 
     // prod_tail cannot be modified here:
     // 1. If you wait for prod_tail to update to the current position, there will be a lot of performance loss
@@ -378,8 +380,9 @@ class Consumer {
    * @return pointer to the contiguous block
    */
   DataPacket TryRead() {
-    const auto prod_head = ring_->prod_head_.load(std::memory_order_acquire);
+    const auto prod_head = ring_->prod_head_.load(std::memory_order_relaxed);
     const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_acquire);
 
     // no data
     if (cons_head == prod_head) {
@@ -395,7 +398,7 @@ class Consumer {
     if (cur_cons_head < cur_prod_head) {
       const DataPacket data_packet{CheckRealSize(group0_head_ = &ring_->data_[cur_cons_head],
                                                  cur_prod_head - cur_cons_head, &group0_total_size_)};
-      ring_->cons_head_.fetch_add(group0_total_size_, std::memory_order_release);
+      ring_->cons_head_.fetch_add(group0_total_size_, std::memory_order_relaxed);
       return data_packet;
     }
 
@@ -429,11 +432,11 @@ class Consumer {
     if (expected_size == group0_total_size_) {
       // Read the next group only if the current group has been committed
       const auto group1 = CheckRealSize(group1_head_ = &ring_->data_[0], cur_prod_head, &group1_total_size_);
-      ring_->cons_head_.store(ring_->next_buffer(cons_head) + group1_total_size_, std::memory_order_release);
+      ring_->cons_head_.store(ring_->next_buffer(cons_head) + group1_total_size_, std::memory_order_relaxed);
       return DataPacket{group0, group1};
     }
 
-    ring_->cons_head_.fetch_add(group0_total_size_, std::memory_order_release);
+    ring_->cons_head_.fetch_add(group0_total_size_, std::memory_order_relaxed);
     return DataPacket{group0};
   }
 
@@ -442,17 +445,24 @@ class Consumer {
    */
   void ReleasePacket() {
     if (group0_total_size_) {
-      std::memset(group0_head_, 0, group0_total_size_);
+      auto &packet_header = *reinterpret_cast<std::atomic_uint32_t *>(group0_head_);
+      std::memset(group0_head_ + sizeof(packet_header), 0, group0_total_size_ - sizeof(packet_header));
+      packet_header.store(0, std::memory_order_relaxed);
+
       group0_head_ = nullptr;
       group0_total_size_ = 0;
     }
 
     if (group1_total_size_) {
-      std::memset(group1_head_, 0, group1_total_size_);
+      auto &packet_header = *reinterpret_cast<std::atomic_uint32_t *>(group1_head_);
+      std::memset(group1_head_ + sizeof(packet_header), 0, group1_total_size_ - sizeof(packet_header));
+      packet_header.store(0, std::memory_order_relaxed);
+
       group1_head_ = nullptr;
       group1_total_size_ = 0;
     }
 
+    std::atomic_thread_fence(std::memory_order_release);
     ring_->cons_notifier_.notify_when_blocking();
   }
 
