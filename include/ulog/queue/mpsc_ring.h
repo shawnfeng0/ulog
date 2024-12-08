@@ -14,6 +14,7 @@
 #include <thread>
 
 #include "lite_notifier.h"
+#include "memory_logger.h"
 #include "power_of_two.h"
 
 // The basic principle of circular queue implementation:
@@ -39,6 +40,17 @@ namespace ulog {
 namespace umq {
 
 inline unsigned align8(const unsigned size) { return (size + 7) & ~7; }
+
+struct logger_item {
+  uint32_t start;
+  uint32_t end;
+  uint32_t value;
+  uint8_t data[1024];
+  size_t cons_head;
+  size_t prod_head;
+  size_t prod_last;
+  size_t size;
+};
 
 class Producer;
 class Consumer;
@@ -217,6 +229,8 @@ class Umq : public std::enable_shared_from_this<Umq> {
   uint8_t pad2[64]{};
   LiteNotifier prod_notifier_;
   LiteNotifier cons_notifier_;
+
+  MemoryLogger<logger_item, 1024> logger_;
 };
 
 class Producer {
@@ -324,6 +338,19 @@ class Producer {
     pending_packet_->data_size.store(real_size, std::memory_order_relaxed);
     pending_packet_->reverse_size.store(packet_size_, std::memory_order_relaxed);
     std::atomic_thread_fence(std::memory_order_release);
+
+    const auto item = ring_->logger_.TryReserve();
+    if (item) {
+      item->start = pending_packet_.get() - ring_->data_;
+      item->end = item->start + sizeof(Header) + align8(packet_size_);
+      item->value = 1;
+      item->cons_head = ring_->cons_head_.load();
+      item->prod_head = ring_->prod_head_.load();
+      item->prod_last = ring_->prod_last_.load();
+      item->size = ring_->size();
+      memcpy(item->data, ring_->data_, sizeof(item->data));
+      ring_->logger_.Commit(item);
+    }
 
     // prod_tail cannot be modified here:
     // 1. If you wait for prod_tail to update to the current position, there will be a lot of performance loss
@@ -449,6 +476,19 @@ class Consumer {
       std::memset(group0_head_ + sizeof(packet_header), 0, group0_total_size_ - sizeof(packet_header));
       packet_header.store(0, std::memory_order_relaxed);
 
+      const auto item = ring_->logger_.TryReserve();
+      if (item) {
+        item->start = group0_head_ - ring_->data_;
+        item->end = item->start + group0_total_size_;
+        item->value = 0;
+        item->cons_head = ring_->cons_head_.load();
+        item->prod_head = ring_->prod_head_.load();
+        item->prod_last = ring_->prod_last_.load();
+        item->size = ring_->size();
+        memcpy(item->data, ring_->data_, sizeof(item->data));
+        ring_->logger_.Commit(item);
+      }
+
       group0_head_ = nullptr;
       group0_total_size_ = 0;
     }
@@ -457,6 +497,19 @@ class Consumer {
       auto &packet_header = *reinterpret_cast<std::atomic_uint32_t *>(group1_head_);
       std::memset(group1_head_ + sizeof(packet_header), 0, group1_total_size_ - sizeof(packet_header));
       packet_header.store(0, std::memory_order_relaxed);
+
+      const auto item = ring_->logger_.TryReserve();
+      if (item) {
+        item->start = group1_head_ - ring_->data_;
+        item->end = item->start + group1_total_size_;
+        item->value = 0;
+        item->cons_head = ring_->cons_head_.load();
+        item->prod_head = ring_->prod_head_.load();
+        item->prod_last = ring_->prod_last_.load();
+        item->size = ring_->size();
+        memcpy(item->data, ring_->data_, sizeof(item->data));
+        ring_->logger_.Commit(item);
+      }
 
       group1_head_ = nullptr;
       group1_total_size_ = 0;
