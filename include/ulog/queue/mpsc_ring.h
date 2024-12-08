@@ -407,64 +407,80 @@ class Consumer {
    * @return pointer to the contiguous block
    */
   DataPacket TryRead() {
-    const auto prod_head = ring_->prod_head_.load(std::memory_order_relaxed);
-    const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
-    std::atomic_thread_fence(std::memory_order_acquire);
+    auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
+    do {
+      const auto prod_head = ring_->prod_head_.load(std::memory_order_relaxed);
+      std::atomic_thread_fence(std::memory_order_acquire);
 
-    // no data
-    if (cons_head == prod_head) {
-      return DataPacket{};
-    }
+      // no data
+      if (cons_head == prod_head) {
+        return DataPacket{};
+      }
 
-    const auto cur_prod_head = prod_head & ring_->mask();
-    const auto cur_cons_head = cons_head & ring_->mask();
+      const auto cur_prod_head = prod_head & ring_->mask();
+      const auto cur_cons_head = cons_head & ring_->mask();
 
-    // read and write are still in the same block
-    // 0__________------------------___0__________------------------___
-    //            ^cons_head        ^prod_head
-    if (cur_cons_head < cur_prod_head) {
-      const DataPacket data_packet{CheckRealSize(group0_head_ = &ring_->data_[cur_cons_head],
-                                                 cur_prod_head - cur_cons_head, &group0_total_size_)};
-      ring_->cons_head_.fetch_add(group0_total_size_, std::memory_order_relaxed);
-      return data_packet;
-    }
+      // read and write are still in the same block
+      // 0__________------------------___0__________------------------___
+      //            ^cons_head        ^prod_head
+      if (cur_cons_head < cur_prod_head) {
+        const DataPacket data_packet{CheckRealSize(group0_head_ = &ring_->data_[cur_cons_head],
+                                                   cur_prod_head - cur_cons_head, &group0_total_size_)};
+        const auto cons_head_next = cons_head + group0_total_size_;
+        if (!ring_->cons_head_.compare_exchange_weak(cons_head, cons_head_next, std::memory_order_relaxed)) {
+          continue;
+        }
+        return data_packet;
+      }
 
-    // Due to the update order, prod_head will be updated first and prod_last will be updated later.
-    // prod_head is already in the next set of loops, so you need to make sure prod_last is updated to the position
-    // before prod_head.
-    auto prod_last = ring_->prod_last_.load(std::memory_order_relaxed);
-    while (prod_last - cons_head > ring_->size()) {
-      std::this_thread::yield();
-      prod_last = ring_->prod_last_.load(std::memory_order_relaxed);
-    }
+      // Due to the update order, prod_head will be updated first and prod_last will be updated later.
+      // prod_head is already in the next set of loops, so you need to make sure prod_last is updated to the position
+      // before prod_head.
+      auto prod_last = ring_->prod_last_.load(std::memory_order_relaxed);
+      while (prod_last - cons_head > ring_->size()) {
+        std::this_thread::yield();
+        prod_last = ring_->prod_last_.load(std::memory_order_relaxed);
+      }
 
-    // read and write are in different blocks, read the current remaining data
-    // 0---_______________skip-skip-ski0---_______________skip-skip-ski
-    //     ^prod_head     ^cons_head       ^prod_head
-    //                    ^prod_last
-    if (cons_head == prod_last && cur_cons_head != 0) {
-      // The current block has been read, "write" has reached the next block
-      // Move the read index, which can make room for the writer
-      const DataPacket data_packet{CheckRealSize(group0_head_ = &ring_->data_[0], cur_prod_head, &group0_total_size_)};
-      ring_->cons_head_.store(ring_->next_buffer(cons_head) + group0_total_size_, std::memory_order_relaxed);
-      return data_packet;
-    }
+      // read and write are in different blocks, read the current remaining data
+      // 0---_______________skip-skip-ski0---_______________skip-skip-ski
+      //     ^prod_head     ^cons_head       ^prod_head
+      //                    ^prod_last
+      if (cons_head == prod_last && cur_cons_head != 0) {
+        // The current block has been read, "write" has reached the next block
+        // Move the read index, which can make room for the writer
+        const DataPacket data_packet{
+            CheckRealSize(group0_head_ = &ring_->data_[0], cur_prod_head, &group0_total_size_)};
+        const auto cons_head_next = ring_->next_buffer(cons_head) + group0_total_size_;
+        if (!ring_->cons_head_.compare_exchange_weak(cons_head, cons_head_next, std::memory_order_relaxed)) {
+          continue;
+        }
+        return data_packet;
+      }
 
-    // 0---___------------skip-skip-ski0---___------------skip-skip-ski
-    //        ^cons_head  ^prod_last       ^prod_head
-    const size_t expected_size = prod_last - cons_head;
-    const auto group0 = CheckRealSize(group0_head_ = &ring_->data_[cur_cons_head], expected_size, &group0_total_size_);
+      // 0---___------------skip-skip-ski0---___------------skip-skip-ski
+      //        ^cons_head  ^prod_last       ^prod_head
+      const size_t expected_size = prod_last - cons_head;
+      const auto group0 =
+          CheckRealSize(group0_head_ = &ring_->data_[cur_cons_head], expected_size, &group0_total_size_);
 
-    // The current packet group has been read, continue reading the next packet group
-    if (expected_size == group0_total_size_) {
-      // Read the next group only if the current group has been committed
-      const auto group1 = CheckRealSize(group1_head_ = &ring_->data_[0], cur_prod_head, &group1_total_size_);
-      ring_->cons_head_.store(ring_->next_buffer(cons_head) + group1_total_size_, std::memory_order_relaxed);
-      return DataPacket{group0, group1};
-    }
+      // The current packet group has been read, continue reading the next packet group
+      if (expected_size == group0_total_size_) {
+        // Read the next group only if the current group has been committed
+        const auto group1 = CheckRealSize(group1_head_ = &ring_->data_[0], cur_prod_head, &group1_total_size_);
+        const auto cons_head_next = ring_->next_buffer(cons_head) + group1_total_size_;
+        if (!ring_->cons_head_.compare_exchange_weak(cons_head, cons_head_next, std::memory_order_relaxed)) {
+          continue;
+        }
+        return DataPacket{group0, group1};
+      }
 
-    ring_->cons_head_.fetch_add(group0_total_size_, std::memory_order_relaxed);
-    return DataPacket{group0};
+      const auto cons_head_next = cons_head + group0_total_size_;
+      if (!ring_->cons_head_.compare_exchange_weak(cons_head, cons_head_next, std::memory_order_relaxed)) {
+        continue;
+      }
+      return DataPacket{group0};
+    } while (true);
   }
 
   /**
