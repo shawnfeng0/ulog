@@ -29,9 +29,8 @@ static void umq_mpsc(const size_t buffer_size, const size_t write_thread_count, 
     uint64_t total_num = 0;
     while (total_num++ < publish_count) {
       size_t size = dis(gen);
-      const auto data = producer.ReserveOrWaitFor(size, std::chrono::milliseconds(1000));
+      const auto data = producer.ReserveOrWaitFor(size, std::chrono::milliseconds(100));
       if (data == nullptr) {
-        producer.Debug();
         continue;
       }
       memcpy(data, data_source, std::min(sizeof(data_source), size));
@@ -52,10 +51,10 @@ static void umq_mpsc(const size_t buffer_size, const size_t write_thread_count, 
     while (ulog::umq::DataPacket data = consumer.ReadOrWait(std::chrono::milliseconds(10))) {
       total_read_packet += data.remain();
       while (const auto packet = data.next()) {
-        // ASSERT_EQ(memcmp(data_source, data.data, data.size), 0);
-        if (memcmp(data_source, packet.data, packet.size) != 0) {
-          consumer.Debug();
-        }
+        ASSERT_EQ(memcmp(data_source, packet.data, packet.size), 0);
+        // if (memcmp(data_source, packet.data, packet.size) != 0) {
+          // consumer.Debug();
+        // }
         total_read_size += packet.size;
       }
       consumer.ReleasePacket(data);
@@ -73,4 +72,4 @@ static void umq_mpsc(const size_t buffer_size, const size_t write_thread_count, 
   LOGGER_MULTI_TOKEN(total_write_size.load());
 }
 
-TEST(MpscRingTest, multi_producer_single_consumer) { umq_mpsc(1024, 2, 1024 * 10, 2); }
+TEST(MpscRingTest, multi_producer_single_consumer) { umq_mpsc(1024 * 8, 16, 1024 * 100, 16); }
