@@ -476,10 +476,10 @@ class Consumer {
       // Due to the update order, prod_head will be updated first and prod_last will be updated later.
       // prod_head is already in the next set of loops, so you need to make sure prod_last is updated to the position
       // before prod_head.
-      auto prod_last = ring_->prod_last_.load(std::memory_order_relaxed);
-      while (prod_last - cons_head > ring_->size()) {
+      const auto prod_last = ring_->prod_last_.load(std::memory_order_relaxed);
+      if (prod_last - cons_head > ring_->size()) {
         std::this_thread::yield();
-        prod_last = ring_->prod_last_.load(std::memory_order_relaxed);
+        continue;
       }
 
       // read and write are in different blocks, read the current remaining data
