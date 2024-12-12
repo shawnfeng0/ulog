@@ -365,8 +365,7 @@ class Producer {
     assert(pending_packet_.get());
 
     pending_packet_->data_size.store(real_size, std::memory_order_relaxed);
-    pending_packet_->reverse_size.store(packet_size_, std::memory_order_relaxed);
-    std::atomic_thread_fence(std::memory_order_release);
+    pending_packet_->reverse_size.store(packet_size_, std::memory_order_release);
 
     const auto item = ring_->logger_.TryReserve();
     if (item) {
