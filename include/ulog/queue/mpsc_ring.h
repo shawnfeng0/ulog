@@ -300,8 +300,7 @@ class Producer {
 
     packet_head_ = ring_->prod_head_.load(std::memory_order_relaxed);
     do {
-      const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
-      std::atomic_thread_fence(std::memory_order_acquire);
+      const auto cons_head = ring_->cons_head_.load(std::memory_order_acquire);
       packet_next_ = packet_head_ + packet_size;
 
       // Not enough space
@@ -438,8 +437,7 @@ class Consumer {
   DataPacket TryRead() {
     cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
     do {
-      const auto prod_head = ring_->prod_head_.load(std::memory_order_relaxed);
-      std::atomic_thread_fence(std::memory_order_acquire);
+      const auto prod_head = ring_->prod_head_.load(std::memory_order_acquire);
 
       // no data
       if (cons_head == prod_head) {
