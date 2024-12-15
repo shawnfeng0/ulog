@@ -483,11 +483,15 @@ class Consumer {
       // 0---_______________skip-skip-ski0---_______________skip-skip-ski
       //     ^prod_head     ^cons_head       ^prod_head
       //                    ^prod_last
-      if (cons_head == prod_last && cur_cons_head != 0) {
+      if (cons_head == prod_last) {
         // The current block has been read, "write" has reached the next block
         // Move the read index, which can make room for the writer
         const PacketGroup group{CheckRealSize(&ring_->data_[0], cur_prod_head)};
-        cons_head_next = ring_->next_buffer(cons_head) + group.raw_size();
+        if (cur_cons_head == 0) {
+          cons_head_next = cons_head + group.raw_size();
+        } else {
+          cons_head_next = ring_->next_buffer(cons_head) + group.raw_size();
+        }
         if (!ring_->cons_head_.compare_exchange_weak(cons_head, cons_head_next, std::memory_order_relaxed)) {
           continue;
         }
