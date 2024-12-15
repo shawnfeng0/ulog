@@ -54,4 +54,12 @@ TEST(IsAllZero, IsAllZero) {
     const char data[5] = {1, 0, 0, 0, 0};
     ASSERT_FALSE(ulog::queue::IsAllZero(data, sizeof(data)));
   }
+
+  {
+    char data[1024];
+    memset(data, 0, sizeof(data));
+    data[224] = 17;
+    data[228] = 17;
+    ASSERT_FALSE(ulog::queue::IsAllZero(data, 232));
+  }
 }

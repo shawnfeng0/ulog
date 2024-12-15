@@ -114,6 +114,7 @@ class PacketGroup {
                        const size_t total_size = 0)
       : packet_count_(count), packet_head_(packet_head), group_ptr_(packet_head.get()), group_size_(total_size) {}
 
+  explicit operator bool() const noexcept { return remain() > 0; }
   size_t remain() const { return packet_count_; }
 
   Packet next() {
@@ -451,7 +452,9 @@ class Consumer {
       // 0__________------------------___0__________------------------___
       //            ^cons_head        ^prod_head
       if (cur_cons_head < cur_prod_head) {
-        const PacketGroup group{CheckRealSize(&ring_->data_[cur_cons_head], cur_prod_head - cur_cons_head)};
+        const auto group = CheckRealSize(&ring_->data_[cur_cons_head], cur_prod_head - cur_cons_head);
+        if (!group) return DataPacket{};
+
         cons_head_next = cons_head + group.raw_size();
         if (!ring_->cons_head_.compare_exchange_weak(cons_head, cons_head_next, std::memory_order_relaxed)) {
           continue;
@@ -486,7 +489,9 @@ class Consumer {
       if (cons_head == prod_last) {
         // The current block has been read, "write" has reached the next block
         // Move the read index, which can make room for the writer
-        const PacketGroup group{CheckRealSize(&ring_->data_[0], cur_prod_head)};
+        const auto group = CheckRealSize(&ring_->data_[0], cur_prod_head);
+        if (!group) return DataPacket{};
+
         if (cur_cons_head == 0) {
           cons_head_next = cons_head + group.raw_size();
         } else {
@@ -512,6 +517,7 @@ class Consumer {
       //        ^cons_head  ^prod_last       ^prod_head
       const size_t expected_size = prod_last - cons_head;
       const auto group0 = CheckRealSize(&ring_->data_[cur_cons_head], expected_size);
+      if (!group0) return DataPacket{};
 
       // The current packet group has been read, continue reading the next packet group
       if (expected_size == group0.raw_size()) {
@@ -590,14 +596,16 @@ class Consumer {
   }
 
  private:
-  static PacketGroup CheckRealSize(uint8_t *data, const size_t size) {
+  static PacketGroup CheckRealSize(uint8_t *data, const size_t size, const size_t max_packet_count = 1) {
     HeaderPtr pk;
     size_t count = 0;
-    for (pk = data; pk.get() < data + size; pk = pk.next()) {
-      if (pk->reverse_size != 0)
-        count++;
-      else
-        break;
+    for (pk = data; pk.get() < data + size;) {
+      if (pk->reverse_size.load(std::memory_order_acquire) == 0) break;
+
+      count++;
+      pk = pk.next();
+
+      if (count >= max_packet_count) break;
     }
 
     if (count == 0) return PacketGroup{};

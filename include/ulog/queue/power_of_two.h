@@ -62,7 +62,7 @@ static inline bool IsInRange(unsigned left, unsigned value, unsigned right) {
 static bool IsPassed(const uint32_t head, const uint32_t tail) { return tail - head < (1U << 31); }
 
 static bool IsAllZero(const void* buffer, const size_t size) {
-  static constexpr std::array<uint8_t, 1024> zero{};
+  static constexpr std::array<uint8_t, 64> zero{};
 
   const size_t full_chunks = size / zero.size();
   const size_t remaining_bytes = size & (zero.size() - 1);
@@ -72,7 +72,6 @@ static bool IsAllZero(const void* buffer, const size_t size) {
       return false;
     }
   }
-
 
   if (remaining_bytes > 0) {
     if (memcmp(static_cast<const uint8_t*>(buffer) + full_chunks * zero.size(), zero.data(), remaining_bytes) != 0) {
