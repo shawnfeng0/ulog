@@ -52,6 +52,14 @@ struct read_item {
   long int tid;
 };
 
+struct write_item {
+  uint32_t cur_start;
+  uint32_t cur_end;
+  uint32_t size;
+  uint32_t line;
+  uint8_t data[1024];
+};
+
 struct logger_item {
   uint32_t cache_start;
   uint32_t cache_cur_start;
@@ -166,7 +174,8 @@ class Umq : public std::enable_shared_from_this<Umq> {
   };
 
  public:
-  explicit Umq(size_t num_elements, Private) : cons_head_(0), prod_head_(0), prod_last_(0), logger_(), read_logger_() {
+  explicit Umq(size_t num_elements, Private)
+      : cons_head_(0), cons_size_(0), prod_head_(0), prod_last_(0), logger_(), read_logger_(), write_logger_() {
     if (num_elements < 2) num_elements = 2;
 
     // round up to the next power of 2, since our 'let the indices wrap'
@@ -248,6 +257,7 @@ class Umq : public std::enable_shared_from_this<Umq> {
 
   uint8_t pad0[64]{};  // Using cache line filling technology can improve performance by 15%
   std::atomic<size_t> cons_head_;
+  std::atomic<size_t> cons_size_;
 
   uint8_t pad1[64]{};
   std::atomic<size_t> prod_head_;
@@ -259,6 +269,7 @@ class Umq : public std::enable_shared_from_this<Umq> {
 
   MemoryLogger<logger_item, 512> logger_;
   MemoryLogger<read_item, 512> read_logger_;
+  MemoryLogger<write_item, 512> write_logger_;
 };
 
 class Producer {
@@ -318,11 +329,24 @@ class Producer {
       //    ^in                          ^new
       if (relate_pos >= packet_size || relate_pos == 0) {
         // After being fully read out, it will be marked as all 0 by the reader
+        ring_->cons_size_.load(std::memory_order_acquire);
         if (!queue::IsAllZero(&ring_->data_[packet_head_ & ring_->mask()], packet_size)) {
           return nullptr;
         }
         if (!ring_->prod_head_.compare_exchange_weak(packet_head_, packet_next_, std::memory_order_relaxed)) {
           continue;
+        }
+
+        const auto item = ring_->write_logger_.TryReserve();
+        if (item) {
+          uint8_t data[1024];
+          memcpy(data, &ring_->data_[packet_head_ & ring_->mask()], packet_size);
+          item->cur_start = packet_head_ & ring_->mask();
+          item->cur_end = item->cur_start + packet_size;
+          item->size = packet_size;
+          item->line = __LINE__;
+          memcpy(item->data, data, std::min(sizeof(item->data), packet_size));
+          ring_->write_logger_.Commit(item);
         }
 
         // Whenever we wrap around, we update the last variable to ensure logical
@@ -335,6 +359,7 @@ class Producer {
       }
 
       if ((cons_head & ring_->mask()) >= packet_size) {
+        ring_->cons_size_.load(std::memory_order_acquire);
         if (!queue::IsAllZero(&ring_->data_[0], packet_size)) {
           return nullptr;
         }
@@ -345,6 +370,19 @@ class Producer {
         if (!ring_->prod_head_.compare_exchange_weak(packet_head_, packet_next_, std::memory_order_relaxed)) {
           continue;
         }
+
+        const auto item = ring_->write_logger_.TryReserve();
+        if (item) {
+          uint8_t data[1024];
+          memcpy(data, &ring_->data_[0], packet_size);
+          item->cur_start = 0 & ring_->mask();
+          item->cur_end = item->cur_start + packet_size;
+          item->size = packet_size;
+          item->line = __LINE__;
+          memcpy(item->data, data, std::min(sizeof(item->data), packet_size));
+          ring_->write_logger_.Commit(item);
+        }
+
         ring_->prod_last_.store(packet_head_, std::memory_order_relaxed);
         pending_packet_ = &ring_->data_[0];
         break;
@@ -570,6 +608,7 @@ class Consumer {
       auto &packet_header = *reinterpret_cast<std::atomic_uint32_t *>(group.raw_ptr());
       std::memset(group.raw_ptr() + sizeof(packet_header), 0, group.raw_size() - sizeof(packet_header));
       packet_header.store(0, std::memory_order_release);
+      ring_->cons_size_.fetch_add(group.raw_size(), std::memory_order_release);
 
       const auto item = ring_->logger_.TryReserve();
       if (item) {
