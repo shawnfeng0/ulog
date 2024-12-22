@@ -1,6 +1,5 @@
 #pragma once
 
-#include <sys/syscall.h>
 #include <ulog/ulog.h>
 #include <unistd.h>
 
@@ -82,7 +81,28 @@ class Producer;
 class Consumer;
 
 struct Header {
-  std::atomic_uint32_t reverse_size;
+  static constexpr size_t kSizeMask = (1U << 31) - 1;
+  static constexpr size_t kMaxDataSize = kSizeMask;
+
+  void set_reverse_size(const uint32_t size, const std::memory_order m = std::memory_order_release) {
+    reverse_size_.store(size, m);
+  }
+  uint32_t reverse_size(const std::memory_order m = std::memory_order_acquire) const {
+    return reverse_size_.load(m) & kSizeMask;
+  }
+
+  void mark_consumed(const std::memory_order m = std::memory_order_relaxed) { reverse_size_.fetch_or(1U << 31, m); }
+  void mark_consumed(const uint32_t new_size, const std::memory_order m = std::memory_order_relaxed) {
+    reverse_size_.store(new_size & (1U << 31), m);
+  }
+  bool consumed(const std::memory_order m = std::memory_order_relaxed) const {
+    return reverse_size_.load(m) & (1U << 31);
+  }
+
+ private:
+  std::atomic_uint32_t reverse_size_{0};
+
+ public:
   std::atomic_uint32_t data_size;
   uint8_t data[0];
 } __attribute__((aligned(8)));
@@ -98,7 +118,7 @@ union HeaderPtr {
   explicit operator bool() const noexcept { return ptr_ != nullptr; }
   auto operator->() const -> Header * { return header; }
   auto get() const -> uint8_t * { return this->ptr_; }
-  HeaderPtr next() const { return HeaderPtr(ptr_ + (sizeof(Header) + align8(header->reverse_size))); }
+  HeaderPtr next() const { return HeaderPtr(ptr_ + (sizeof(Header) + align8(header->reverse_size()))); }
 
  private:
   Header *header;
@@ -175,7 +195,7 @@ class Mq : public std::enable_shared_from_this<Mq> {
 
  public:
   explicit Mq(size_t num_elements, Private)
-      : cons_head_(0), prod_head_(0), prod_last_(0), logger_(), read_logger_(), write_logger_() {
+      : cons_head_(0), cons_tail_(0), prod_head_(0), prod_last_(0), logger_(), read_logger_(), write_logger_() {
     if (num_elements < 2) num_elements = 2;
 
     // round up to the next power of 2, since our 'let the indices wrap'
@@ -261,10 +281,13 @@ class Mq : public std::enable_shared_from_this<Mq> {
   std::atomic<size_t> cons_head_;
 
   uint8_t pad1[64]{};
+  std::atomic<size_t> cons_tail_;
+
+  uint8_t pad2[64]{};
   std::atomic<size_t> prod_head_;
   std::atomic<size_t> prod_last_;
 
-  uint8_t pad2[64]{};
+  uint8_t pad3[64]{};
   LiteNotifier prod_notifier_;
   LiteNotifier cons_notifier_;
 
@@ -402,7 +425,7 @@ class Producer {
     assert(pending_packet_.get());
 
     pending_packet_->data_size.store(real_size, std::memory_order_relaxed);
-    pending_packet_->reverse_size.store(packet_size_, std::memory_order_release);
+    pending_packet_->set_reverse_size(packet_size_, std::memory_order_release);
 
     const auto item = ring_->logger_.TryReserve();
     if (item) {
@@ -637,7 +660,7 @@ class Consumer {
     HeaderPtr pk;
     size_t count = 0;
     for (pk = data; pk.get() < data + size;) {
-      if (pk->reverse_size.load(std::memory_order_acquire) == 0) break;
+      if (pk->reverse_size(std::memory_order_acquire) == 0) break;
 
       count++;
       pk = pk.next();
@@ -653,5 +676,5 @@ class Consumer {
   size_t cons_head = 0;
   std::shared_ptr<Mq> ring_;
 };
-}  // namespace mpsc
+}  // namespace mpmc
 }  // namespace ulog
