@@ -10,6 +10,8 @@
 #include <random>
 #include <thread>
 
+#include "ulog/queue/mpmc_ring.h"
+
 template <typename Mq>
 static void mq_test(const size_t buffer_size, const size_t write_thread_count, const size_t publish_count,
                     const size_t read_thread_count) {
@@ -74,3 +76,5 @@ static void mq_test(const size_t buffer_size, const size_t write_thread_count, c
 }
 
 TEST(MpscRingTest, multi_producer_single_consumer) { mq_test<ulog::mpsc::Mq>(1024, 4, 1024 * 100, 1); }
+
+TEST(MpscRingTest, multi_producer_multi_consumer) { mq_test<ulog::mpmc::Mq>(1024, 4, 1024 * 100, 1); }
