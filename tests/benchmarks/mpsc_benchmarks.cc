@@ -11,11 +11,12 @@
 #include "ulog/queue/mpsc_ring.h"
 #include "ulog/ulog.h"
 
-static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, const size_t publish_count) {
-  const auto umq = ulog::umq::Umq::Create(buffer_size);
+static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, const size_t publish_count,
+                     const size_t max_read_thread) {
+  const auto umq = ulog::mpsc::Mq::Create(buffer_size);
 
   auto write_entry = [=] {
-    ulog::umq::Producer producer(umq);
+    ulog::mpsc::Producer producer(umq);
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<uint32_t> dis(8, 256);
@@ -42,24 +43,28 @@ static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, co
   std::vector<std::thread> write_thread;
   for (size_t i = 0; i < max_write_thread; ++i) write_thread.emplace_back(write_entry);
 
-  std::thread{[=] {
-    ulog::umq::Consumer consumer(umq);
+  auto read_entry = [=] {
+    ulog::mpsc::Consumer consumer(umq);
     size_t total_packet = 0;
-    while (ulog::umq::DataPacket ptr = consumer.ReadOrWait(std::chrono::milliseconds(10))) {
-      total_packet += ptr.remain();
-      while (const auto data = ptr.next()) {
+    while (ulog::mpsc::DataPacket data = consumer.ReadOrWait(std::chrono::milliseconds(10))) {
+      total_packet += data.remain();
+      while (const auto packet = data.next()) {
         uint8_t data_recv[100 * 1024];
-        memcpy(data_recv, data.data, data.size);
+        memcpy(data_recv, packet.data, packet.size);
       }
-      consumer.ReleasePacket();
+      consumer.ReleasePacket(data);
     }
     LOGGER_MULTI_TOKEN(buffer_size, total_packet);
-  }}.detach();
+  };
+  std::vector<std::thread> read_thread;
+  for (size_t i = 0; i < max_read_thread; ++i) read_thread.emplace_back(read_entry);
 
   for (auto& t : write_thread) t.join();
+  for (auto& t : read_thread) t.join();
 }
 
-static void fifo_mpsc(const size_t buffer_size, const size_t max_write_thread, const size_t publish_count) {
+static void fifo_mpsc(const size_t buffer_size, const size_t max_write_thread, const size_t publish_count,
+                      const size_t max_read_thread) {
   auto fifo = new ulog::FifoPowerOfTwo(buffer_size, 1);
 
   auto write_entry = [=] {
@@ -82,16 +87,19 @@ static void fifo_mpsc(const size_t buffer_size, const size_t max_write_thread, c
   std::vector<std::thread> write_thread;
   for (size_t i = 0; i < max_write_thread; ++i) write_thread.emplace_back(write_entry);
 
-  std::thread{[=] {
+  auto read_entry = [=] {
     uint64_t total_num = 0;
     uint8_t data_recv[100 * 1024];
     while (const auto size = fifo->OutputWaitIfEmpty(data_recv, sizeof(data_recv), 10)) {
       total_num += size;
     }
     LOGGER_MULTI_TOKEN(buffer_size, total_num);
-  }}.detach();
+  };
+  std::vector<std::thread> read_thread;
+  for (size_t i = 0; i < max_read_thread; ++i) read_thread.emplace_back(read_entry);
 
   for (auto& t : write_thread) t.join();
+  for (auto& t : read_thread) t.join();
 }
 
 int main() {
@@ -99,7 +107,7 @@ int main() {
                         ULOG_F_FUNCTION | ULOG_F_TIME | ULOG_F_PROCESS_ID | ULOG_F_LEVEL | ULOG_F_FILE_LINE);
   logger_set_output_level(ulog_global_logger, ULOG_LEVEL_INFO);
 
-  auto test_func = [](const size_t buffer_size) {
+  auto mpsc_test = [](const size_t buffer_size) {
     constexpr size_t publish_count = 10 * 1024;
     LOGGER_INFO("Algorithm buffer size: %lu", buffer_size);
     LOGGER_INFO("Number of packet published per thread: %lu", publish_count);
@@ -107,14 +115,14 @@ int main() {
     LOGGER_INFO("%16s %16s %16s", "write_thread", "umq", "kfifo+mutex");
     for (int thread_count = 1; thread_count <= 200;
          thread_count = thread_count < 10 ? thread_count << 1 : thread_count + 10) {
-      auto mpsc_time = LOGGER_TIME_CODE({ umq_mpsc(buffer_size, thread_count, publish_count); });
-      auto fifo_time = LOGGER_TIME_CODE({ fifo_mpsc(buffer_size, thread_count, publish_count); });
+      auto mpsc_time = LOGGER_TIME_CODE({ umq_mpsc(buffer_size, thread_count, publish_count, 1); });
+      auto fifo_time = LOGGER_TIME_CODE({ fifo_mpsc(buffer_size, thread_count, publish_count, 1); });
       LOGGER_INFO("%16d %16lu %16lu", thread_count, mpsc_time, fifo_time);
     }
   };
 
-  test_func(64 * 1024);
-  test_func(64 * 1024 * 8);
+  mpsc_test(64 * 1024);
+  mpsc_test(64 * 1024 * 8);
 
   pthread_exit(nullptr);
 }

@@ -3,6 +3,8 @@
 //
 
 #pragma once
+#include <assert.h>
+
 #include <array>
 
 namespace ulog {
@@ -59,27 +61,15 @@ static inline bool IsInRange(unsigned left, unsigned value, unsigned right) {
 /**
  * @brief Check if the tail has passed the head, considering the wraparound case when tail < head (overflow)
  */
-static bool IsPassed(const uint32_t head, const uint32_t tail) { return tail - head < (1U << 31); }
+static bool inline IsPassed(const uint32_t head, const uint32_t tail) { return tail - head < (1U << 31); }
 
-static bool IsAllZero(const void* buffer, const size_t size) {
-  static constexpr std::array<uint8_t, 1024> zero{};
-
-  const size_t full_chunks = size / zero.size();
-  const size_t remaining_bytes = size & (zero.size() - 1);
-
-  for (size_t i = 0; i < full_chunks; ++i) {
-    if (memcmp(static_cast<const uint8_t*>(buffer) + i * zero.size(), zero.data(), zero.size()) != 0) {
-      return false;
-    }
-  }
-
-
-  if (remaining_bytes > 0) {
-    if (memcmp(static_cast<const uint8_t*>(buffer) + full_chunks * zero.size(), zero.data(), remaining_bytes) != 0) {
-      return false;
-    }
-  }
-
+static bool inline IsAllZero(const void* buffer, const size_t size) {
+  assert(reinterpret_cast<uintptr_t>(buffer) % 8 == 0);
+  assert(size % 8 == 0);
+  const auto ptr_uint32_start = static_cast<const uint32_t*>(buffer);
+  const auto ptr_uint32_end = ptr_uint32_start + (size / sizeof(*ptr_uint32_start));
+  for (auto i = ptr_uint32_start; i < ptr_uint32_end; i++)
+    if (*i != 0) return false;
   return true;
 }
 

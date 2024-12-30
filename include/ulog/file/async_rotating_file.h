@@ -28,12 +28,12 @@ class AsyncRotatingFile {
    */
   AsyncRotatingFile(const size_t fifo_size, std::string filename, const std::size_t max_file_size,
                     const std::size_t max_files, const std::time_t max_flush_period_sec = 0)
-      : umq_(umq::Umq::Create(fifo_size)), rotating_file_(std::move(filename), max_file_size, max_files) {
+      : umq_(mpsc::Mq::Create(fifo_size)), rotating_file_(std::move(filename), max_file_size, max_files) {
     auto async_thread_function = [=, this]() {
       std::time_t last_flush_time = std::time(nullptr);
-      umq::Consumer reader(umq_->shared_from_this());
+      mpsc::Consumer reader(umq_->shared_from_this());
       while (!should_exit_) {
-        umq::DataPacket ptr = reader.ReadOrWait(std::chrono::milliseconds(1000), [&] { return should_exit_.load(); });
+        mpsc::DataPacket ptr = reader.ReadOrWait(std::chrono::milliseconds(1000), [&] { return should_exit_.load(); });
         while (const auto data = ptr.next()) {
           rotating_file_.SinkIt(data.data, data.size);
         }
@@ -65,11 +65,11 @@ class AsyncRotatingFile {
     if (async_thread_) async_thread_->join();
   }
 
-  umq::Producer CreateProducer() const { return umq::Producer(umq_->shared_from_this()); }
+  mpsc::Producer CreateProducer() const { return mpsc::Producer(umq_->shared_from_this()); }
 
   size_t InPacket(const void *buf, const size_t num_elements,
                   const std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000)) const {
-    umq::Producer writer(umq_->shared_from_this());
+    mpsc::Producer writer(umq_->shared_from_this());
     uint8_t *buffer = writer.ReserveOrWaitFor(num_elements, wait_time);
     if (buffer) {
       memcpy(buffer, buf, num_elements);
@@ -80,7 +80,7 @@ class AsyncRotatingFile {
   }
 
  private:
-  std::shared_ptr<umq::Umq> umq_;
+  std::shared_ptr<mpsc::Mq> umq_;
   RotatingFile rotating_file_;
   std::unique_ptr<std::thread> async_thread_;
 
