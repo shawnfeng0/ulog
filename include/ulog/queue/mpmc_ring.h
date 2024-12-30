@@ -91,7 +91,7 @@ struct Header {
     return reverse_size_.load(m) & kSizeMask;
   }
 
-  void mark_consumed(const std::memory_order m = std::memory_order_relaxed) { reverse_size_.fetch_or(1U << 31, m); }
+  // void mark_consumed(const std::memory_order m = std::memory_order_relaxed) { reverse_size_.fetch_or(1U << 31, m); }
   void mark_consumed(const uint32_t new_size, const std::memory_order m = std::memory_order_relaxed) {
     reverse_size_.store(new_size & (1U << 31), m);
   }
@@ -195,7 +195,14 @@ class Mq : public std::enable_shared_from_this<Mq> {
 
  public:
   explicit Mq(size_t num_elements, Private)
-      : cons_head_(0), cons_tail_(0), prod_head_(0), prod_last_(0), logger_(), read_logger_(), write_logger_() {
+      : cons_head_(0),
+        cons_tail_(0),
+        cons_recycle_lock_(false),
+        prod_head_(0),
+        prod_last_(0),
+        logger_(),
+        read_logger_(),
+        write_logger_() {
     if (num_elements < 2) num_elements = 2;
 
     // round up to the next power of 2, since our 'let the indices wrap'
@@ -282,6 +289,7 @@ class Mq : public std::enable_shared_from_this<Mq> {
 
   uint8_t pad1[64]{};
   std::atomic<size_t> cons_tail_;
+  queue::AtomSubLock cons_recycle_lock_;
 
   uint8_t pad2[64]{};
   std::atomic<size_t> prod_head_;
@@ -627,9 +635,9 @@ class Consumer {
     for (auto &group : {data.group0_, data.group1_}) {
       if (!group.raw_size()) continue;
 
-      auto &packet_header = *reinterpret_cast<std::atomic_uint32_t *>(group.raw_ptr());
-      std::memset(group.raw_ptr() + sizeof(packet_header), 0, group.raw_size() - sizeof(packet_header));
-      packet_header.store(0, std::memory_order_release);
+      // Mark all consumed data on the first packet
+      auto &packet_header = *reinterpret_cast<Header *>(group.raw_ptr());
+      packet_header.mark_consumed(group.raw_size() - sizeof(Header), std::memory_order_relaxed);
 
       const auto item = ring_->logger_.TryReserve();
       if (item) {
@@ -652,7 +660,28 @@ class Consumer {
       }
     }
 
-    ring_->cons_notifier_.notify_when_blocking();
+    ring_->cons_recycle_lock_.add(1, std::memory_order_release);
+
+    // Notify the producer that the data has been consumed
+    {
+      if (!ring_->cons_recycle_lock_.lock_for_sub(std::memory_order_relaxed)) {
+        return;
+      }
+
+      while (true) {
+        const auto prod_last = ring_->prod_last_.load(std::memory_order_relaxed);
+        const auto cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
+        const auto cons_tail = ring_->cons_tail_.load(std::memory_order_relaxed);
+
+        const auto size = ring_->cons_recycle_lock_.size(std::memory_order_acquire);
+        if (size == 0 && ring_->cons_recycle_lock_.unlock_if_not_increased(size)) {
+        }
+        if (ring_->cons_head_.load(std::memory_order_relaxed) != ring_->cons_tail_.load(std::memory_order_relaxed)) {
+        }
+      }
+
+      ring_->cons_notifier_.notify_when_blocking();
+    }
   }
 
  private:

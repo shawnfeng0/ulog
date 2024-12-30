@@ -63,3 +63,16 @@ TEST(IsAllZero, IsAllZero) {
     ASSERT_FALSE(ulog::queue::IsAllZero(data, 232));
   }
 }
+
+TEST(power_of_2, atom_sub_lock) {
+  ulog::queue::AtomSubLock atom_sub_lock;
+  atom_sub_lock.add(10, std::memory_order_release);
+  ASSERT_EQ(atom_sub_lock.size(), 10);
+  atom_sub_lock.lock_for_sub();
+  ASSERT_EQ(atom_sub_lock.size(), 10);
+  atom_sub_lock.sub(4, std::memory_order_relaxed);
+  ASSERT_EQ(atom_sub_lock.size(), 6);
+  ASSERT_TRUE(atom_sub_lock.unlock_if_not_increased(6, std::memory_order_relaxed));
+  atom_sub_lock.add(1);
+  ASSERT_EQ(atom_sub_lock.size(), 7);
+}
