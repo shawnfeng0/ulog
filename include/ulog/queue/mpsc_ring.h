@@ -57,7 +57,6 @@ struct write_item {
   uint32_t cur_end;
   uint32_t size;
   uint32_t line;
-  uint8_t data[1024];
 };
 
 struct logger_item {
@@ -70,7 +69,6 @@ struct logger_item {
   uint32_t start;
   uint32_t end;
   uint32_t value;
-  uint8_t data[1024];
   size_t cons_head;
   size_t prod_head;
   size_t prod_last;
@@ -82,13 +80,27 @@ class Producer;
 class Consumer;
 
 struct Header {
+  static constexpr size_t kFlagMask = 1U << 31;
+  static constexpr size_t kSizeMask = kFlagMask - 1;
+
+  void set_size(const uint32_t size, const std::memory_order m) { data_size.store(size, m); }
+  uint32_t size(const std::memory_order m) const { return data_size.load(m) & kSizeMask; }
+
+  void mark_discarded(const std::memory_order m) { data_size.fetch_or(kFlagMask, m); }
+  bool discarded(const std::memory_order m) const { return data_size.load(m) & kFlagMask; }
+  bool valid(const std::memory_order m) const { return data_size.load(m) != 0; }
+
   std::atomic_uint32_t reverse_size;
-  std::atomic_uint32_t data_size;
+
+ private:
+  std::atomic_uint32_t data_size{0};
+
+ public:
   uint8_t data[0];
 } __attribute__((aligned(8)));
 
 union HeaderPtr {
-  explicit HeaderPtr(uint8_t *ptr = nullptr) : ptr_(ptr) {}
+  explicit HeaderPtr(void *ptr = nullptr) : ptr_(static_cast<uint8_t *>(ptr)) {}
 
   HeaderPtr &operator=(uint8_t *ptr) {
     ptr_ = ptr;
@@ -128,7 +140,7 @@ class PacketGroup {
   Packet next() {
     if (!remain()) return Packet{};
 
-    const Packet packet{packet_head_->data_size, packet_head_->data};
+    const Packet packet{packet_head_->size(std::memory_order_relaxed), packet_head_->data};
     packet_head_ = packet_head_.next();
     packet_count_--;
     return packet;
@@ -202,8 +214,8 @@ class Mq : public std::enable_shared_from_this<Mq> {
     const auto cur_p_last = prod_last & mask();
     const auto cur_c_head = cons_head & mask();
 
-    printf("prod_head: %zd(%zd), prod_last: %zd(%zd), cons_head: %zd(%zd)\n", prod_head, cur_p_head, prod_last,
-           cur_p_last, cons_head, cur_c_head);
+    printf("prod_head: %u(%zd), prod_last: %u(%zd), cons_head: %u(%zd)\n", prod_head, cur_p_head, prod_last, cur_p_last,
+           cons_head, cur_c_head);
 
     for (size_t i = 0; i < size(); i++) {
       if (data_[i])
@@ -258,11 +270,11 @@ class Mq : public std::enable_shared_from_this<Mq> {
   size_t mask_;
 
   uint8_t pad0[64]{};  // Using cache line filling technology can improve performance by 15%
-  std::atomic<size_t> cons_head_;
+  std::atomic<uint32_t> cons_head_;
 
   uint8_t pad1[64]{};
-  std::atomic<size_t> prod_head_;
-  std::atomic<size_t> prod_last_;
+  std::atomic<uint32_t> prod_head_;
+  std::atomic<uint32_t> prod_last_;
 
   uint8_t pad2[64]{};
   LiteNotifier prod_notifier_;
@@ -275,13 +287,8 @@ class Mq : public std::enable_shared_from_this<Mq> {
 
 class Producer {
  public:
-  explicit Producer(const std::shared_ptr<Mq> &ring) : ring_(ring), packet_size_(0) {}
-
-  ~Producer() {
-    if (pending_packet_.get()) {
-      Commit(0);
-    }
-  }
+  explicit Producer(const std::shared_ptr<Mq> &ring) : ring_(ring) {}
+  ~Producer() = default;
 
   void Debug() const { ring_->Debug(); }
 
@@ -310,8 +317,9 @@ class Producer {
    */
   uint8_t *Reserve(const size_t size) {
     const auto packet_size = sizeof(Header) + align8(size);
+    HeaderPtr pending_packet_;
 
-    packet_head_ = ring_->prod_head_.load(std::memory_order_relaxed);
+    auto packet_head_ = ring_->prod_head_.load(std::memory_order_relaxed);
     do {
       const auto cons_head = ring_->cons_head_.load(std::memory_order_acquire);
       packet_next_ = packet_head_ + packet_size;
@@ -336,13 +344,10 @@ class Producer {
 
         const auto item = ring_->write_logger_.TryReserve();
         if (item) {
-          uint8_t data[1024];
-          memcpy(data, &ring_->data_[packet_head_ & ring_->mask()], packet_size);
           item->cur_start = packet_head_ & ring_->mask();
           item->cur_end = item->cur_start + packet_size;
           item->size = packet_size;
           item->line = __LINE__;
-          memcpy(item->data, data, std::min(sizeof(item->data), packet_size));
           ring_->write_logger_.Commit(item);
         }
 
@@ -372,7 +377,6 @@ class Producer {
           item->cur_end = item->cur_start + packet_size;
           item->size = packet_size;
           item->line = __LINE__;
-          memcpy(item->data, data, std::min(sizeof(item->data), packet_size));
           ring_->write_logger_.Commit(item);
         }
 
@@ -384,31 +388,33 @@ class Producer {
       return nullptr;
     } while (true);
 
-    packet_size_ = size;
+    pending_packet_->reverse_size.store(size, std::memory_order_relaxed);
     return &pending_packet_->data[0];
   }
 
   /**
    * Commits the data to the buffer, so that it can be read out.
    */
-  void Commit(const size_t real_size) {
-    assert(real_size <= packet_size_);
-    assert(pending_packet_.get());
+  void Commit(const uint8_t *data, const size_t real_size) {
+    const HeaderPtr pending_packet_(intrusive::owner_of(data, &Header::data));
+    assert(real_size <= pending_packet_->reverse_size);
 
-    pending_packet_->data_size.store(real_size, std::memory_order_relaxed);
-    pending_packet_->reverse_size.store(packet_size_, std::memory_order_release);
+    if (real_size) {
+      pending_packet_->set_size(real_size, std::memory_order_release);
+    } else {
+      pending_packet_->mark_discarded(std::memory_order_relaxed);
+    }
 
     const auto item = ring_->logger_.TryReserve();
     if (item) {
       item->start = pending_packet_.get() - ring_->data_;
-      item->end = item->start + sizeof(Header) + align8(packet_size_);
+      item->end = item->start + sizeof(Header) + align8(pending_packet_->reverse_size);
       item->value = 1;
       item->cons_head = ring_->cons_head_.load();
       item->prod_head = ring_->prod_head_.load();
       item->prod_last = ring_->prod_last_.load();
       item->size = ring_->size();
       item->tid = syscall(SYS_gettid);
-      memcpy(item->data, ring_->data_, sizeof(item->data));
       ring_->logger_.Commit(item);
     }
 
@@ -417,7 +423,6 @@ class Producer {
     // 2. If you don't wait for prod_tail, just do a check and mark? It doesn't work either. Because it is a wait-free
     // process, in a highly competitive scenario, the queue may have been updated once, and the data is unreliable.
     ring_->prod_notifier_.notify_when_blocking();
-    pending_packet_ = nullptr;
   }
 
   /**
@@ -425,16 +430,12 @@ class Producer {
    * @param wait_time The maximum waiting time
    */
   void Flush(const std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000)) const {
-    // TODO: mpmc need modify flush()
     ring_->cons_notifier_.wait_for(wait_time,
-                                   [&]() { return ulog::queue::IsPassed(packet_next_, ring_->cons_head_.load()); });
+                                   [&]() { return queue::IsPassed(packet_next_, ring_->cons_head_.load()); });
   }
 
  private:
   std::shared_ptr<Mq> ring_;
-  HeaderPtr pending_packet_;
-  size_t packet_size_;
-  decltype(ring_->prod_head_.load()) packet_head_{};
   decltype(ring_->prod_head_.load()) packet_next_{};
 };
 
@@ -598,7 +599,6 @@ class Consumer {
         item->prod_last = ring_->prod_last_.load();
         item->size = ring_->size();
         item->tid = syscall(SYS_gettid);
-        memcpy(item->data, ring_->data_, sizeof(item->data));
 
         item->cache_start = cons_head;
         item->cache_cur_start = cons_head & ring_->mask();
@@ -618,7 +618,7 @@ class Consumer {
     HeaderPtr pk;
     size_t count = 0;
     for (pk = data; pk.get() < data + size;) {
-      if (pk->reverse_size.load(std::memory_order_acquire) == 0) break;
+      if (pk->valid(std::memory_order_relaxed) == 0) break;
 
       count++;
       pk = pk.next();

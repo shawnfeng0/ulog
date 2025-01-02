@@ -16,7 +16,7 @@ static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, co
   const auto umq = ulog::mpsc::Mq::Create(buffer_size);
 
   auto write_entry = [=] {
-    ulog::mpsc::Producer producer(umq);
+    ulog::mpsc::Mq::Producer producer(umq);
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<uint32_t> dis(8, 256);
@@ -35,7 +35,7 @@ static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, co
           "rr"
           "sdfeeraerasdfqwersdfqwerrerasdfqwer";
       memcpy(data, data_source, std::min(sizeof(data_source), size));
-      producer.Commit(size);
+      producer.Commit(data, size);
     }
     producer.Flush();
   };
@@ -44,7 +44,7 @@ static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, co
   for (size_t i = 0; i < max_write_thread; ++i) write_thread.emplace_back(write_entry);
 
   auto read_entry = [=] {
-    ulog::mpsc::Consumer consumer(umq);
+    ulog::mpsc::Mq::Consumer consumer(umq);
     size_t total_packet = 0;
     while (ulog::mpsc::DataPacket data = consumer.ReadOrWait(std::chrono::milliseconds(10))) {
       total_packet += data.remain();

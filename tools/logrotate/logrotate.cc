@@ -41,13 +41,14 @@ int main(int argc, char *argv[]) {
 
     // End of input
     if (real_size <= 0) {
+      writer.Commit(buffer, 0); // TODO: discard data
       break;
     }
 
     if (args_info.stdout_flag) {
       write(STDOUT_FILENO, buffer, real_size);
     }
-    writer.Commit(real_size);
+    writer.Commit(buffer, real_size);
   }
 
   return 0;

@@ -33,11 +33,11 @@ class AsyncRotatingFile {
       std::time_t last_flush_time = std::time(nullptr);
       mpsc::Consumer reader(umq_->shared_from_this());
       while (!should_exit_) {
-        mpsc::DataPacket ptr = reader.ReadOrWait(std::chrono::milliseconds(1000), [&] { return should_exit_.load(); });
-        while (const auto data = ptr.next()) {
+        auto data_packet = reader.ReadOrWait(std::chrono::milliseconds(1000), [&] { return should_exit_.load(); });
+        while (const auto data = data_packet.next()) {
           rotating_file_.SinkIt(data.data, data.size);
         }
-        reader.ReleasePacket();
+        reader.ReleasePacket(data_packet);
 
         // Flush
         std::time_t const cur_time = std::time(nullptr);
@@ -73,7 +73,7 @@ class AsyncRotatingFile {
     uint8_t *buffer = writer.ReserveOrWaitFor(num_elements, wait_time);
     if (buffer) {
       memcpy(buffer, buf, num_elements);
-      writer.Commit(num_elements);
+      writer.Commit(buffer, num_elements);
       return num_elements;
     }
     return 0;
