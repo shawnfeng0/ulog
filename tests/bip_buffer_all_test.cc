@@ -8,7 +8,6 @@
 #include <random>
 #include <thread>
 
-#include "ulog/queue/spsc_bip_buffer.h"
 #include "ulog/queue/spsc_bip_buffer2.h"
 #include "ulog/ulog.h"
 
@@ -56,14 +55,6 @@ static void spsc(uint32_t buffer_size) {
 }
 
 TEST(BipBufferTestSingle, singl_producer_single_consumer) {
-  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 4); });
-  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 5); });
-  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 6); });
-  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 7); });
-  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 8); });
-  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 9); });
-  LOGGER_TIME_CODE({ spsc<ulog::BipBuffer<uint32_t>>(1 << 10); });
-
   LOGGER_TIME_CODE({ spsc<ulog::BipBuffer2<uint32_t>>(1 << 4); });
   LOGGER_TIME_CODE({ spsc<ulog::BipBuffer2<uint32_t>>(1 << 5); });
   LOGGER_TIME_CODE({ spsc<ulog::BipBuffer2<uint32_t>>(1 << 6); });
