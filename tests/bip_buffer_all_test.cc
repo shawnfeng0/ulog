@@ -8,7 +8,7 @@
 #include <random>
 #include <thread>
 
-#include "ulog/queue/spsc_bip_buffer2.h"
+#include "ulog/queue/spsc_ring.h"
 #include "ulog/ulog.h"
 
 template <typename T>
