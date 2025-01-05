@@ -456,7 +456,7 @@ class Consumer {
   template <typename Condition>
   DataPacket ReadOrWait(const std::chrono::milliseconds timeout, Condition other_condition = []() { return false; }) {
     DataPacket ptr;
-    ring_->prod_notifier_.wait_for(timeout, [&] { return (ptr = TryRead()).remain() > 0 || other_condition(); });
+    ring_->prod_notifier_.wait_for(timeout, [&] { return (ptr = Read()).remain() > 0 || other_condition(); });
     return ptr;
   }
   DataPacket ReadOrWait(const std::chrono::milliseconds timeout) {
@@ -467,7 +467,7 @@ class Consumer {
    * Gets a pointer to the contiguous block in the buffer, and returns the size of that block.
    * @return pointer to the contiguous block
    */
-  DataPacket TryRead() {
+  DataPacket Read() {
     cons_head = ring_->cons_head_.load(std::memory_order_relaxed);
     const auto prod_head = ring_->prod_head_.load(std::memory_order_acquire);
 
@@ -583,7 +583,7 @@ class Consumer {
   /**
    * Releases data from the buffer, so that more data can be written in.
    */
-  void ReleasePacket(const DataPacket &data) const {
+  void Release(const DataPacket &data) const {
     for (auto &group : {data.group0_, data.group1_}) {
       if (!group.raw_size()) continue;
 

@@ -52,7 +52,7 @@ static void umq_mpsc(const size_t buffer_size, const size_t max_write_thread, co
         uint8_t data_recv[100 * 1024];
         memcpy(data_recv, packet.data, packet.size);
       }
-      consumer.ReleasePacket(data);
+      consumer.Release(data);
     }
     LOGGER_MULTI_TOKEN(buffer_size, total_packet);
   };

@@ -24,6 +24,8 @@ template <typename T>
 struct Packet {
   explicit Packet(const size_t s = 0, T *d = nullptr) : size(s), data(d) {}
   Packet(const Packet &other) = default;
+  Packet &operator=(const Packet &other) = default;
+
   Packet(Packet &&other) noexcept : size(other.size), data(other.data) {
     other.data = nullptr;
     other.size = 0;
@@ -40,7 +42,7 @@ class DataPacket {
   friend class Consumer<T>;
 
  public:
-  explicit DataPacket(const uint32_t end_index, Packet<T> group0 = Packet<T>{}, Packet<T> group1 = Packet<T>{})
+  explicit DataPacket(const uint32_t end_index = 0, Packet<T> group0 = Packet<T>{}, Packet<T> group1 = Packet<T>{})
       : end_index_(end_index), group0_(std::move(group0)), group1_(std::move(group1)) {}
 
   explicit operator bool() const noexcept { return remain() > 0; }
@@ -53,7 +55,7 @@ class DataPacket {
   }
 
  private:
-  const uint32_t end_index_;
+  uint32_t end_index_;
   Packet<T> group0_;
   Packet<T> group1_;
 };
@@ -85,6 +87,24 @@ class Mq : public std::enable_shared_from_this<Mq<T>> {
   static std::shared_ptr<Mq> Create(size_t num_elements) { return std::make_shared<Mq>(num_elements, Private()); }
   using Producer = spsc::Producer<T>;
   using Consumer = spsc::Consumer<T>;
+
+  /**
+   * Ensure that all currently written data has been read and processed
+   * @param wait_time The maximum waiting time
+   */
+  void Flush(const std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000)) {
+    prod_notifier_.notify_when_blocking();
+    const auto prod_head = in_.load();
+    cons_notifier_.wait_for(wait_time, [&]() { return queue::IsPassed(prod_head, out_.load()); });
+  }
+
+  /**
+   * Notify all waiting threads, so that they can check the status of the queue
+   */
+  void Notify() {
+    prod_notifier_.notify_when_blocking();
+    cons_notifier_.notify_when_blocking();
+  }
 
  private:
   size_t size() const { return mask_ + 1; }
@@ -173,6 +193,8 @@ class Producer {
    * returned by the TryReserve function.
    */
   void Commit(const T * /* unused */, const size_t size) {
+    if (size == 0) return;  // Discard empty data
+
     // only written from push thread
     const auto in = ring_->in_.load(std::memory_order_relaxed);
 
@@ -213,14 +235,14 @@ class Consumer {
   DataPacket<T> ReadOrWait(
       const std::chrono::milliseconds timeout, Condition other_condition = []() { return false; }) {
     DataPacket<T> ptr;
-    ring_->prod_notifier_.wait_for(timeout, [&] { return (ptr = TryRead()).remain() > 0 || other_condition(); });
+    ring_->prod_notifier_.wait_for(timeout, [&] { return (ptr = Read()).remain() > 0 || other_condition(); });
     return ptr;
   }
   DataPacket<T> ReadOrWait(const std::chrono::milliseconds timeout) {
     return ReadOrWait(timeout, [] { return false; });
   }
 
-  DataPacket<T> TryRead() {
+  DataPacket<T> Read() {
     const auto in = ring_->in_.load(std::memory_order_acquire);
     const auto last = ring_->last_.load(std::memory_order_relaxed);
     const auto out = ring_->out_.load(std::memory_order_relaxed);

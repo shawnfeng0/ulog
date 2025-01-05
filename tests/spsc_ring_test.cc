@@ -37,7 +37,7 @@ static void spsc(const uint32_t buffer_size, const uint64_t limit) {
     typename T::Consumer consumer(buffer);
     uint64_t read_count = 0;
     while (read_count < limit) {
-      auto data = consumer.TryRead();
+      auto data = consumer.Read();
 
       if (!data) {
         std::this_thread::yield();

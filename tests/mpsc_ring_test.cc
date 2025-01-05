@@ -55,7 +55,7 @@ static void mq_test(const size_t buffer_size, const size_t write_thread_count, c
         ASSERT_EQ(memcmp(data_source, packet.data, packet.size), 0);
         total_read_size += packet.size;
       }
-      consumer.ReleasePacket(data);
+      consumer.Release(data);
     }
   };
 

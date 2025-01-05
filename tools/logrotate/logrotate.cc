@@ -6,6 +6,8 @@
 
 #include "cmdline.h"
 #include "ulog/file/async_rotating_file.h"
+#include "ulog/queue/mpsc_ring.h"
+#include "ulog/queue/spsc_ring.h"
 #include "ulog/ulog.h"
 
 int main(int argc, char *argv[]) {
@@ -15,8 +17,9 @@ int main(int argc, char *argv[]) {
 
   const int fifo_size = std::max(args_info.fifo_size_arg, 16 * 1024);
 
-  const ulog::AsyncRotatingFile async_rotate(fifo_size, args_info.file_path_arg, args_info.file_size_arg,
-                                             args_info.file_number_arg, args_info.flush_interval_arg);
+  const ulog::AsyncRotatingFile<ulog::spsc::Mq<uint8_t>> async_rotate(
+      fifo_size, args_info.file_path_arg, args_info.file_size_arg, args_info.file_number_arg,
+      args_info.flush_interval_arg);
 
   cmdline_parser_free(&args_info); /* release allocated memory */
 
@@ -35,13 +38,13 @@ int main(int argc, char *argv[]) {
 
   pollfd fds{.fd = STDIN_FILENO, .events = POLLIN, .revents = 0};
   while (poll(&fds, 1, -1) >= 0) {
-    uint8_t *buffer = writer.ReserveOrWait(reverse_size);
+    auto *buffer = writer.ReserveOrWait(reverse_size);
 
     const auto real_size = read(STDIN_FILENO, buffer, reverse_size);
 
     // End of input
     if (real_size <= 0) {
-      writer.Commit(buffer, 0); // TODO: discard data
+      writer.Commit(buffer, 0);
       break;
     }
 
