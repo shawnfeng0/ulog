@@ -4,11 +4,16 @@
 #include <cstddef>
 #include <utility>
 
+#include "lite_notifier.h"
 #include "power_of_two.h"
 
 namespace ulog {
 namespace spsc {
 
+template <typename T>
+class Producer;
+template <typename T>
+class Consumer;
 template <typename T>
 class Mq;
 
@@ -32,6 +37,7 @@ struct Packet {
 template <typename T>
 class DataPacket {
   friend class Mq<T>;
+  friend class Consumer<T>;
 
  public:
   explicit DataPacket(const uint32_t end_index, Packet<T> group0 = Packet<T>{}, Packet<T> group1 = Packet<T>{})
@@ -54,13 +60,15 @@ class DataPacket {
 
 template <typename T = char>
 class Mq : public std::enable_shared_from_this<Mq<T>> {
+  friend class Producer<T>;
+  friend class Consumer<T>;
 
   struct Private {
     explicit Private() = default;
   };
 
  public:
-  explicit Mq(size_t num_elements, Private) : out_(0), in_(0), last_(0), wrapped_(false) {
+  explicit Mq(size_t num_elements, Private) : out_(0), in_(0), last_(0) {
     if (num_elements < 2)
       num_elements = 2;
     else {
@@ -75,94 +83,8 @@ class Mq : public std::enable_shared_from_this<Mq<T>> {
 
   // Everyone else has to use this factory function
   static std::shared_ptr<Mq> Create(size_t num_elements) { return std::make_shared<Mq>(num_elements, Private()); }
-
-  /**
-   * Try to reserve space of size
-   * @param size size of space to reserve
-   * @return data pointer if successful, otherwise nullptr
-   */
-  T *Reserve(const size_t size) {
-    const auto out = out_.load(std::memory_order_relaxed);
-    const auto in = in_.load(std::memory_order_relaxed);
-
-    const auto unused = this->size() - (in - out);
-    if (unused < size) {
-      return nullptr;
-    }
-
-    // The current block has enough free space
-    if (this->size() - (in & mask()) >= size) {
-      wrapped_ = false;
-      return &data_[in & mask()];
-    }
-
-    // new_pos is in the next block
-    if ((out & mask()) >= size) {
-      wrapped_ = true;
-      return &data_[0];
-    }
-
-    return nullptr;
-  }
-
-  /**
-   * Commits the data to the buffer, so that it can be read out.
-   * @param size the size of the data to be committed
-   *
-   * NOTE:
-   * The validity of the size is not checked, it needs to be within the range
-   * returned by the TryReserve function.
-   */
-  void Commit(const T * /* unused */, const size_t size) {
-    // only written from push thread
-    const auto in = in_.load(std::memory_order_relaxed);
-
-    if (wrapped_) {
-      last_.store(in, std::memory_order_relaxed);
-      in_.store(next_buffer(in) + size, std::memory_order_release);
-    } else {
-      // Whenever we wrap around, we update the last variable to ensure logical
-      // consistency.
-      const auto new_pos = in + size;
-      if ((new_pos & mask()) == 0) {
-        last_.store(new_pos, std::memory_order_relaxed);
-      }
-      in_.store(new_pos, std::memory_order_release);
-    }
-  }
-
-  DataPacket<T> TryRead() {
-    const auto in = in_.load(std::memory_order_acquire);
-    const auto last = last_.load(std::memory_order_relaxed);
-    const auto out = out_.load(std::memory_order_relaxed);
-
-    if (out == in) {
-      return DataPacket<T>{out};
-    }
-
-    const auto cur_in = in & mask();
-    const auto cur_out = out & mask();
-
-    // read and write are still in the same block
-    if (cur_out < cur_in) {
-      return DataPacket<T>{in, Packet<T>(in - out, &data_[cur_out])};
-    }
-
-    // read and write are in different blocks, read the current remaining data
-    if (out != last) {
-      Packet<T> group0{last - out, &data_[cur_out]};
-      Packet<T> group1{cur_in, cur_in != 0 ? &data_[0] : nullptr};
-      return DataPacket<T>{in, group0, group1};
-    }
-
-    if (cur_in == 0) {
-      return DataPacket<T>{in};
-    }
-
-    return DataPacket<T>{in, Packet<T>{cur_in, &data_[0]}};
-  }
-
-  void Release(const DataPacket<T> &data) { out_.store(data.end_index_, std::memory_order_release); }
+  using Producer = spsc::Producer<T>;
+  using Consumer = spsc::Consumer<T>;
 
  private:
   size_t size() const { return mask_ + 1; }
@@ -184,7 +106,158 @@ class Mq : public std::enable_shared_from_this<Mq<T>> {
   // for writer thread
   std::atomic_uint32_t in_;
   std::atomic_uint32_t last_;
+
+  char pad2[64]{};
+  LiteNotifier prod_notifier_;
+  LiteNotifier cons_notifier_;
+};
+
+template <typename T>
+class Producer {
+ public:
+  explicit Producer(const std::shared_ptr<Mq<T>> &ring) : ring_(ring), wrapped_(false) {}
+
+  /**
+   * Reserve space of size, automatically retry until timeout
+   * @param size size of space to reserve
+   * @param timeout The maximum waiting time if there is insufficient space in the queue
+   * @return data pointer if successful, otherwise nullptr
+   */
+  T *ReserveOrWaitFor(const size_t size, const std::chrono::milliseconds timeout) {
+    T *ptr;
+    ring_->cons_notifier_.wait_for(timeout, [&] { return (ptr = Reserve(size)) != nullptr; });
+    return ptr;
+  }
+
+  T *ReserveOrWait(const size_t size) {
+    T *ptr;
+    ring_->cons_notifier_.wait([&] { return (ptr = Reserve(size)) != nullptr; });
+    return ptr;
+  }
+
+  /**
+   * Try to reserve space of size
+   * @param size size of space to reserve
+   * @return data pointer if successful, otherwise nullptr
+   */
+  T *Reserve(const size_t size) {
+    const auto out = ring_->out_.load(std::memory_order_relaxed);
+    const auto in = ring_->in_.load(std::memory_order_relaxed);
+
+    const auto unused = ring_->size() - (in - out);
+    if (unused < size) {
+      return nullptr;
+    }
+
+    // The current block has enough free space
+    if (ring_->size() - (in & ring_->mask()) >= size) {
+      wrapped_ = false;
+      return &ring_->data_[in & ring_->mask()];
+    }
+
+    // new_pos is in the next block
+    if ((out & ring_->mask()) >= size) {
+      wrapped_ = true;
+      return &ring_->data_[0];
+    }
+
+    return nullptr;
+  }
+
+  /**
+   * Commits the data to the buffer, so that it can be read out.
+   * @param size the size of the data to be committed
+   *
+   * NOTE:
+   * The validity of the size is not checked, it needs to be within the range
+   * returned by the TryReserve function.
+   */
+  void Commit(const T * /* unused */, const size_t size) {
+    // only written from push thread
+    const auto in = ring_->in_.load(std::memory_order_relaxed);
+
+    if (wrapped_) {
+      ring_->last_.store(in, std::memory_order_relaxed);
+      ring_->in_.store(ring_->next_buffer(in) + size, std::memory_order_release);
+    } else {
+      // Whenever we wrap around, we update the last variable to ensure logical
+      // consistency.
+      const auto new_pos = in + size;
+      if ((new_pos & ring_->mask()) == 0) {
+        ring_->last_.store(new_pos, std::memory_order_relaxed);
+      }
+      ring_->in_.store(new_pos, std::memory_order_release);
+    }
+
+    ring_->prod_notifier_.notify_when_blocking();
+  }
+
+ private:
+  std::shared_ptr<Mq<T>> ring_;
   bool wrapped_;
+};
+
+template <typename T>
+class Consumer {
+ public:
+  explicit Consumer(const std::shared_ptr<Mq<T>> &ring) : ring_(ring) {}
+
+  /**
+   * Gets a pointer to the contiguous block in the buffer, and returns the size of that block. automatically retry until
+   * timeout
+   * @param timeout The maximum waiting time
+   * @param other_condition Other wake-up conditions
+   * @return pointer to the contiguous block
+   */
+  template <typename Condition>
+  DataPacket<T> ReadOrWait(
+      const std::chrono::milliseconds timeout, Condition other_condition = []() { return false; }) {
+    DataPacket<T> ptr;
+    ring_->prod_notifier_.wait_for(timeout, [&] { return (ptr = TryRead()).remain() > 0 || other_condition(); });
+    return ptr;
+  }
+  DataPacket<T> ReadOrWait(const std::chrono::milliseconds timeout) {
+    return ReadOrWait(timeout, [] { return false; });
+  }
+
+  DataPacket<T> TryRead() {
+    const auto in = ring_->in_.load(std::memory_order_acquire);
+    const auto last = ring_->last_.load(std::memory_order_relaxed);
+    const auto out = ring_->out_.load(std::memory_order_relaxed);
+
+    if (out == in) {
+      return DataPacket<T>{out};
+    }
+
+    const auto cur_in = in & ring_->mask();
+    const auto cur_out = out & ring_->mask();
+
+    // read and write are still in the same block
+    if (cur_out < cur_in) {
+      return DataPacket<T>{in, Packet<T>(in - out, &ring_->data_[cur_out])};
+    }
+
+    // read and write are in different blocks, read the current remaining data
+    if (out != last) {
+      Packet<T> group0{last - out, &ring_->data_[cur_out]};
+      Packet<T> group1{cur_in, cur_in != 0 ? &ring_->data_[0] : nullptr};
+      return DataPacket<T>{in, group0, group1};
+    }
+
+    if (cur_in == 0) {
+      return DataPacket<T>{in};
+    }
+
+    return DataPacket<T>{in, Packet<T>{cur_in, &ring_->data_[0]}};
+  }
+
+  void Release(const DataPacket<T> &data) {
+    ring_->out_.store(data.end_index_, std::memory_order_release);
+    ring_->cons_notifier_.notify_when_blocking();
+  }
+
+ private:
+  std::shared_ptr<Mq<T>> ring_;
 };
 
 }  // namespace spsc

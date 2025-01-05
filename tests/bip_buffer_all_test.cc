@@ -16,6 +16,7 @@ static void spsc(const uint32_t buffer_size, const uint64_t limit) {
   auto buffer = T::Create(buffer_size);
 
   std::thread write_thread{[&] {
+    typename T::Producer producer(buffer);
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<uint32_t> dis(1, std::max<uint32_t>(buffer_size / 100, 2));
@@ -23,19 +24,20 @@ static void spsc(const uint32_t buffer_size, const uint64_t limit) {
     while (write_count < limit) {
       size_t size = dis(gen);
 
-      decltype(buffer->Reserve(size)) data;
-      while ((data = buffer->Reserve(size)) == nullptr) {
+      decltype(producer.Reserve(size)) data;
+      while ((data = producer.Reserve(size)) == nullptr) {
         std::this_thread::yield();
       }
       for (size_t i = 0; i < size; ++i) data[i] = write_count++;
-      buffer->Commit(data, size);
+      producer.Commit(data, size);
     }
   }};
 
   std::thread read_thread{[&] {
+    typename T::Consumer consumer(buffer);
     uint64_t read_count = 0;
     while (read_count < limit) {
-      auto data = buffer->TryRead();
+      auto data = consumer.TryRead();
 
       if (!data) {
         std::this_thread::yield();
@@ -47,7 +49,7 @@ static void spsc(const uint32_t buffer_size, const uint64_t limit) {
           ASSERT_EQ(packet.data[i], read_count++);
         }
       }
-      buffer->Release(data);
+      consumer.Release(data);
     }
   }};
 
