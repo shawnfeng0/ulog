@@ -17,47 +17,29 @@ class Consumer;
 template <typename T>
 class Mq;
 
-/**
- * Data structure used when reading data externally
- */
-template <typename T>
-struct Packet {
-  explicit Packet(const size_t s = 0, T *d = nullptr) : size(s), data(d) {}
-  Packet(const Packet &other) = default;
-  Packet &operator=(const Packet &other) = default;
-
-  Packet(Packet &&other) noexcept : size(other.size), data(other.data) {
-    other.data = nullptr;
-    other.size = 0;
-  }
-
-  explicit operator bool() const noexcept { return data != nullptr; }
-  size_t size = 0;
-  T *data = nullptr;
-};
-
 template <typename T>
 class DataPacket {
   friend class Mq<T>;
   friend class Consumer<T>;
 
  public:
-  explicit DataPacket(const uint32_t end_index = 0, Packet<T> group0 = Packet<T>{}, Packet<T> group1 = Packet<T>{})
+  explicit DataPacket(const uint32_t end_index = 0, queue::Packet<T> group0 = queue::Packet<T>{},
+                      queue::Packet<T> group1 = queue::Packet<T>{})
       : end_index_(end_index), group0_(std::move(group0)), group1_(std::move(group1)) {}
 
   explicit operator bool() const noexcept { return remain() > 0; }
   size_t remain() const { return (group0_ ? 1 : 0) + (group1_ ? 1 : 0); }
 
-  Packet<T> next() {
+  queue::Packet<T> next() {
     if (group0_) return std::move(group0_);
     if (group1_) return std::move(group1_);
-    return Packet<T>{0, nullptr};
+    return queue::Packet<T>{0, nullptr};
   }
 
  private:
   uint32_t end_index_;
-  Packet<T> group0_;
-  Packet<T> group1_;
+  queue::Packet<T> group0_;
+  queue::Packet<T> group1_;
 };
 
 template <typename T = char>
@@ -256,13 +238,13 @@ class Consumer {
 
     // read and write are still in the same block
     if (cur_out < cur_in) {
-      return DataPacket<T>{in, Packet<T>(in - out, &ring_->data_[cur_out])};
+      return DataPacket<T>{in, queue::Packet<T>(in - out, &ring_->data_[cur_out])};
     }
 
     // read and write are in different blocks, read the current remaining data
     if (out != last) {
-      Packet<T> group0{last - out, &ring_->data_[cur_out]};
-      Packet<T> group1{cur_in, cur_in != 0 ? &ring_->data_[0] : nullptr};
+      queue::Packet<T> group0{last - out, &ring_->data_[cur_out]};
+      queue::Packet<T> group1{cur_in, cur_in != 0 ? &ring_->data_[0] : nullptr};
       return DataPacket<T>{in, group0, group1};
     }
 
@@ -270,7 +252,7 @@ class Consumer {
       return DataPacket<T>{in};
     }
 
-    return DataPacket<T>{in, Packet<T>{cur_in, &ring_->data_[0]}};
+    return DataPacket<T>{in, queue::Packet<T>{cur_in, &ring_->data_[0]}};
   }
 
   void Release(const DataPacket<T> &data) {

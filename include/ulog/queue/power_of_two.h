@@ -3,12 +3,29 @@
 //
 
 #pragma once
-#include <assert.h>
-
-#include <array>
+#include <cassert>
 
 namespace ulog {
 namespace queue {
+
+/**
+ * Data structure used when reading data externally
+ */
+template <typename T = uint8_t>
+struct Packet {
+  explicit Packet(const size_t s = 0, T *d = nullptr) : size(s), data(d) {}
+  Packet(const Packet &other) = default;
+  Packet &operator=(const Packet &other) = default;
+
+  Packet(Packet &&other) noexcept : size(other.size), data(other.data) {
+    other.data = nullptr;
+    other.size = 0;
+  }
+
+  explicit operator bool() const noexcept { return data != nullptr; }
+  size_t size = 0;
+  T *data = nullptr;
+};
 
 template <typename T>
 static inline constexpr bool is_power_of_2(T x) {
@@ -63,10 +80,10 @@ static inline bool IsInRange(unsigned left, unsigned value, unsigned right) {
  */
 static bool inline IsPassed(const uint32_t head, const uint32_t tail) { return tail - head < (1U << 31); }
 
-static bool inline IsAllZero(const void* buffer, const size_t size) {
+static bool inline IsAllZero(const void *buffer, const size_t size) {
   assert(reinterpret_cast<uintptr_t>(buffer) % 8 == 0);
   assert(size % 8 == 0);
-  const auto ptr_uint32_start = static_cast<const uint32_t*>(buffer);
+  const auto ptr_uint32_start = static_cast<const uint32_t *>(buffer);
   const auto ptr_uint32_end = ptr_uint32_start + (size / sizeof(*ptr_uint32_start));
   for (auto i = ptr_uint32_start; i < ptr_uint32_end; i++)
     if (*i != 0) return false;

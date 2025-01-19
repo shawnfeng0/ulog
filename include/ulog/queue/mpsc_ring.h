@@ -117,17 +117,6 @@ union HeaderPtr {
   __attribute__((unused)) uint8_t *ptr_;
 };
 
-/**
- * Data structure used when reading data externally
- */
-struct Packet {
-  explicit Packet(const size_t s = 0, void *d = nullptr) : size(s), data(d) {}
-
-  explicit operator bool() const noexcept { return data != nullptr; }
-  size_t size = 0;
-  void *data = nullptr;
-};
-
 class PacketGroup {
  public:
   explicit PacketGroup(const HeaderPtr packet_head = HeaderPtr{nullptr}, const size_t count = 0,
@@ -137,10 +126,10 @@ class PacketGroup {
   explicit operator bool() const noexcept { return remain() > 0; }
   size_t remain() const { return packet_count_; }
 
-  Packet next() {
-    if (!remain()) return Packet{};
+  queue::Packet<> next() {
+    if (!remain()) return queue::Packet<>{};
 
-    const Packet packet{packet_head_->size(std::memory_order_relaxed), packet_head_->data};
+    const queue::Packet<> packet{packet_head_->size(std::memory_order_relaxed), packet_head_->data};
     packet_head_ = packet_head_.next();
     packet_count_--;
     return packet;
@@ -166,10 +155,10 @@ class DataPacket {
   explicit operator bool() const noexcept { return remain() > 0; }
   size_t remain() const { return group0_.remain() + group1_.remain(); }
 
-  Packet next() {
+  queue::Packet<> next() {
     if (group0_.remain()) return group0_.next();
     if (group1_.remain()) return group1_.next();
-    return Packet{0, nullptr};
+    return queue::Packet<>{0, nullptr};
   }
 
  private:

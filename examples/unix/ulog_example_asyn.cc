@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <ctime>
 
-#include "ulog/helper/queue/fifo_power_of_two.h"
+#include "ulog/queue/fifo_power_of_two.h"
 #include "ulog/ulog.h"
 
 void *ulog_asyn_thread(void *arg) {
@@ -23,8 +23,7 @@ void *ulog_asyn_thread(void *arg) {
     }
   }
 
-  printf("fifo.num_dropped():%zu, fifo.peak():%zu, fifo.size():%zu",
-         fifo.num_dropped(), fifo.peak(), fifo.size());
+  printf("fifo.num_dropped():%zu, fifo.peak():%zu, fifo.size():%zu", fifo.num_dropped(), fifo.peak(), fifo.size());
   return nullptr;
 }
 

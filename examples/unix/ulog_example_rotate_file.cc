@@ -4,9 +4,10 @@
 #include <ctime>
 #include <vector>
 
-#include "ulog/helper/async_rotating_file.h"
-#include "ulog/helper/queue/fifo_power_of_two.h"
-#include "ulog/helper/rotating_file.h"
+#include "ulog/file/async_rotating_file.h"
+#include "ulog/queue/fifo_power_of_two.h"
+#include "ulog/queue/mpsc_ring.h"
+#include "ulog/queue/spsc_ring.h"
 #include "ulog/ulog.h"
 
 static void OutputFunc() {
@@ -38,18 +39,17 @@ static void OutputFunc() {
 }
 
 int main() {
-  auto &async_rotate = *new ulog::AsyncRotatingFile(
-      65536 * 2, "/tmp/ulog/test.txt", 100 * 1024, 5, 1);
+  ulog::AsyncRotatingFile<ulog::mpsc::Mq> async_rotate(65536 * 2, "/tmp/ulog/test.txt", 100 * 1024, 5, true, 1);
 
   // Initial logger
   logger_set_user_data(ULOG_GLOBAL, &async_rotate);
   logger_set_output_callback(ULOG_GLOBAL, [](void *user_data, const char *str) {
     printf("%s", str);
-    auto &async = *(ulog::AsyncRotatingFile *)(user_data);
-    return (int)async.InPacket(str, strlen(str));
+    auto &async = *static_cast<decltype(&async_rotate)>(user_data);
+    return static_cast<int>(async.InPacket(str, strlen(str)));
   });
   logger_set_flush_callback(ULOG_GLOBAL, [](void *user_data) {
-    auto &async = *(ulog::AsyncRotatingFile *)(user_data);
+    auto &async = *static_cast<decltype(&async_rotate)>(user_data);
     async.Flush();
   });
 
@@ -57,17 +57,7 @@ int main() {
   std::vector<std::thread> threads;
   uint32_t num_threads = 10;
   while (num_threads--) threads.emplace_back(OutputFunc);
-
   for (auto &thread : threads) thread.join();
 
-  // Wait flush
-  while (!async_rotate.is_idle()) usleep(1000);
-
-  printf("fifo.num_dropped():%zu, fifo.peak():%zu, fifo.size():%zu\n",
-         async_rotate.fifo_num_dropped(), async_rotate.fifo_peak(),
-         async_rotate.fifo_size());
-
-  delete &async_rotate;
-
-  pthread_exit(nullptr);
+  return 0;
 }
