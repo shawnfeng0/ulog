@@ -80,8 +80,9 @@ class ZstdLimitFile final : public WriterInterface {
 
     if (zstd_frame_in_ > 0) {
       auto status = WriteCompressData(nullptr, 0, ZSTD_e_end);
-      if (status) zstd_frame_in_ = 0;
-      return status;
+      if (!status) return status;
+
+      zstd_frame_in_ = 0;
     }
 
     std::fflush(file_);
