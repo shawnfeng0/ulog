@@ -48,7 +48,7 @@ struct ulog_buffer_s {
   char *cur_buf_ptr_;
 };
 
-static inline void loggger_buffer_init(struct ulog_buffer_s *log_buf) {
+static inline void logger_buffer_init(struct ulog_buffer_s *log_buf) {
   log_buf->cur_buf_ptr_ = log_buf->log_out_buf_;
 }
 
@@ -330,7 +330,7 @@ inline void print(struct ulog_buffer_s *log_buffer, bool color,
 #define ULOG_OUT_TOKEN(logger, token)                                   \
   ({                                                                    \
     struct ulog_buffer_s log_buffer;                                    \
-    loggger_buffer_init(&log_buffer);                                   \
+    logger_buffer_init(&log_buffer);                                   \
     ULOG_OUT_TOKEN_IMPLEMENT(                                           \
         &log_buffer, logger_check_format(logger, ULOG_F_COLOR), token); \
     LOGGER_LOCAL_DEBUG(logger, "%s", log_buffer.log_out_buf_);          \
@@ -370,7 +370,7 @@ inline void print(struct ulog_buffer_s *log_buffer, bool color,
 #define ULOG_OUT_MULTI_TOKEN(logger, ...)                                     \
   ({                                                                          \
     struct ulog_buffer_s log_buffer;                                          \
-    loggger_buffer_init(&log_buffer);                                         \
+    logger_buffer_init(&log_buffer);                                         \
     ULOG_EXPAND(ULOG_MACRO_CONCAT(ULOG_TOKEN_AUX_,                            \
                                   ULOG_ARG_COUNT(__VA_ARGS__))(               \
         &log_buffer, logger_check_format(logger, ULOG_F_COLOR), __VA_ARGS__)) \

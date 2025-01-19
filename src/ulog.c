@@ -180,7 +180,7 @@ uintptr_t logger_hex_dump(struct ulog_s *logger, const void *data,
   if (!data || width == 0 || !is_logger_valid(logger)) return 0;
 
   struct ulog_buffer_s log_buffer;
-  loggger_buffer_init(&log_buffer);
+  logger_buffer_init(&log_buffer);
 
   const uint8_t *data_raw = data;
   const uint8_t *data_cur = data;
@@ -228,7 +228,7 @@ void logger_raw(struct ulog_s *logger, enum ulog_level_e level, const char *fmt,
   if (!is_logger_valid(logger) || !fmt || level < logger->log_level_) return;
 
   struct ulog_buffer_s log_buffer;
-  loggger_buffer_init(&log_buffer);
+  logger_buffer_init(&log_buffer);
 
   va_list ap;
   va_start(ap, fmt);
@@ -244,7 +244,7 @@ void logger_log_with_header(struct ulog_s *logger, enum ulog_level_e level,
   if (!is_logger_valid(logger) || !fmt || level < logger->log_level_) return;
 
   struct ulog_buffer_s log_buffer;
-  loggger_buffer_init(&log_buffer);
+  logger_buffer_init(&log_buffer);
 
   // Color
   if (logger_check_format(logger, ULOG_F_NUMBER | ULOG_F_TIME | ULOG_F_LEVEL))
