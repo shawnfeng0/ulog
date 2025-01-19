@@ -1,5 +1,5 @@
 package "logrotate"
-version "1.0"
+version "0.6.0"
 purpose "Loop logging of standard inputs to several files"
 
 option "file-path" - "File path to record log"
@@ -12,5 +12,9 @@ option "fifo-size" - "Fifo size"
         string typestr="size" optional default="32KB"
 option "flush-interval" - "Interval between flush"
         int    typestr="second" optional default="1"
+option "zstd-compress" - "Compress with zstd"
+        flag off
+option "zstd-params" - "Parameters for zstd compression,\nlarger == more compression and memory (e.g., level=3,windows-log=21,chain-log=16,hash-log=17)"
+        string typestr="params" optional
 option "rotate-first" - "Should rotate first before write"
         flag off

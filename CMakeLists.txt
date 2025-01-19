@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.5...3.31)
 
 # Set cmake_policies
 include(cmake/policy.cmake)
@@ -25,6 +25,10 @@ add_compile_options(-Wextra -Wall)
 # ulog library
 add_library(ulog src/ulog.c)
 target_include_directories(ulog PUBLIC include)
+
+if (ULOG_BUILD_EXAMPLES OR ULOG_BUILD_TOOLS)
+    include(cmake/zstd.cmake)
+endif ()
 
 if (ULOG_BUILD_EXAMPLES)
     add_subdirectory(examples)

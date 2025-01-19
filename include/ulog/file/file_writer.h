@@ -4,88 +4,77 @@
 
 #pragma once
 
-#include "ulog/file/file.h"
+#include "file.h"
+#include "writer_interface.h"
 
 namespace ulog {
 
-// Reference: https://github.com/gabime/spdlog
-class FileWriter {
+class FileLimitWriter final : public WriterInterface {
  public:
-  FileWriter() = default;
+  explicit FileLimitWriter(const size_t file_limit_size) : file_limit_size_(file_limit_size) {}
+  ~FileLimitWriter() override { FileLimitWriter::Close(); }
 
-  FileWriter(const FileWriter &) = delete;
-  FileWriter &operator=(const FileWriter &) = delete;
+  Status Open(const std::string &filename, const bool truncate) override {
+    if (file_ != nullptr) {
+      return Status::Corruption("File already opened!", filename);
+    }
 
-  ~FileWriter() { Close(); }
-
-  void Open(const std::string &fname, bool truncate = false) {
-    Close();
-
-    filename_ = fname;
     // create containing folder if not exists already.
-    file::create_dir(file::dir_name(fname));
-
-    auto *mode = truncate ? "wb" : "ab";
-    fd_ = ::fopen((fname.c_str()), mode);
-  }
-
-  void Reopen(bool truncate) {
-    if (filename_.empty()) {
-      return;
-    }
-    Open(filename_, truncate);
-  }
-
-  void Flush() const { std::fflush(fd_); }
-
-  void Close() {
-    if (fd_) std::fclose(fd_);
-    fd_ = nullptr;
-  }
-
-  bool Write(const void *data, std::size_t len) {
-    return fd_ != nullptr && (std::fwrite(data, 1, len, fd_) == len);
-  }
-
-  std::size_t size() const { return fd_ ? file::filesize(fd_) : 0; }
-
-  const std::string &filename() const { return filename_; }
-
-  // return file path and its extension:
-  //
-  // "mylog.txt" => ("mylog", ".txt")
-  // "mylog" => ("mylog", "")
-  // "mylog." => ("mylog.", "")
-  // "/dir1/dir2/mylog.txt" => ("/dir1/dir2/mylog", ".txt")
-  //
-  // the starting dot in filenames is ignored (hidden files):
-  //
-  // ".mylog" => (".mylog". "")
-  // "my_folder/.mylog" => ("my_folder/.mylog", "")
-  // "my_folder/.mylog.txt" => ("my_folder/.mylog", ".txt")
-  static std::tuple<std::string, std::string> SplitByExtension(
-      const std::string &fname) {
-    auto ext_index = fname.rfind('.');
-
-    // no valid extension found - return whole path and empty string as
-    // extension
-    if (ext_index == std::string::npos || ext_index == 0 ||
-        ext_index == fname.size() - 1) {
-      return std::make_tuple(fname, std::string());
+    if (!file::create_dir(file::dir_name(filename))) {
+      return Status::Corruption("Error creating directory", filename);
     }
 
-    // treat cases like "/etc/rc.d/somelogfile or "/abc/.hiddenfile"
-    auto folder_index = fname.rfind(file::kFolderSep);
-    if (folder_index != std::string::npos && folder_index >= ext_index - 1) {
-      return std::make_tuple(fname, std::string());
+    file_ = fopen(filename.c_str(), truncate ? "wb" : "ab");
+    if (!file_) {
+      return Status::IOError("Error opening file", filename);
     }
 
-    // finally - return a valid base and extension tuple
-    return std::make_tuple(fname.substr(0, ext_index), fname.substr(ext_index));
+    file_write_size_ = truncate ? 0 : file::filesize(file_);
+    return Status::OK();
+  }
+
+  Status Write(const void *data, const size_t length) override {
+    if (!file_) {
+      return Status::Corruption("Not opened");
+    }
+
+    if (file_write_size_ + length > file_limit_size_) {
+      return Status::Full();
+    }
+
+    if (std::fwrite(data, 1, length, file_) != length) {
+      return Status::IOError("Error writing to file");
+    }
+
+    file_write_size_ += length;
+    return Status::OK();
+  }
+
+  Status Flush() override {
+    if (!file_) {
+      return Status::Corruption("Not opened");
+    }
+
+    fflush(file_);
+    return Status::OK();
+  }
+
+  Status Close() override {
+    if (!file_) {
+      return Status::Corruption("Not opened");
+    }
+
+    fclose(file_);
+    file_ = nullptr;
+
+    return Status::OK();
   }
 
  private:
-  std::FILE *fd_{nullptr};
-  std::string filename_;
+  // config
+  const size_t file_limit_size_;
+
+  std::FILE *file_{nullptr};
+  size_t file_write_size_{0};
 };
 }  // namespace ulog

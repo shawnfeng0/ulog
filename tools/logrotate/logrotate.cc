@@ -4,11 +4,15 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <map>
 
 #include "cmdline.h"
 #include "ulog/file/async_rotating_file.h"
+#include "ulog/file/zstd_file_writer.h"
 #include "ulog/queue/mpsc_ring.h"
 #include "ulog/queue/spsc_ring.h"
+
+#define ZSTD_DEFAULT_LEVEL 3
 
 static auto to_bytes(const std::string &sizeStr) {
   size_t i = 0;
@@ -17,11 +21,28 @@ static auto to_bytes(const std::string &sizeStr) {
   std::string unit = sizeStr.substr(i);
   std::transform(unit.begin(), unit.end(), unit.begin(), ::tolower);
 
-  if (unit == "k" || unit == "kb") return size << 10;
-  if (unit == "m" || unit == "mb") return size << 20;
-  if (unit == "g" || unit == "gb") return size << 30;
+  if (unit == "k" || unit == "kb" || unit == "kib") return size << 10;
+  if (unit == "m" || unit == "mb" || unit == "mib") return size << 20;
+  if (unit == "g" || unit == "gb" || unit == "gib") return size << 30;
 
   return size;
+}
+
+static std::map<std::string, std::string> ParseParametersMap(const std::string &input) {
+  std::map<std::string, std::string> params;
+  std::string item;
+  std::stringstream ss(input);
+
+  while (std::getline(ss, item, ',')) {
+    const std::size_t pos = item.find('=');
+    if (pos != std::string::npos) {
+      const std::string key = item.substr(0, pos);
+      const std::string value = item.substr(pos + 1);
+      params[key] = value;
+    }
+  }
+
+  return params;
 }
 
 int main(const int argc, char *argv[]) {
@@ -31,12 +52,40 @@ int main(const int argc, char *argv[]) {
 
   const auto fifo_size = std::max(to_bytes(args_info.fifo_size_arg), 16ULL * 1024);
   const auto file_size = to_bytes(args_info.file_size_arg);
+  std::string filepath = args_info.file_path_arg;
+
+  std::unique_ptr<ulog::WriterInterface> file_writer;
+  // Zstd compression
+  if (args_info.zstd_compress_flag) {
+    // Append .zst extension if not present
+    std::string basename, ext;
+    std::tie(basename, ext) = ulog::file::SplitByExtension(filepath);
+    if (ext != ".zst") filepath += ".zst";
+
+    // Parse zstd parameters
+    if (args_info.zstd_params_given) {
+      const std::map<std::string, std::string> result = ParseParametersMap(args_info.zstd_params_arg);
+      file_writer = std::make_unique<ulog::ZstdLimitFile>(
+          file_size, result.count("level") ? std::stoi(result.at("level")) : ZSTD_DEFAULT_LEVEL,
+          result.count("window-log") ? std::stoi(result.at("window-log")) : 0,
+          result.count("chain-log") ? std::stoi(result.at("chain-log")) : 0,
+          result.count("hash-log") ? std::stoi(result.at("hash-log")) : 0);
+
+      // No zstd parameters
+    } else {
+      file_writer = std::make_unique<ulog::ZstdLimitFile>(file_size);
+    }
+
+    // No compression
+  } else {
+    file_writer = std::make_unique<ulog::FileLimitWriter>(file_size);
+  }
 
   const ulog::AsyncRotatingFile<ulog::spsc::Mq<uint8_t>> async_rotate(
-      fifo_size, args_info.file_path_arg, file_size, args_info.file_number_arg, args_info.rotate_first_flag,
-      args_info.flush_interval_arg);
+      std::move(file_writer), fifo_size, args_info.file_path_arg, args_info.file_number_arg,
+      args_info.rotate_first_flag, args_info.flush_interval_arg);
 
-  cmdline_parser_free(&args_info); /* release allocated memory */
+  cmdline_parser_free(&args_info);
 
   // Set O_NONBLOCK flag
   {

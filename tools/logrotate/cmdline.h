@@ -31,7 +31,7 @@ extern "C" {
 
 #ifndef CMDLINE_PARSER_VERSION
 /** @brief the program version */
-#define CMDLINE_PARSER_VERSION "1.0"
+#define CMDLINE_PARSER_VERSION "0.6.0"
 #endif
 
 /** @brief Where the command line options are stored */
@@ -54,6 +54,14 @@ struct gengetopt_args_info
   int flush_interval_arg;	/**< @brief Interval between flush (default='1').  */
   char * flush_interval_orig;	/**< @brief Interval between flush original value given at command line.  */
   const char *flush_interval_help; /**< @brief Interval between flush help description.  */
+  int zstd_compress_flag;	/**< @brief Compress with zstd (default=off).  */
+  const char *zstd_compress_help; /**< @brief Compress with zstd help description.  */
+  char * zstd_params_arg;	/**< @brief Parameters for zstd compression,
+  larger == more compression and memory (e.g., level=3,windows-log=21,chain-log=16,hash-log=17).  */
+  char * zstd_params_orig;	/**< @brief Parameters for zstd compression,
+  larger == more compression and memory (e.g., level=3,windows-log=21,chain-log=16,hash-log=17) original value given at command line.  */
+  const char *zstd_params_help; /**< @brief Parameters for zstd compression,
+  larger == more compression and memory (e.g., level=3,windows-log=21,chain-log=16,hash-log=17) help description.  */
   int rotate_first_flag;	/**< @brief Should rotate first before write (default=off).  */
   const char *rotate_first_help; /**< @brief Should rotate first before write help description.  */
   
@@ -64,6 +72,8 @@ struct gengetopt_args_info
   unsigned int file_number_given ;	/**< @brief Whether file-number was given.  */
   unsigned int fifo_size_given ;	/**< @brief Whether fifo-size was given.  */
   unsigned int flush_interval_given ;	/**< @brief Whether flush-interval was given.  */
+  unsigned int zstd_compress_given ;	/**< @brief Whether zstd-compress was given.  */
+  unsigned int zstd_params_given ;	/**< @brief Whether zstd-params was given.  */
   unsigned int rotate_first_given ;	/**< @brief Whether rotate-first was given.  */
 
 } ;

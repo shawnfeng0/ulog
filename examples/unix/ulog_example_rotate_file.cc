@@ -4,6 +4,7 @@
 #include <ctime>
 #include <vector>
 
+#include "ulog/error.h"
 #include "ulog/file/async_rotating_file.h"
 #include "ulog/queue/fifo_power_of_two.h"
 #include "ulog/queue/mpsc_ring.h"
@@ -39,7 +40,9 @@ static void OutputFunc() {
 }
 
 int main() {
-  ulog::AsyncRotatingFile<ulog::mpsc::Mq> async_rotate(65536 * 2, "/tmp/ulog/test.txt", 100 * 1024, 5, true, 1);
+  std::unique_ptr<ulog::WriterInterface> file_writer = std::make_unique<ulog::FileLimitWriter>(100 * 1024);
+  ulog::AsyncRotatingFile<ulog::mpsc::Mq> async_rotate(std::move(file_writer), 65536 * 2, "/tmp/ulog/test.txt", 5, true,
+                                                       1);
 
   // Initial logger
   logger_set_user_data(ULOG_GLOBAL, &async_rotate);
@@ -50,7 +53,10 @@ int main() {
   });
   logger_set_flush_callback(ULOG_GLOBAL, [](void *user_data) {
     auto &async = *static_cast<decltype(&async_rotate)>(user_data);
-    async.Flush();
+    const auto status = async.Flush();
+    if (!status) {
+      ULOG_ERROR("Failed to flush file: %s", status.ToString().c_str());
+    }
   });
 
   // Create some output thread

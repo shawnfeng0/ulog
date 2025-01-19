@@ -41,6 +41,8 @@ const char *gengetopt_args_info_help[] = {
   "      --file-number=number     Maximum number of files  (default=`10')",
   "      --fifo-size=size         Fifo size  (default=`32KB')",
   "      --flush-interval=second  Interval between flush  (default=`1')",
+  "      --zstd-compress          Compress with zstd  (default=off)",
+  "      --zstd-params=params     Parameters for zstd compression,\n                                 larger == more compression and memory (e.g.,\n                                 level=3,windows-log=21,chain-log=16,hash-log=17)",
   "      --rotate-first           Should rotate first before write  (default=off)",
     0
 };
@@ -76,6 +78,8 @@ void clear_given (struct gengetopt_args_info *args_info)
   args_info->file_number_given = 0 ;
   args_info->fifo_size_given = 0 ;
   args_info->flush_interval_given = 0 ;
+  args_info->zstd_compress_given = 0 ;
+  args_info->zstd_params_given = 0 ;
   args_info->rotate_first_given = 0 ;
 }
 
@@ -93,6 +97,9 @@ void clear_args (struct gengetopt_args_info *args_info)
   args_info->fifo_size_orig = NULL;
   args_info->flush_interval_arg = 1;
   args_info->flush_interval_orig = NULL;
+  args_info->zstd_compress_flag = 0;
+  args_info->zstd_params_arg = NULL;
+  args_info->zstd_params_orig = NULL;
   args_info->rotate_first_flag = 0;
   
 }
@@ -109,7 +116,9 @@ void init_args_info(struct gengetopt_args_info *args_info)
   args_info->file_number_help = gengetopt_args_info_help[4] ;
   args_info->fifo_size_help = gengetopt_args_info_help[5] ;
   args_info->flush_interval_help = gengetopt_args_info_help[6] ;
-  args_info->rotate_first_help = gengetopt_args_info_help[7] ;
+  args_info->zstd_compress_help = gengetopt_args_info_help[7] ;
+  args_info->zstd_params_help = gengetopt_args_info_help[8] ;
+  args_info->rotate_first_help = gengetopt_args_info_help[9] ;
   
 }
 
@@ -207,6 +216,8 @@ cmdline_parser_release (struct gengetopt_args_info *args_info)
   free_string_field (&(args_info->fifo_size_arg));
   free_string_field (&(args_info->fifo_size_orig));
   free_string_field (&(args_info->flush_interval_orig));
+  free_string_field (&(args_info->zstd_params_arg));
+  free_string_field (&(args_info->zstd_params_orig));
   
   
 
@@ -251,6 +262,10 @@ cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
     write_into_file(outfile, "fifo-size", args_info->fifo_size_orig, 0);
   if (args_info->flush_interval_given)
     write_into_file(outfile, "flush-interval", args_info->flush_interval_orig, 0);
+  if (args_info->zstd_compress_given)
+    write_into_file(outfile, "zstd-compress", 0, 0 );
+  if (args_info->zstd_params_given)
+    write_into_file(outfile, "zstd-params", args_info->zstd_params_orig, 0);
   if (args_info->rotate_first_given)
     write_into_file(outfile, "rotate-first", 0, 0 );
   
@@ -548,6 +563,8 @@ cmdline_parser_internal (
         { "file-number",	1, NULL, 0 },
         { "fifo-size",	1, NULL, 0 },
         { "flush-interval",	1, NULL, 0 },
+        { "zstd-compress",	0, NULL, 0 },
+        { "zstd-params",	1, NULL, 0 },
         { "rotate-first",	0, NULL, 0 },
         { 0,  0, 0, 0 }
       };
@@ -636,6 +653,33 @@ cmdline_parser_internal (
                 &(local_args_info.flush_interval_given), optarg, 0, "1", ARG_INT,
                 check_ambiguity, override, 0, 0,
                 "flush-interval", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          /* Compress with zstd.  */
+          else if (strcmp (long_options[option_index].name, "zstd-compress") == 0)
+          {
+          
+          
+            if (update_arg((void *)&(args_info->zstd_compress_flag), 0, &(args_info->zstd_compress_given),
+                &(local_args_info.zstd_compress_given), optarg, 0, 0, ARG_FLAG,
+                check_ambiguity, override, 1, 0, "zstd-compress", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          /* Parameters for zstd compression,
+          larger == more compression and memory (e.g., level=3,windows-log=21,chain-log=16,hash-log=17).  */
+          else if (strcmp (long_options[option_index].name, "zstd-params") == 0)
+          {
+          
+          
+            if (update_arg( (void *)&(args_info->zstd_params_arg), 
+                 &(args_info->zstd_params_orig), &(args_info->zstd_params_given),
+                &(local_args_info.zstd_params_given), optarg, 0, 0, ARG_STRING,
+                check_ambiguity, override, 0, 0,
+                "zstd-params", '-',
                 additional_error))
               goto failure;
           

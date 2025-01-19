@@ -11,6 +11,7 @@
 #include <string>
 #include <thread>
 
+#include "ulog/error.h"
 #include "ulog/file/rotating_file.h"
 
 namespace ulog {
@@ -20,24 +21,27 @@ class AsyncRotatingFile {
  public:
   /**
    * Build a logger that asynchronously outputs data to a file
+   * @param writer File writing instance, which may be compressed writing or direct writing
    * @param fifo_size Asynchronous first-in first-out buffer size
    * @param filename File name
-   * @param max_file_size Maximum size of a single file
    * @param max_files Number of files that can be divided
    * @param rotate_on_open Whether to rotate the file when opening
-   * @param max_flush_period_sec Maximum file flush period (some file systems
-   * and platforms only refresh once every 60s by default, which is too slow)
+   * @param max_flush_period_sec Maximum file flush period (some file systems and platforms only refresh once every 60s
+   * by default, which is too slow)
    */
-  AsyncRotatingFile(const size_t fifo_size, const std::string &filename, const std::size_t max_file_size,
+  AsyncRotatingFile(std::unique_ptr<WriterInterface> &&writer, const size_t fifo_size, const std::string &filename,
                     const std::size_t max_files, const bool rotate_on_open, const std::time_t max_flush_period_sec)
-      : umq_(Queue::Create(fifo_size)), rotating_file_(filename, max_file_size, max_files, rotate_on_open) {
+      : umq_(Queue::Create(fifo_size)), rotating_file_(std::move(writer), filename, max_files, rotate_on_open) {
     auto async_thread_function = [=, this]() {
       std::time_t last_flush_time = std::time(nullptr);
       typename Queue::Consumer reader(umq_->shared_from_this());
       while (!should_exit_) {
         auto data_packet = reader.ReadOrWait(std::chrono::milliseconds(1000), [&] { return should_exit_.load(); });
         while (const auto data = data_packet.next()) {
-          rotating_file_.SinkIt(data.data, data.size);
+          auto status = rotating_file_.SinkIt(data.data, data.size);
+          if (!status) {
+            ULOG_ERROR("Failed to write to file: %s", status.ToString().c_str());
+          }
         }
         reader.Release(data_packet);
 
@@ -45,7 +49,10 @@ class AsyncRotatingFile {
         std::time_t const cur_time = std::time(nullptr);
         if (cur_time - last_flush_time >= max_flush_period_sec) {
           last_flush_time = cur_time;
-          rotating_file_.Flush();
+          auto status = rotating_file_.Flush();
+          if (!status) {
+            ULOG_ERROR("Failed to flush file: %s", status.ToString().c_str());
+          }
         }
       }
     };
@@ -55,9 +62,9 @@ class AsyncRotatingFile {
   AsyncRotatingFile(const AsyncRotatingFile &) = delete;
   AsyncRotatingFile &operator=(const AsyncRotatingFile &) = delete;
 
-  void Flush() const {
+  Status Flush() const {
     umq_->Flush();
-    rotating_file_.Flush();
+    return rotating_file_.Flush();
   }
 
   ~AsyncRotatingFile() {
