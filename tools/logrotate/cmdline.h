@@ -42,18 +42,18 @@ struct gengetopt_args_info
   char * file_path_arg;	/**< @brief File path to record log.  */
   char * file_path_orig;	/**< @brief File path to record log original value given at command line.  */
   const char *file_path_help; /**< @brief File path to record log help description.  */
-  char * file_size_arg;	/**< @brief Size of each file (default='1MB').  */
-  char * file_size_orig;	/**< @brief Size of each file original value given at command line.  */
-  const char *file_size_help; /**< @brief Size of each file help description.  */
-  int file_number_arg;	/**< @brief Maximum number of files (default='10').  */
+  char * file_size_arg;	/**< @brief Size of each file (e.g., 1MB, 500KB, 2GB) (default='1MB').  */
+  char * file_size_orig;	/**< @brief Size of each file (e.g., 1MB, 500KB, 2GB) original value given at command line.  */
+  const char *file_size_help; /**< @brief Size of each file (e.g., 1MB, 500KB, 2GB) help description.  */
+  int file_number_arg;	/**< @brief Maximum number of files (default='8').  */
   char * file_number_orig;	/**< @brief Maximum number of files original value given at command line.  */
   const char *file_number_help; /**< @brief Maximum number of files help description.  */
   char * fifo_size_arg;	/**< @brief Fifo size (default='32KB').  */
   char * fifo_size_orig;	/**< @brief Fifo size original value given at command line.  */
   const char *fifo_size_help; /**< @brief Fifo size help description.  */
-  int flush_interval_arg;	/**< @brief Interval between flush (default='1').  */
-  char * flush_interval_orig;	/**< @brief Interval between flush original value given at command line.  */
-  const char *flush_interval_help; /**< @brief Interval between flush help description.  */
+  char * flush_interval_arg;	/**< @brief Interval between flush (e.g., 1, 3s, 500ms, 5min) (default='1s').  */
+  char * flush_interval_orig;	/**< @brief Interval between flush (e.g., 1, 3s, 500ms, 5min) original value given at command line.  */
+  const char *flush_interval_help; /**< @brief Interval between flush (e.g., 1, 3s, 500ms, 5min) help description.  */
   int zstd_compress_flag;	/**< @brief Compress with zstd (default=off).  */
   const char *zstd_compress_help; /**< @brief Compress with zstd help description.  */
   char * zstd_params_arg;	/**< @brief Parameters for zstd compression,

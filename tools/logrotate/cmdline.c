@@ -25,7 +25,7 @@
 
 #include "cmdline.h"
 
-const char *gengetopt_args_info_purpose = "Loop logging of standard inputs to several files";
+const char *gengetopt_args_info_purpose = "Loop logging of standard inputs to several files.\nSupported size units: bytes (default), kb/KB, mb/MB, gb/GB;\nSupported time units: s/sec (seconds, default), ms (milliseconds), min\n(minutes), hour (hour)";
 
 const char *gengetopt_args_info_usage = "Usage: logrotate [OPTION]...";
 
@@ -34,16 +34,16 @@ const char *gengetopt_args_info_versiontext = "";
 const char *gengetopt_args_info_description = "";
 
 const char *gengetopt_args_info_help[] = {
-  "  -h, --help                   Print help and exit",
-  "  -V, --version                Print version and exit",
-  "      --file-path=path         File path to record log",
-  "      --file-size=size         Size of each file  (default=`1MB')",
-  "      --file-number=number     Maximum number of files  (default=`10')",
-  "      --fifo-size=size         Fifo size  (default=`32KB')",
-  "      --flush-interval=second  Interval between flush  (default=`1')",
-  "      --zstd-compress          Compress with zstd  (default=off)",
-  "      --zstd-params=params     Parameters for zstd compression,\n                                 larger == more compression and memory (e.g.,\n                                 level=3,windows-log=21,chain-log=16,hash-log=17)",
-  "      --rotate-first           Should rotate first before write  (default=off)",
+  "  -h, --help                 Print help and exit",
+  "  -V, --version              Print version and exit",
+  "      --file-path=path       File path to record log",
+  "      --file-size=size       Size of each file (e.g., 1MB, 500KB, 2GB)\n                               (default=`1MB')",
+  "      --file-number=number   Maximum number of files  (default=`8')",
+  "      --fifo-size=size       Fifo size  (default=`32KB')",
+  "      --flush-interval=time  Interval between flush (e.g., 1, 3s, 500ms, 5min)\n                               (default=`1s')",
+  "      --zstd-compress        Compress with zstd  (default=off)",
+  "      --zstd-params=params   Parameters for zstd compression,\n                               larger == more compression and memory (e.g.,\n                               level=3,windows-log=21,chain-log=16,hash-log=17)",
+  "      --rotate-first         Should rotate first before write  (default=off)",
     0
 };
 
@@ -91,11 +91,11 @@ void clear_args (struct gengetopt_args_info *args_info)
   args_info->file_path_orig = NULL;
   args_info->file_size_arg = gengetopt_strdup ("1MB");
   args_info->file_size_orig = NULL;
-  args_info->file_number_arg = 10;
+  args_info->file_number_arg = 8;
   args_info->file_number_orig = NULL;
   args_info->fifo_size_arg = gengetopt_strdup ("32KB");
   args_info->fifo_size_orig = NULL;
-  args_info->flush_interval_arg = 1;
+  args_info->flush_interval_arg = gengetopt_strdup ("1s");
   args_info->flush_interval_orig = NULL;
   args_info->zstd_compress_flag = 0;
   args_info->zstd_params_arg = NULL;
@@ -215,6 +215,7 @@ cmdline_parser_release (struct gengetopt_args_info *args_info)
   free_string_field (&(args_info->file_number_orig));
   free_string_field (&(args_info->fifo_size_arg));
   free_string_field (&(args_info->fifo_size_orig));
+  free_string_field (&(args_info->flush_interval_arg));
   free_string_field (&(args_info->flush_interval_orig));
   free_string_field (&(args_info->zstd_params_arg));
   free_string_field (&(args_info->zstd_params_orig));
@@ -601,7 +602,7 @@ cmdline_parser_internal (
               goto failure;
           
           }
-          /* Size of each file.  */
+          /* Size of each file (e.g., 1MB, 500KB, 2GB).  */
           else if (strcmp (long_options[option_index].name, "file-size") == 0)
           {
           
@@ -622,7 +623,7 @@ cmdline_parser_internal (
           
             if (update_arg( (void *)&(args_info->file_number_arg), 
                  &(args_info->file_number_orig), &(args_info->file_number_given),
-                &(local_args_info.file_number_given), optarg, 0, "10", ARG_INT,
+                &(local_args_info.file_number_given), optarg, 0, "8", ARG_INT,
                 check_ambiguity, override, 0, 0,
                 "file-number", '-',
                 additional_error))
@@ -643,14 +644,14 @@ cmdline_parser_internal (
               goto failure;
           
           }
-          /* Interval between flush.  */
+          /* Interval between flush (e.g., 1, 3s, 500ms, 5min).  */
           else if (strcmp (long_options[option_index].name, "flush-interval") == 0)
           {
           
           
             if (update_arg( (void *)&(args_info->flush_interval_arg), 
                  &(args_info->flush_interval_orig), &(args_info->flush_interval_given),
-                &(local_args_info.flush_interval_given), optarg, 0, "1", ARG_INT,
+                &(local_args_info.flush_interval_given), optarg, 0, "1s", ARG_STRING,
                 check_ambiguity, override, 0, 0,
                 "flush-interval", '-',
                 additional_error))

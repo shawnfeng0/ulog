@@ -443,13 +443,19 @@ class Consumer {
    * @return pointer to the contiguous block
    */
   template <typename Condition>
-  DataPacket ReadOrWait(const std::chrono::milliseconds timeout, Condition other_condition = []() { return false; }) {
+  DataPacket ReadOrWait(const std::chrono::milliseconds timeout, Condition other_condition) {
     DataPacket ptr;
     ring_->prod_notifier_.wait_for(timeout, [&] { return (ptr = Read()).remain() > 0 || other_condition(); });
     return ptr;
   }
   DataPacket ReadOrWait(const std::chrono::milliseconds timeout) {
     return ReadOrWait(timeout, [] { return false; });
+  }
+  template <typename Condition>
+  DataPacket ReadOrWait(Condition other_condition) {
+    DataPacket ptr;
+    ring_->prod_notifier_.wait([&] { return (ptr = Read()).remain() > 0 || other_condition(); });
+    return ptr;
   }
 
   /**

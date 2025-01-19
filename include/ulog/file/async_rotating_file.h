@@ -26,17 +26,21 @@ class AsyncRotatingFile {
    * @param filename File name
    * @param max_files Number of files that can be divided
    * @param rotate_on_open Whether to rotate the file when opening
-   * @param max_flush_period_sec Maximum file flush period (some file systems and platforms only refresh once every 60s
+   * @param max_flush_period Maximum file flush period (some file systems and platforms only refresh once every 60s
    * by default, which is too slow)
    */
   AsyncRotatingFile(std::unique_ptr<WriterInterface> &&writer, const size_t fifo_size, const std::string &filename,
-                    const std::size_t max_files, const bool rotate_on_open, const std::time_t max_flush_period_sec)
+                    const std::size_t max_files, const bool rotate_on_open,
+                    const std::chrono::milliseconds max_flush_period)
       : umq_(Queue::Create(fifo_size)), rotating_file_(std::move(writer), filename, max_files, rotate_on_open) {
     auto async_thread_function = [=, this]() {
-      std::time_t last_flush_time = std::time(nullptr);
+      auto last_flush_time = std::chrono::steady_clock::now();
+      bool need_wait_flush = false;  // Whether to wait for the next flush
       typename Queue::Consumer reader(umq_->shared_from_this());
+
       while (!should_exit_) {
-        auto data_packet = reader.ReadOrWait(std::chrono::milliseconds(1000), [&] { return should_exit_.load(); });
+        auto data_packet = need_wait_flush ? reader.ReadOrWait(max_flush_period, [&] { return should_exit_.load(); })
+                                           : reader.ReadOrWait([&] { return should_exit_.load(); });
         while (const auto data = data_packet.next()) {
           auto status = rotating_file_.SinkIt(data.data, data.size);
           if (!status) {
@@ -46,13 +50,21 @@ class AsyncRotatingFile {
         reader.Release(data_packet);
 
         // Flush
-        std::time_t const cur_time = std::time(nullptr);
-        if (cur_time - last_flush_time >= max_flush_period_sec) {
-          last_flush_time = cur_time;
+        const auto cur_time = std::chrono::steady_clock::now();
+        if (need_wait_flush && cur_time - last_flush_time >= max_flush_period) {
           auto status = rotating_file_.Flush();
           if (!status) {
             ULOG_ERROR("Failed to flush file: %s", status.ToString().c_str());
+            continue;
           }
+          last_flush_time = cur_time;
+
+          // Already flushed, only need to wait forever for the next data
+          need_wait_flush = false;
+
+        } else {
+          // data has been written and the maximum waiting time is until the next flush
+          need_wait_flush = true;
         }
       }
     };

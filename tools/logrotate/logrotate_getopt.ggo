@@ -1,17 +1,17 @@
 package "logrotate"
 version "0.6.0"
-purpose "Loop logging of standard inputs to several files"
+purpose "Loop logging of standard inputs to several files.\nSupported size units: bytes (default), kb/KB, mb/MB, gb/GB;\nSupported time units: s/sec (seconds, default), ms (milliseconds), min (minutes), hour (hour)"
 
 option "file-path" - "File path to record log"
         string typestr="path" required
-option "file-size" - "Size of each file"
+option "file-size" - "Size of each file (e.g., 1MB, 500KB, 2GB)"
         string typestr="size" optional default="1MB"
 option "file-number" - "Maximum number of files"
-        int    typestr="number" optional default="10"
+        int    typestr="number" optional default="8"
 option "fifo-size" - "Fifo size"
         string typestr="size" optional default="32KB"
-option "flush-interval" - "Interval between flush"
-        int    typestr="second" optional default="1"
+option "flush-interval" - "Interval between flush (e.g., 1, 3s, 500ms, 5min)"
+        string typestr="time" optional default="1s"
 option "zstd-compress" - "Compress with zstd"
         flag off
 option "zstd-params" - "Parameters for zstd compression,\nlarger == more compression and memory (e.g., level=3,windows-log=21,chain-log=16,hash-log=17)"

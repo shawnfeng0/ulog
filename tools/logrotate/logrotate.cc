@@ -14,11 +14,11 @@
 
 #define ZSTD_DEFAULT_LEVEL 3
 
-static auto to_bytes(const std::string &sizeStr) {
+static auto to_bytes(const std::string &size_str) {
   size_t i = 0;
-  const auto size = std::stoull(sizeStr, &i);
+  const auto size = std::stoull(size_str, &i);
 
-  std::string unit = sizeStr.substr(i);
+  std::string unit = size_str.substr(i);
   std::transform(unit.begin(), unit.end(), unit.begin(), ::tolower);
 
   if (unit == "k" || unit == "kb" || unit == "kib") return size << 10;
@@ -26,6 +26,21 @@ static auto to_bytes(const std::string &sizeStr) {
   if (unit == "g" || unit == "gb" || unit == "gib") return size << 30;
 
   return size;
+}
+
+static std::chrono::milliseconds to_chrono_time(const std::string &time_str) {
+  size_t i = 0;
+  const auto size = std::stoull(time_str, &i);
+
+  std::string unit = time_str.substr(i);
+  std::transform(unit.begin(), unit.end(), unit.begin(), ::tolower);
+
+  if (unit == "ms") return std::chrono::milliseconds{size};
+  if (unit == "s" || unit == "sec") return std::chrono::seconds{size};
+  if (unit == "min") return std::chrono::minutes{size};
+  if (unit == "hour") return std::chrono::hours{size};
+
+  return std::chrono::seconds{size};
 }
 
 static std::map<std::string, std::string> ParseParametersMap(const std::string &input) {
@@ -52,6 +67,7 @@ int main(const int argc, char *argv[]) {
 
   const auto fifo_size = std::max(to_bytes(args_info.fifo_size_arg), 16ULL * 1024);
   const auto file_size = to_bytes(args_info.file_size_arg);
+  const auto flush_interval = to_chrono_time(args_info.flush_interval_arg);
   std::string filepath = args_info.file_path_arg;
 
   std::unique_ptr<ulog::WriterInterface> file_writer;
@@ -82,8 +98,8 @@ int main(const int argc, char *argv[]) {
   }
 
   const ulog::AsyncRotatingFile<ulog::spsc::Mq<uint8_t>> async_rotate(
-      std::move(file_writer), fifo_size, args_info.file_path_arg, args_info.file_number_arg,
-      args_info.rotate_first_flag, args_info.flush_interval_arg);
+      std::move(file_writer), fifo_size, filepath, args_info.file_number_arg, args_info.rotate_first_flag,
+      flush_interval);
 
   cmdline_parser_free(&args_info);
 
