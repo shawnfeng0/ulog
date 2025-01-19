@@ -42,20 +42,20 @@ struct gengetopt_args_info
   char * file_path_arg;	/**< @brief File path to record log.  */
   char * file_path_orig;	/**< @brief File path to record log original value given at command line.  */
   const char *file_path_help; /**< @brief File path to record log help description.  */
-  int file_size_arg;	/**< @brief Size of each file.  */
+  char * file_size_arg;	/**< @brief Size of each file (default='1MB').  */
   char * file_size_orig;	/**< @brief Size of each file original value given at command line.  */
   const char *file_size_help; /**< @brief Size of each file help description.  */
-  int file_number_arg;	/**< @brief Maximum number of files.  */
+  int file_number_arg;	/**< @brief Maximum number of files (default='10').  */
   char * file_number_orig;	/**< @brief Maximum number of files original value given at command line.  */
   const char *file_number_help; /**< @brief Maximum number of files help description.  */
-  int fifo_size_arg;	/**< @brief Fifo size (default='32768').  */
+  char * fifo_size_arg;	/**< @brief Fifo size (default='32KB').  */
   char * fifo_size_orig;	/**< @brief Fifo size original value given at command line.  */
   const char *fifo_size_help; /**< @brief Fifo size help description.  */
-  int stdout_flag;	/**< @brief Should print to stdout (default=off).  */
-  const char *stdout_help; /**< @brief Should print to stdout help description.  */
-  int flush_interval_arg;	/**< @brief Interval between flush (default='0').  */
+  int flush_interval_arg;	/**< @brief Interval between flush (default='1').  */
   char * flush_interval_orig;	/**< @brief Interval between flush original value given at command line.  */
   const char *flush_interval_help; /**< @brief Interval between flush help description.  */
+  int rotate_first_flag;	/**< @brief Should rotate first before write (default=off).  */
+  const char *rotate_first_help; /**< @brief Should rotate first before write help description.  */
   
   unsigned int help_given ;	/**< @brief Whether help was given.  */
   unsigned int version_given ;	/**< @brief Whether version was given.  */
@@ -63,8 +63,8 @@ struct gengetopt_args_info
   unsigned int file_size_given ;	/**< @brief Whether file-size was given.  */
   unsigned int file_number_given ;	/**< @brief Whether file-number was given.  */
   unsigned int fifo_size_given ;	/**< @brief Whether fifo-size was given.  */
-  unsigned int stdout_given ;	/**< @brief Whether stdout was given.  */
   unsigned int flush_interval_given ;	/**< @brief Whether flush-interval was given.  */
+  unsigned int rotate_first_given ;	/**< @brief Whether rotate-first was given.  */
 
 } ;
 

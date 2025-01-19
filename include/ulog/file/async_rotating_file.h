@@ -10,7 +10,6 @@
 #include <memory>
 #include <string>
 #include <thread>
-#include <utility>
 
 #include "ulog/file/rotating_file.h"
 
@@ -22,15 +21,16 @@ class AsyncRotatingFile {
   /**
    * Build a logger that asynchronously outputs data to a file
    * @param fifo_size Asynchronous first-in first-out buffer size
-   * @param filename File name for storing data
+   * @param filename File name
    * @param max_file_size Maximum size of a single file
    * @param max_files Number of files that can be divided
+   * @param rotate_on_open Whether to rotate the file when opening
    * @param max_flush_period_sec Maximum file flush period (some file systems
    * and platforms only refresh once every 60s by default, which is too slow)
    */
-  AsyncRotatingFile(const size_t fifo_size, std::string filename, const std::size_t max_file_size,
-                    const std::size_t max_files, const std::time_t max_flush_period_sec = 0)
-      : umq_(Queue::Create(fifo_size)), rotating_file_(std::move(filename), max_file_size, max_files) {
+  AsyncRotatingFile(const size_t fifo_size, const std::string &filename, const std::size_t max_file_size,
+                    const std::size_t max_files, const bool rotate_on_open, const std::time_t max_flush_period_sec)
+      : umq_(Queue::Create(fifo_size)), rotating_file_(filename, max_file_size, max_files, rotate_on_open) {
     auto async_thread_function = [=, this]() {
       std::time_t last_flush_time = std::time(nullptr);
       typename Queue::Consumer reader(umq_->shared_from_this());
@@ -49,7 +49,7 @@ class AsyncRotatingFile {
         }
       }
     };
-    async_thread_ = std::unique_ptr<std::thread>{new std::thread{async_thread_function}};
+    async_thread_ = std::make_unique<std::thread>(async_thread_function);
   }
 
   AsyncRotatingFile(const AsyncRotatingFile &) = delete;

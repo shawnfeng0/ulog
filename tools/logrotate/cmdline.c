@@ -37,11 +37,11 @@ const char *gengetopt_args_info_help[] = {
   "  -h, --help                   Print help and exit",
   "  -V, --version                Print version and exit",
   "      --file-path=path         File path to record log",
-  "      --file-size=size         Size of each file",
-  "      --file-number=number     Maximum number of files",
-  "      --fifo-size=size         Fifo size  (default=`32768')",
-  "      --stdout                 Should print to stdout  (default=off)",
-  "      --flush-interval=second  Interval between flush  (default=`0')",
+  "      --file-size=size         Size of each file  (default=`1MB')",
+  "      --file-number=number     Maximum number of files  (default=`10')",
+  "      --fifo-size=size         Fifo size  (default=`32KB')",
+  "      --flush-interval=second  Interval between flush  (default=`1')",
+  "      --rotate-first           Should rotate first before write  (default=off)",
     0
 };
 
@@ -75,8 +75,8 @@ void clear_given (struct gengetopt_args_info *args_info)
   args_info->file_size_given = 0 ;
   args_info->file_number_given = 0 ;
   args_info->fifo_size_given = 0 ;
-  args_info->stdout_given = 0 ;
   args_info->flush_interval_given = 0 ;
+  args_info->rotate_first_given = 0 ;
 }
 
 static
@@ -85,13 +85,15 @@ void clear_args (struct gengetopt_args_info *args_info)
   FIX_UNUSED (args_info);
   args_info->file_path_arg = NULL;
   args_info->file_path_orig = NULL;
+  args_info->file_size_arg = gengetopt_strdup ("1MB");
   args_info->file_size_orig = NULL;
+  args_info->file_number_arg = 10;
   args_info->file_number_orig = NULL;
-  args_info->fifo_size_arg = 32768;
+  args_info->fifo_size_arg = gengetopt_strdup ("32KB");
   args_info->fifo_size_orig = NULL;
-  args_info->stdout_flag = 0;
-  args_info->flush_interval_arg = 0;
+  args_info->flush_interval_arg = 1;
   args_info->flush_interval_orig = NULL;
+  args_info->rotate_first_flag = 0;
   
 }
 
@@ -106,8 +108,8 @@ void init_args_info(struct gengetopt_args_info *args_info)
   args_info->file_size_help = gengetopt_args_info_help[3] ;
   args_info->file_number_help = gengetopt_args_info_help[4] ;
   args_info->fifo_size_help = gengetopt_args_info_help[5] ;
-  args_info->stdout_help = gengetopt_args_info_help[6] ;
-  args_info->flush_interval_help = gengetopt_args_info_help[7] ;
+  args_info->flush_interval_help = gengetopt_args_info_help[6] ;
+  args_info->rotate_first_help = gengetopt_args_info_help[7] ;
   
 }
 
@@ -199,8 +201,10 @@ cmdline_parser_release (struct gengetopt_args_info *args_info)
 
   free_string_field (&(args_info->file_path_arg));
   free_string_field (&(args_info->file_path_orig));
+  free_string_field (&(args_info->file_size_arg));
   free_string_field (&(args_info->file_size_orig));
   free_string_field (&(args_info->file_number_orig));
+  free_string_field (&(args_info->fifo_size_arg));
   free_string_field (&(args_info->fifo_size_orig));
   free_string_field (&(args_info->flush_interval_orig));
   
@@ -245,10 +249,10 @@ cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
     write_into_file(outfile, "file-number", args_info->file_number_orig, 0);
   if (args_info->fifo_size_given)
     write_into_file(outfile, "fifo-size", args_info->fifo_size_orig, 0);
-  if (args_info->stdout_given)
-    write_into_file(outfile, "stdout", 0, 0 );
   if (args_info->flush_interval_given)
     write_into_file(outfile, "flush-interval", args_info->flush_interval_orig, 0);
+  if (args_info->rotate_first_given)
+    write_into_file(outfile, "rotate-first", 0, 0 );
   
 
   i = EXIT_SUCCESS;
@@ -368,18 +372,6 @@ cmdline_parser_required2 (struct gengetopt_args_info *args_info, const char *pro
   if (! args_info->file_path_given)
     {
       fprintf (stderr, "%s: '--file-path' option required%s\n", prog_name, (additional_error ? additional_error : ""));
-      error_occurred = 1;
-    }
-  
-  if (! args_info->file_size_given)
-    {
-      fprintf (stderr, "%s: '--file-size' option required%s\n", prog_name, (additional_error ? additional_error : ""));
-      error_occurred = 1;
-    }
-  
-  if (! args_info->file_number_given)
-    {
-      fprintf (stderr, "%s: '--file-number' option required%s\n", prog_name, (additional_error ? additional_error : ""));
       error_occurred = 1;
     }
   
@@ -555,8 +547,8 @@ cmdline_parser_internal (
         { "file-size",	1, NULL, 0 },
         { "file-number",	1, NULL, 0 },
         { "fifo-size",	1, NULL, 0 },
-        { "stdout",	0, NULL, 0 },
         { "flush-interval",	1, NULL, 0 },
+        { "rotate-first",	0, NULL, 0 },
         { 0,  0, 0, 0 }
       };
 
@@ -599,7 +591,7 @@ cmdline_parser_internal (
           
             if (update_arg( (void *)&(args_info->file_size_arg), 
                  &(args_info->file_size_orig), &(args_info->file_size_given),
-                &(local_args_info.file_size_given), optarg, 0, 0, ARG_INT,
+                &(local_args_info.file_size_given), optarg, 0, "1MB", ARG_STRING,
                 check_ambiguity, override, 0, 0,
                 "file-size", '-',
                 additional_error))
@@ -613,7 +605,7 @@ cmdline_parser_internal (
           
             if (update_arg( (void *)&(args_info->file_number_arg), 
                  &(args_info->file_number_orig), &(args_info->file_number_given),
-                &(local_args_info.file_number_given), optarg, 0, 0, ARG_INT,
+                &(local_args_info.file_number_given), optarg, 0, "10", ARG_INT,
                 check_ambiguity, override, 0, 0,
                 "file-number", '-',
                 additional_error))
@@ -627,21 +619,9 @@ cmdline_parser_internal (
           
             if (update_arg( (void *)&(args_info->fifo_size_arg), 
                  &(args_info->fifo_size_orig), &(args_info->fifo_size_given),
-                &(local_args_info.fifo_size_given), optarg, 0, "32768", ARG_INT,
+                &(local_args_info.fifo_size_given), optarg, 0, "32KB", ARG_STRING,
                 check_ambiguity, override, 0, 0,
                 "fifo-size", '-',
-                additional_error))
-              goto failure;
-          
-          }
-          /* Should print to stdout.  */
-          else if (strcmp (long_options[option_index].name, "stdout") == 0)
-          {
-          
-          
-            if (update_arg((void *)&(args_info->stdout_flag), 0, &(args_info->stdout_given),
-                &(local_args_info.stdout_given), optarg, 0, 0, ARG_FLAG,
-                check_ambiguity, override, 1, 0, "stdout", '-',
                 additional_error))
               goto failure;
           
@@ -653,9 +633,21 @@ cmdline_parser_internal (
           
             if (update_arg( (void *)&(args_info->flush_interval_arg), 
                  &(args_info->flush_interval_orig), &(args_info->flush_interval_given),
-                &(local_args_info.flush_interval_given), optarg, 0, "0", ARG_INT,
+                &(local_args_info.flush_interval_given), optarg, 0, "1", ARG_INT,
                 check_ambiguity, override, 0, 0,
                 "flush-interval", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          /* Should rotate first before write.  */
+          else if (strcmp (long_options[option_index].name, "rotate-first") == 0)
+          {
+          
+          
+            if (update_arg((void *)&(args_info->rotate_first_flag), 0, &(args_info->rotate_first_given),
+                &(local_args_info.rotate_first_given), optarg, 0, 0, ARG_FLAG,
+                check_ambiguity, override, 1, 0, "rotate-first", '-',
                 additional_error))
               goto failure;
           

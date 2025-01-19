@@ -5,12 +5,12 @@ purpose "Loop logging of standard inputs to several files"
 option "file-path" - "File path to record log"
         string typestr="path" required
 option "file-size" - "Size of each file"
-        int    typestr="size" required
+        string typestr="size" optional default="1MB"
 option "file-number" - "Maximum number of files"
-        int    typestr="number" required
+        int    typestr="number" optional default="10"
 option "fifo-size" - "Fifo size"
-        int    typestr="size" optional default="32768"
-option "stdout" - "Should print to stdout"
-        flag off
+        string typestr="size" optional default="32KB"
 option "flush-interval" - "Interval between flush"
-        int    typestr="second" optional default="0"
+        int    typestr="second" optional default="1"
+option "rotate-first" - "Should rotate first before write"
+        flag off
