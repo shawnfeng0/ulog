@@ -25,9 +25,9 @@
 
 #include "cmdline.h"
 
-const char *gengetopt_args_info_purpose = "Loop logging of standard inputs to several files.\nSupported size units: bytes (default), kb/KB, mb/MB, gb/GB;\nSupported time units: s/sec (seconds, default), ms (milliseconds), min\n(minutes), hour (hour)";
+const char *gengetopt_args_info_purpose = "Loop logging of standard inputs to several files.";
 
-const char *gengetopt_args_info_usage = "Usage: logrotate [OPTION]...";
+const char *gengetopt_args_info_usage = "Usage: logrotate -f PATH [OPTIONS]...";
 
 const char *gengetopt_args_info_versiontext = "";
 
@@ -36,14 +36,15 @@ const char *gengetopt_args_info_description = "";
 const char *gengetopt_args_info_help[] = {
   "  -h, --help                 Print help and exit",
   "  -V, --version              Print version and exit",
-  "      --file-path=path       File path to record log",
-  "      --file-size=size       Size of each file (e.g., 1MB, 500KB, 2GB)\n                               (default=`1MB')",
-  "      --file-number=number   Maximum number of files  (default=`8')",
-  "      --fifo-size=size       Fifo size  (default=`32KB')",
-  "      --flush-interval=time  Interval between flush (e.g., 1, 3s, 500ms, 5min)\n                               (default=`1s')",
+  "  -f, --file-path=PATH       File path to record log",
+  "  -s, --file-size=SIZE       Size of each file (e.g., 1MB, 500KB, 2GB)\n                               (default=`1MB')",
+  "  -n, --max-files=NUM        Maximum number of files  (default=`8')",
+  "  -c, --fifo-size=SIZE       Fifo size  (default=`32KB')",
+  "  -i, --flush-interval=TIME  The time interval between flushing to disk or\n                               writing the compression end mark and flushing to\n                               disk (e.g., 1, 3s, 500ms, 5min)  (default=`1s')",
   "      --zstd-compress        Compress with zstd  (default=off)",
-  "      --zstd-params=params   Parameters for zstd compression,\n                               larger == more compression and memory (e.g.,\n                               level=3,windows-log=21,chain-log=16,hash-log=17)",
+  "      --zstd-params=params   Parameters for zstd compression,\n                               larger == more compression and memory (e.g.,\n                               level=3,window-log=21,chain-log=16,hash-log=17)",
   "      --rotate-first         Should rotate first before write  (default=off)",
+  "\nThe SIZE parameter units are K, M, G (power of 1024). If the unit is not\nspecified, the default is bytes.\nThe TIME parameter units are s, sec, ms, min, hour. If the unit is not\nspecified, the default is seconds.",
     0
 };
 
@@ -75,7 +76,7 @@ void clear_given (struct gengetopt_args_info *args_info)
   args_info->version_given = 0 ;
   args_info->file_path_given = 0 ;
   args_info->file_size_given = 0 ;
-  args_info->file_number_given = 0 ;
+  args_info->max_files_given = 0 ;
   args_info->fifo_size_given = 0 ;
   args_info->flush_interval_given = 0 ;
   args_info->zstd_compress_given = 0 ;
@@ -91,8 +92,8 @@ void clear_args (struct gengetopt_args_info *args_info)
   args_info->file_path_orig = NULL;
   args_info->file_size_arg = gengetopt_strdup ("1MB");
   args_info->file_size_orig = NULL;
-  args_info->file_number_arg = 8;
-  args_info->file_number_orig = NULL;
+  args_info->max_files_arg = 8;
+  args_info->max_files_orig = NULL;
   args_info->fifo_size_arg = gengetopt_strdup ("32KB");
   args_info->fifo_size_orig = NULL;
   args_info->flush_interval_arg = gengetopt_strdup ("1s");
@@ -113,7 +114,7 @@ void init_args_info(struct gengetopt_args_info *args_info)
   args_info->version_help = gengetopt_args_info_help[1] ;
   args_info->file_path_help = gengetopt_args_info_help[2] ;
   args_info->file_size_help = gengetopt_args_info_help[3] ;
-  args_info->file_number_help = gengetopt_args_info_help[4] ;
+  args_info->max_files_help = gengetopt_args_info_help[4] ;
   args_info->fifo_size_help = gengetopt_args_info_help[5] ;
   args_info->flush_interval_help = gengetopt_args_info_help[6] ;
   args_info->zstd_compress_help = gengetopt_args_info_help[7] ;
@@ -212,7 +213,7 @@ cmdline_parser_release (struct gengetopt_args_info *args_info)
   free_string_field (&(args_info->file_path_orig));
   free_string_field (&(args_info->file_size_arg));
   free_string_field (&(args_info->file_size_orig));
-  free_string_field (&(args_info->file_number_orig));
+  free_string_field (&(args_info->max_files_orig));
   free_string_field (&(args_info->fifo_size_arg));
   free_string_field (&(args_info->fifo_size_orig));
   free_string_field (&(args_info->flush_interval_arg));
@@ -257,8 +258,8 @@ cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
     write_into_file(outfile, "file-path", args_info->file_path_orig, 0);
   if (args_info->file_size_given)
     write_into_file(outfile, "file-size", args_info->file_size_orig, 0);
-  if (args_info->file_number_given)
-    write_into_file(outfile, "file-number", args_info->file_number_orig, 0);
+  if (args_info->max_files_given)
+    write_into_file(outfile, "max-files", args_info->max_files_orig, 0);
   if (args_info->fifo_size_given)
     write_into_file(outfile, "fifo-size", args_info->fifo_size_orig, 0);
   if (args_info->flush_interval_given)
@@ -387,12 +388,17 @@ cmdline_parser_required2 (struct gengetopt_args_info *args_info, const char *pro
   /* checks for required options */
   if (! args_info->file_path_given)
     {
-      fprintf (stderr, "%s: '--file-path' option required%s\n", prog_name, (additional_error ? additional_error : ""));
+      fprintf (stderr, "%s: '--file-path' ('-f') option required%s\n", prog_name, (additional_error ? additional_error : ""));
       error_occurred = 1;
     }
   
   
   /* checks for dependences among options */
+  if (args_info->zstd_params_given && ! args_info->zstd_compress_given)
+    {
+      fprintf (stderr, "%s: '--zstd-params' option depends on option 'zstd-compress'%s\n", prog_name, (additional_error ? additional_error : ""));
+      error_occurred = 1;
+    }
 
   return error_occurred;
 }
@@ -559,18 +565,18 @@ cmdline_parser_internal (
       static struct option long_options[] = {
         { "help",	0, NULL, 'h' },
         { "version",	0, NULL, 'V' },
-        { "file-path",	1, NULL, 0 },
-        { "file-size",	1, NULL, 0 },
-        { "file-number",	1, NULL, 0 },
-        { "fifo-size",	1, NULL, 0 },
-        { "flush-interval",	1, NULL, 0 },
+        { "file-path",	1, NULL, 'f' },
+        { "file-size",	1, NULL, 's' },
+        { "max-files",	1, NULL, 'n' },
+        { "fifo-size",	1, NULL, 'c' },
+        { "flush-interval",	1, NULL, 'i' },
         { "zstd-compress",	0, NULL, 0 },
         { "zstd-params",	1, NULL, 0 },
         { "rotate-first",	0, NULL, 0 },
         { 0,  0, 0, 0 }
       };
 
-      c = getopt_long (argc, argv, "hV", long_options, &option_index);
+      c = getopt_long (argc, argv, "hVf:s:n:c:i:", long_options, &option_index);
 
       if (c == -1) break;	/* Exit from `while (1)' loop.  */
 
@@ -586,80 +592,70 @@ cmdline_parser_internal (
           cmdline_parser_free (&local_args_info);
           exit (EXIT_SUCCESS);
 
+        case 'f':	/* File path to record log.  */
+        
+        
+          if (update_arg( (void *)&(args_info->file_path_arg), 
+               &(args_info->file_path_orig), &(args_info->file_path_given),
+              &(local_args_info.file_path_given), optarg, 0, 0, ARG_STRING,
+              check_ambiguity, override, 0, 0,
+              "file-path", 'f',
+              additional_error))
+            goto failure;
+        
+          break;
+        case 's':	/* Size of each file (e.g., 1MB, 500KB, 2GB).  */
+        
+        
+          if (update_arg( (void *)&(args_info->file_size_arg), 
+               &(args_info->file_size_orig), &(args_info->file_size_given),
+              &(local_args_info.file_size_given), optarg, 0, "1MB", ARG_STRING,
+              check_ambiguity, override, 0, 0,
+              "file-size", 's',
+              additional_error))
+            goto failure;
+        
+          break;
+        case 'n':	/* Maximum number of files.  */
+        
+        
+          if (update_arg( (void *)&(args_info->max_files_arg), 
+               &(args_info->max_files_orig), &(args_info->max_files_given),
+              &(local_args_info.max_files_given), optarg, 0, "8", ARG_INT,
+              check_ambiguity, override, 0, 0,
+              "max-files", 'n',
+              additional_error))
+            goto failure;
+        
+          break;
+        case 'c':	/* Fifo size.  */
+        
+        
+          if (update_arg( (void *)&(args_info->fifo_size_arg), 
+               &(args_info->fifo_size_orig), &(args_info->fifo_size_given),
+              &(local_args_info.fifo_size_given), optarg, 0, "32KB", ARG_STRING,
+              check_ambiguity, override, 0, 0,
+              "fifo-size", 'c',
+              additional_error))
+            goto failure;
+        
+          break;
+        case 'i':	/* The time interval between flushing to disk or writing the compression end mark and flushing to disk (e.g., 1, 3s, 500ms, 5min).  */
+        
+        
+          if (update_arg( (void *)&(args_info->flush_interval_arg), 
+               &(args_info->flush_interval_orig), &(args_info->flush_interval_given),
+              &(local_args_info.flush_interval_given), optarg, 0, "1s", ARG_STRING,
+              check_ambiguity, override, 0, 0,
+              "flush-interval", 'i',
+              additional_error))
+            goto failure;
+        
+          break;
 
         case 0:	/* Long option with no short option */
-          /* File path to record log.  */
-          if (strcmp (long_options[option_index].name, "file-path") == 0)
-          {
-          
-          
-            if (update_arg( (void *)&(args_info->file_path_arg), 
-                 &(args_info->file_path_orig), &(args_info->file_path_given),
-                &(local_args_info.file_path_given), optarg, 0, 0, ARG_STRING,
-                check_ambiguity, override, 0, 0,
-                "file-path", '-',
-                additional_error))
-              goto failure;
-          
-          }
-          /* Size of each file (e.g., 1MB, 500KB, 2GB).  */
-          else if (strcmp (long_options[option_index].name, "file-size") == 0)
-          {
-          
-          
-            if (update_arg( (void *)&(args_info->file_size_arg), 
-                 &(args_info->file_size_orig), &(args_info->file_size_given),
-                &(local_args_info.file_size_given), optarg, 0, "1MB", ARG_STRING,
-                check_ambiguity, override, 0, 0,
-                "file-size", '-',
-                additional_error))
-              goto failure;
-          
-          }
-          /* Maximum number of files.  */
-          else if (strcmp (long_options[option_index].name, "file-number") == 0)
-          {
-          
-          
-            if (update_arg( (void *)&(args_info->file_number_arg), 
-                 &(args_info->file_number_orig), &(args_info->file_number_given),
-                &(local_args_info.file_number_given), optarg, 0, "8", ARG_INT,
-                check_ambiguity, override, 0, 0,
-                "file-number", '-',
-                additional_error))
-              goto failure;
-          
-          }
-          /* Fifo size.  */
-          else if (strcmp (long_options[option_index].name, "fifo-size") == 0)
-          {
-          
-          
-            if (update_arg( (void *)&(args_info->fifo_size_arg), 
-                 &(args_info->fifo_size_orig), &(args_info->fifo_size_given),
-                &(local_args_info.fifo_size_given), optarg, 0, "32KB", ARG_STRING,
-                check_ambiguity, override, 0, 0,
-                "fifo-size", '-',
-                additional_error))
-              goto failure;
-          
-          }
-          /* Interval between flush (e.g., 1, 3s, 500ms, 5min).  */
-          else if (strcmp (long_options[option_index].name, "flush-interval") == 0)
-          {
-          
-          
-            if (update_arg( (void *)&(args_info->flush_interval_arg), 
-                 &(args_info->flush_interval_orig), &(args_info->flush_interval_given),
-                &(local_args_info.flush_interval_given), optarg, 0, "1s", ARG_STRING,
-                check_ambiguity, override, 0, 0,
-                "flush-interval", '-',
-                additional_error))
-              goto failure;
-          
-          }
           /* Compress with zstd.  */
-          else if (strcmp (long_options[option_index].name, "zstd-compress") == 0)
+          if (strcmp (long_options[option_index].name, "zstd-compress") == 0)
           {
           
           
@@ -671,7 +667,7 @@ cmdline_parser_internal (
           
           }
           /* Parameters for zstd compression,
-          larger == more compression and memory (e.g., level=3,windows-log=21,chain-log=16,hash-log=17).  */
+          larger == more compression and memory (e.g., level=3,window-log=21,chain-log=16,hash-log=17).  */
           else if (strcmp (long_options[option_index].name, "zstd-params") == 0)
           {
           

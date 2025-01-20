@@ -97,9 +97,9 @@ int main(const int argc, char *argv[]) {
     file_writer = std::make_unique<ulog::FileLimitWriter>(file_size);
   }
 
-  const ulog::AsyncRotatingFile<ulog::spsc::Mq<uint8_t>> async_rotate(
-      std::move(file_writer), fifo_size, filepath, args_info.file_number_arg, args_info.rotate_first_flag,
-      flush_interval);
+  const ulog::AsyncRotatingFile<ulog::spsc::Mq<uint8_t>> async_rotate(std::move(file_writer), fifo_size, filepath,
+                                                                      args_info.max_files_arg,
+                                                                      args_info.rotate_first_flag, flush_interval);
 
   cmdline_parser_free(&args_info);
 

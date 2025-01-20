@@ -132,5 +132,5 @@ It is written using ulog's asynchronous fifo and extended headers for file loop 
 Usage:
 
 ```bash
-your_program | logrotate --file-path /tmp/example/log.txt --file-size=100000 --file-number=3
+your_program | logrotate --file-path /tmp/example/log.txt --file-size=100000 --max-files=3
 ```

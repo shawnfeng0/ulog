@@ -1,20 +1,26 @@
 package "logrotate"
 version "0.6.0"
-purpose "Loop logging of standard inputs to several files.\nSupported size units: bytes (default), kb/KB, mb/MB, gb/GB;\nSupported time units: s/sec (seconds, default), ms (milliseconds), min (minutes), hour (hour)"
 
-option "file-path" - "File path to record log"
-        string typestr="path" required
-option "file-size" - "Size of each file (e.g., 1MB, 500KB, 2GB)"
-        string typestr="size" optional default="1MB"
-option "file-number" - "Maximum number of files"
-        int    typestr="number" optional default="8"
-option "fifo-size" - "Fifo size"
-        string typestr="size" optional default="32KB"
-option "flush-interval" - "Interval between flush (e.g., 1, 3s, 500ms, 5min)"
-        string typestr="time" optional default="1s"
+usage "logrotate -f PATH [OPTIONS]..."
+
+purpose "Loop logging of standard inputs to several files."
+
+option "file-path" f "File path to record log"
+        string typestr="PATH" required
+option "file-size" s "Size of each file (e.g., 1MB, 500KB, 2GB)"
+        string typestr="SIZE" optional default="1MB"
+option "max-files" n "Maximum number of files"
+        int    typestr="NUM" optional default="8"
+option "fifo-size" c "Fifo size"
+        string typestr="SIZE" optional default="32KB"
+option "flush-interval" i "The time interval between flushing to disk or writing the compression end mark and flushing to disk (e.g., 1, 3s, 500ms, 5min)"
+        string typestr="TIME" optional default="1s"
 option "zstd-compress" - "Compress with zstd"
         flag off
-option "zstd-params" - "Parameters for zstd compression,\nlarger == more compression and memory (e.g., level=3,windows-log=21,chain-log=16,hash-log=17)"
-        string typestr="params" optional
+option "zstd-params" - "Parameters for zstd compression,\nlarger == more compression and memory (e.g., level=3,window-log=21,chain-log=16,hash-log=17)"
+        string typestr="params" optional dependon="zstd-compress"
 option "rotate-first" - "Should rotate first before write"
         flag off
+
+text "\nThe SIZE parameter units are K, M, G (power of 1024). If the unit is not specified, the default is bytes."
+text "\nThe TIME parameter units are s, sec, ms, min, hour. If the unit is not specified, the default is seconds."
