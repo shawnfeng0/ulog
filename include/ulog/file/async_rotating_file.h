@@ -33,7 +33,7 @@ class AsyncRotatingFile {
                     const std::size_t max_files, const bool rotate_on_open,
                     const std::chrono::milliseconds max_flush_period)
       : umq_(Queue::Create(fifo_size)), rotating_file_(std::move(writer), filename, max_files, rotate_on_open) {
-    auto async_thread_function = [=, this]() {
+    auto async_thread_function = [max_flush_period, this] {
       auto last_flush_time = std::chrono::steady_clock::now();
       bool need_wait_flush = false;  // Whether to wait for the next flush
       typename Queue::Consumer reader(umq_->shared_from_this());

@@ -258,14 +258,14 @@ class Mq : public std::enable_shared_from_this<Mq> {
   uint8_t *data_;  // the buffer holding the data
   size_t mask_;
 
-  uint8_t pad0[64]{};  // Using cache line filling technology can improve performance by 15%
+  [[maybe_unused]] uint8_t pad0[64]{};  // Using cache line filling technology can improve performance by 15%
   std::atomic<uint32_t> cons_head_;
 
-  uint8_t pad1[64]{};
+  [[maybe_unused]] uint8_t pad1[64]{};
   std::atomic<uint32_t> prod_head_;
   std::atomic<uint32_t> prod_last_;
 
-  uint8_t pad2[64]{};
+  [[maybe_unused]] uint8_t pad2[64]{};
   LiteNotifier prod_notifier_;
   LiteNotifier cons_notifier_;
 
