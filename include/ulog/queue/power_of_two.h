@@ -80,15 +80,5 @@ static inline bool IsInRange(unsigned left, unsigned value, unsigned right) {
  */
 static bool inline IsPassed(const uint32_t head, const uint32_t tail) { return tail - head < (1U << 31); }
 
-static bool inline IsAllZero(const void *buffer, const size_t size) {
-  assert(reinterpret_cast<uintptr_t>(buffer) % 8 == 0);
-  assert(size % 8 == 0);
-  const auto ptr_uint32_start = static_cast<const uint32_t *>(buffer);
-  const auto ptr_uint32_end = ptr_uint32_start + (size / sizeof(*ptr_uint32_start));
-  for (auto i = ptr_uint32_start; i < ptr_uint32_end; i++)
-    if (*i != 0) return false;
-  return true;
-}
-
 }  // namespace queue
 }  // namespace ulog

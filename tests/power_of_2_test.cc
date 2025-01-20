@@ -38,28 +38,3 @@ TEST(PowOfTwo, IsPassed) {
   ASSERT_EQ(ulog::queue::IsPassed(1, 0xFFFFFFFF), false);
   ASSERT_EQ(ulog::queue::IsPassed(0xFFFFFFFF, 1), true);
 }
-
-TEST(IsAllZero, IsAllZero) {
-  {
-    const char data[5] = {0, 0, 0, 0, 0};
-    ASSERT_TRUE(ulog::queue::IsAllZero(data, sizeof(data)));
-  }
-
-  {
-    const char data[5] = {0, 0, 0, 0, 5};
-    ASSERT_FALSE(ulog::queue::IsAllZero(data, sizeof(data)));
-  }
-
-  {
-    const char data[5] = {1, 0, 0, 0, 0};
-    ASSERT_FALSE(ulog::queue::IsAllZero(data, sizeof(data)));
-  }
-
-  {
-    char data[1024];
-    memset(data, 0, sizeof(data));
-    data[224] = 17;
-    data[228] = 17;
-    ASSERT_FALSE(ulog::queue::IsAllZero(data, 232));
-  }
-}
