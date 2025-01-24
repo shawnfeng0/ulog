@@ -101,23 +101,20 @@ static inline std::string dir_name(const std::string &path) {
 // ".mylog" => (".mylog". "")
 // "my_folder/.mylog" => ("my_folder/.mylog", "")
 // "my_folder/.mylog.txt" => ("my_folder/.mylog", ".txt")
-static inline std::tuple<std::string, std::string> SplitByExtension(const std::string &fname) {
-  const auto ext_index = fname.rfind('.');
+//
+// "my_folder/.mylog.txt.zst" => ("my_folder/.mylog", ".txt.zst")
+// "/etc/rc.d/somelogfile" => ("/etc/rc.d/somelogfile", "")
+static inline std::tuple<std::string, std::string> SplitByExtension(const std::string &filename) {
+  const auto folder_index = filename.rfind(file::kFolderSep);
+  const auto ext_index = filename.find('.', folder_index == std::string::npos ? 1 : folder_index + 2);
 
-  // no valid extension found - return whole path and empty string as
-  // extension
-  if (ext_index == std::string::npos || ext_index == 0 || ext_index == fname.size() - 1) {
-    return std::make_tuple(fname, std::string());
-  }
-
-  // treat cases like "/etc/rc.d/somelogfile or "/abc/.hiddenfile"
-  const auto folder_index = fname.rfind(file::kFolderSep);
-  if (folder_index != std::string::npos && folder_index >= ext_index - 1) {
-    return std::make_tuple(fname, std::string());
+  // no valid extension found - return whole path and empty string as extension
+  if (ext_index == std::string::npos || ext_index == 0 || ext_index == filename.size() - 1) {
+    return std::make_tuple(filename, std::string());
   }
 
   // finally - return a valid base and extension tuple
-  return std::make_tuple(fname.substr(0, ext_index), fname.substr(ext_index));
+  return std::make_tuple(filename.substr(0, ext_index), filename.substr(ext_index));
 }
 
 static inline std::string CalcFilename(const std::string &filename, std::size_t index) {

@@ -76,7 +76,7 @@ int main(const int argc, char *argv[]) {
     // Append .zst extension if not present
     std::string basename, ext;
     std::tie(basename, ext) = ulog::file::SplitByExtension(filepath);
-    if (ext != ".zst") filepath += ".zst";
+    if (ext.find(".zst") == std::string::npos) filepath += ".zst";
 
     // Parse zstd parameters
     if (args_info.zstd_params_given) {
