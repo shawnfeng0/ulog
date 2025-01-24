@@ -149,7 +149,7 @@ static inline bool RenameFile(const std::string &src_filename, const std::string
 // log.2.txt -> log.3.txt
 // log.3.txt -> delete
 static void inline RotateFiles(const std::string &filename, const size_t max_files) {
-  for (auto i = max_files; i > 1; --i) {
+  for (auto i = max_files - 1; i > 1; --i) {
     std::string src = CalcFilename(filename, i - 1);
     if (!ulog::file::path_exists(src)) {
       continue;
