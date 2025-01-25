@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cstring>
 #include <ctime>
+#include <functional>
 #include <memory>
 #include <string>
 #include <thread>
@@ -26,6 +27,7 @@ class AsyncRotatingFile {
     bool rotate_on_open{};
     std::chrono::milliseconds max_flush_period{};
     RotationStrategy rotation_strategy{};
+    std::function<std::vector<char>()> cb_file_head{};
   };
 
   /**
@@ -38,12 +40,15 @@ class AsyncRotatingFile {
    * @param max_flush_period Maximum file flush period (some file systems and platforms only refresh once every 60s
    * by default, which is too slow)
    * @param rotation_strategy Rotation strategy
+   * @param cb_file_head Called to obtain header data before writing each file.
    */
   AsyncRotatingFile(std::unique_ptr<WriterInterface> &&writer, const size_t fifo_size, const std::string &filename,
                     const std::size_t max_files, const bool rotate_on_open,
-                    const std::chrono::milliseconds max_flush_period, const RotationStrategy rotation_strategy)
+                    const std::chrono::milliseconds max_flush_period, const RotationStrategy rotation_strategy,
+                    std::function<std::vector<char>()> &&cb_file_head)
       : umq_(Queue::Create(fifo_size)),
-        rotating_file_(std::move(writer), filename, max_files, rotate_on_open, rotation_strategy) {
+        rotating_file_(std::move(writer), filename, max_files, rotate_on_open, rotation_strategy,
+                       std::move(cb_file_head)) {
     auto async_thread_function = [max_flush_period, this] {
       auto last_flush_time = std::chrono::steady_clock::now();
       bool need_wait_flush = false;  // Whether to wait for the next flush
@@ -82,9 +87,9 @@ class AsyncRotatingFile {
     async_thread_ = std::make_unique<std::thread>(async_thread_function);
   }
 
-  explicit AsyncRotatingFile(std::unique_ptr<WriterInterface> &&writer, const Config &c)
+  explicit AsyncRotatingFile(std::unique_ptr<WriterInterface> &&writer, Config &c)
       : AsyncRotatingFile(std::move(writer), c.fifo_size, c.filename, c.max_files, c.rotate_on_open, c.max_flush_period,
-                          c.rotation_strategy) {}
+                          c.rotation_strategy, std::move(c.cb_file_head)) {}
 
   AsyncRotatingFile(const AsyncRotatingFile &) = delete;
   AsyncRotatingFile &operator=(const AsyncRotatingFile &) = delete;

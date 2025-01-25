@@ -40,8 +40,20 @@ static void OutputFunc() {
 
 int main() {
   std::unique_ptr<ulog::file::WriterInterface> file_writer = std::make_unique<ulog::file::FileLimitWriter>(100 * 1024);
-  ulog::file::AsyncRotatingFile<ulog::mpsc::Mq> async_rotate(std::move(file_writer), 65536 * 2, "/tmp/ulog/test.txt", 5,
-                                                             true, std::chrono::seconds{1}, ulog::file::kRename);
+
+  ulog::file::AsyncRotatingFile<ulog::mpsc::Mq>::Config config;
+  config.fifo_size = 65536 * 2;
+  config.filename = "/tmp/ulog/test.txt";
+  config.max_files = 5;
+  config.rotate_on_open = true;
+  config.max_flush_period = std::chrono::seconds{1};
+  config.rotation_strategy = ulog::file::kRename;
+  config.cb_file_head = [] {
+    std::string file_head = "This is ulog lib file head.\n";
+    return std::vector(file_head.begin(), file_head.end());
+  };
+
+  ulog::file::AsyncRotatingFile<ulog::mpsc::Mq> async_rotate(std::move(file_writer), config);
 
   // Initial logger
   logger_set_user_data(ULOG_GLOBAL, &async_rotate);
