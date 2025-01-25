@@ -8,7 +8,7 @@
 
 #include "ulog/status.h"
 
-namespace ulog {
+namespace ulog::file {
 
 class WriterInterface {
  public:
@@ -51,4 +51,4 @@ class WriterInterface {
    */
   virtual Status Write(const void* data, std::size_t len) = 0;
 };
-}  // namespace ulog
+}  // namespace ulog::file

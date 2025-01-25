@@ -7,7 +7,7 @@
 #include "file.h"
 #include "writer_interface.h"
 
-namespace ulog {
+namespace ulog::file {
 
 class ZstdLimitFile final : public WriterInterface {
  public:
@@ -143,4 +143,4 @@ class ZstdLimitFile final : public WriterInterface {
   std::vector<uint8_t> zstd_out_buffer_;
 };
 
-}  // namespace ulog
+}  // namespace ulog::file

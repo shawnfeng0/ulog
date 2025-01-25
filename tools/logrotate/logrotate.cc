@@ -70,7 +70,7 @@ int main(const int argc, char *argv[]) {
   const auto flush_interval = to_chrono_time(args_info.flush_interval_arg);
   std::string filepath = args_info.file_path_arg;
 
-  std::unique_ptr<ulog::WriterInterface> file_writer;
+  std::unique_ptr<ulog::file::WriterInterface> file_writer;
   // Zstd compression
   if (args_info.zstd_compress_flag) {
     // Append .zst extension if not present
@@ -81,7 +81,7 @@ int main(const int argc, char *argv[]) {
     // Parse zstd parameters
     if (args_info.zstd_params_given) {
       const std::map<std::string, std::string> result = ParseParametersMap(args_info.zstd_params_arg);
-      file_writer = std::make_unique<ulog::ZstdLimitFile>(
+      file_writer = std::make_unique<ulog::file::ZstdLimitFile>(
           file_size, result.count("level") ? std::stoi(result.at("level")) : ZSTD_DEFAULT_LEVEL,
           result.count("window-log") ? std::stoi(result.at("window-log")) : 0,
           result.count("chain-log") ? std::stoi(result.at("chain-log")) : 0,
@@ -89,12 +89,12 @@ int main(const int argc, char *argv[]) {
 
       // No zstd parameters
     } else {
-      file_writer = std::make_unique<ulog::ZstdLimitFile>(file_size);
+      file_writer = std::make_unique<ulog::file::ZstdLimitFile>(file_size);
     }
 
     // No compression
   } else {
-    file_writer = std::make_unique<ulog::FileLimitWriter>(file_size);
+    file_writer = std::make_unique<ulog::file::FileLimitWriter>(file_size);
   }
 
   const ulog::file::RotationStrategy rotation_strategy = std::string(args_info.rotation_strategy_arg) == "incremental"

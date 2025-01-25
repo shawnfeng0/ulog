@@ -7,7 +7,7 @@
 #include "file.h"
 #include "writer_interface.h"
 
-namespace ulog {
+namespace ulog::file {
 
 class FileLimitWriter final : public WriterInterface {
  public:
@@ -77,4 +77,4 @@ class FileLimitWriter final : public WriterInterface {
   std::FILE *file_{nullptr};
   size_t file_write_size_{0};
 };
-}  // namespace ulog
+}  // namespace ulog::file

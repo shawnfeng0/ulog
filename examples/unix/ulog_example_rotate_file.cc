@@ -39,7 +39,7 @@ static void OutputFunc() {
 }
 
 int main() {
-  std::unique_ptr<ulog::WriterInterface> file_writer = std::make_unique<ulog::FileLimitWriter>(100 * 1024);
+  std::unique_ptr<ulog::file::WriterInterface> file_writer = std::make_unique<ulog::file::FileLimitWriter>(100 * 1024);
   ulog::file::AsyncRotatingFile<ulog::mpsc::Mq> async_rotate(std::move(file_writer), 65536 * 2, "/tmp/ulog/test.txt", 5,
                                                              true, std::chrono::seconds{1}, ulog::file::kRename);
 
