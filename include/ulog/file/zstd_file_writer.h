@@ -11,8 +11,9 @@ namespace ulog::file {
 
 class ZstdLimitFile final : public WriterInterface {
  public:
-  explicit ZstdLimitFile(const size_t file_limit_size, const int zstd_level = 3, const int zstd_window_log = 0,
-                         const int zstd_chain_log = 0, const int zstd_hash_log = 0,
+  explicit ZstdLimitFile(const size_t file_limit_size, const int zstd_level = 3, const int zstd_window_log = 14,
+                         const int zstd_chain_log = 14, const int zstd_hash_log = 15, const int zstd_search_log = 2,
+                         const int zstd_min_match = 4, const int zstd_target_length = 0, const int zstd_strategy = 2,
                          const size_t zstd_max_frame_in = 8 << 20)
       : config_file_limit_size_(file_limit_size), config_zstd_max_frame_in_(zstd_max_frame_in) {
     zstd_out_buffer_.resize(16 * 1024);
@@ -24,6 +25,10 @@ class ZstdLimitFile final : public WriterInterface {
     ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_windowLog, zstd_window_log);
     ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_chainLog, zstd_chain_log);
     ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_hashLog, zstd_hash_log);
+    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_searchLog, zstd_search_log);
+    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_minMatch, zstd_min_match);
+    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_targetLength, zstd_target_length);
+    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_strategy, zstd_strategy);
   }
 
   ~ZstdLimitFile() override {

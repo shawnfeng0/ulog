@@ -85,7 +85,11 @@ int main(const int argc, char *argv[]) {
           file_size, result.count("level") ? std::stoi(result.at("level")) : ZSTD_DEFAULT_LEVEL,
           result.count("window-log") ? std::stoi(result.at("window-log")) : 0,
           result.count("chain-log") ? std::stoi(result.at("chain-log")) : 0,
-          result.count("hash-log") ? std::stoi(result.at("hash-log")) : 0);
+          result.count("hash-log") ? std::stoi(result.at("hash-log")) : 0,
+          result.count("search-log") ? std::stoi(result.at("search-log")) : 0,
+          result.count("min-match") ? std::stoi(result.at("min-match")) : 0,
+          result.count("target-length") ? std::stoi(result.at("target-length")) : 0,
+          result.count("strategy") ? std::stoi(result.at("strategy")) : 0);
 
       // No zstd parameters
     } else {
