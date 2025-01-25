@@ -5,11 +5,11 @@
 #include <algorithm>
 #include <cstdlib>
 #include <map>
+#include <sstream>
 
 #include "cmdline.h"
 #include "ulog/file/async_rotating_file.h"
 #include "ulog/file/zstd_file_writer.h"
-#include "ulog/queue/mpsc_ring.h"
 #include "ulog/queue/spsc_ring.h"
 
 #define ZSTD_DEFAULT_LEVEL 3
@@ -68,15 +68,15 @@ int main(const int argc, char *argv[]) {
   const auto fifo_size = std::max(to_bytes(args_info.fifo_size_arg), 16ULL * 1024);
   const auto file_size = to_bytes(args_info.file_size_arg);
   const auto flush_interval = to_chrono_time(args_info.flush_interval_arg);
-  std::string filepath = args_info.file_path_arg;
+  std::string filename = args_info.file_path_arg;
 
   std::unique_ptr<ulog::file::WriterInterface> file_writer;
   // Zstd compression
   if (args_info.zstd_compress_flag) {
     // Append .zst extension if not present
     std::string basename, ext;
-    std::tie(basename, ext) = ulog::file::SplitByExtension(filepath);
-    if (ext.find(".zst") == std::string::npos) filepath += ".zst";
+    std::tie(basename, ext) = ulog::file::SplitByExtension(filename);
+    if (ext.find(".zst") == std::string::npos) filename += ".zst";
 
     // Parse zstd parameters
     if (args_info.zstd_params_given) {
@@ -105,9 +105,15 @@ int main(const int argc, char *argv[]) {
                                                              ? ulog::file::RotationStrategy::kIncrement
                                                              : ulog::file::RotationStrategy::kRename;
 
-  const ulog::file::AsyncRotatingFile<ulog::spsc::Mq<uint8_t>> async_rotate(
-      std::move(file_writer), fifo_size, filepath, args_info.max_files_arg, args_info.rotate_first_flag, flush_interval,
-      rotation_strategy);
+  ulog::file::AsyncRotatingFile<ulog::spsc::Mq<>>::Config config;
+  config.fifo_size = fifo_size;
+  config.filename = filename;
+  config.max_files = args_info.max_files_arg;
+  config.rotate_on_open = args_info.rotate_first_flag;
+  config.max_flush_period = flush_interval;
+  config.rotation_strategy = rotation_strategy;
+
+  const ulog::file::AsyncRotatingFile<ulog::spsc::Mq<>> async_rotate(std::move(file_writer), config);
 
   cmdline_parser_free(&args_info);
 

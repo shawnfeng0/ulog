@@ -19,6 +19,15 @@ namespace ulog::file {
 template <typename Queue>
 class AsyncRotatingFile {
  public:
+  struct Config {
+    size_t fifo_size{};
+    std::string filename;
+    std::size_t max_files{};
+    bool rotate_on_open{};
+    std::chrono::milliseconds max_flush_period{};
+    RotationStrategy rotation_strategy{};
+  };
+
   /**
    * Build a logger that asynchronously outputs data to a file
    * @param writer File writing instance, which may be compressed writing or direct writing
@@ -73,10 +82,14 @@ class AsyncRotatingFile {
     async_thread_ = std::make_unique<std::thread>(async_thread_function);
   }
 
+  explicit AsyncRotatingFile(std::unique_ptr<WriterInterface> &&writer, const Config &c)
+      : AsyncRotatingFile(std::move(writer), c.fifo_size, c.filename, c.max_files, c.rotate_on_open, c.max_flush_period,
+                          c.rotation_strategy) {}
+
   AsyncRotatingFile(const AsyncRotatingFile &) = delete;
   AsyncRotatingFile &operator=(const AsyncRotatingFile &) = delete;
 
-  Status Flush() const {
+  [[nodiscard]] Status Flush() const {
     umq_->Flush();
     return rotating_file_.Flush();
   }
