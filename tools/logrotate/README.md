@@ -35,21 +35,34 @@ Please refer to the following command line options for more advanced usage.
 Usage: logrotate -f PATH [OPTIONS]...
 Loop logging of standard inputs to several files.
 
-  -h, --help                 Print help and exit
-  -V, --version              Print version and exit
-  -f, --file-path=PATH       File path to record log
-  -s, --file-size=SIZE       Size of each file (e.g., 1MB, 500KB, 2GB)
-                               (default=`1MB')
-  -n, --max-files=NUM        Maximum number of files  (default=`8')
-  -c, --fifo-size=SIZE       Fifo size  (default=`32KB')
-  -i, --flush-interval=TIME  The time interval between flushing to disk or
-                               writing the compression end mark and flushing to
-                               disk (e.g., 1, 3s, 500ms, 5min)  (default=`1s')
-  -z, --zstd-compress        Compress with zstd  (default=off)
-  -p, --zstd-params=params   Parameters for zstd compression,
-                               larger == more compression and memory (e.g.,
-                               level=3,window-log=21,chain-log=16,hash-log=17)
-  -r, --rotate-first         Should rotate first before write  (default=off)
+Examples:
+ your_program | logrotate --file-path=log.txt --file-size=1MB --max-files=8
+ your_program | logrotate -f log.txt -s 1MB -n 8 --zstd-compress
+
+  -h, --help                   Print help and exit
+  -V, --version                Print version and exit
+
+File options:
+  -f, --file-path=PATH         File path to record log
+  -s, --file-size=SIZE         Size of each file  (default=`1MB')
+  -n, --max-files=NUM          Maximum number of files  (default=`8')
+  -i, --flush-interval=time    Time interval between flushing to disk
+                                 (default=`1s')
+      --rotation-strategy=STR  File rotation strategy:
+                                 rename: log.1.txt -> log.2.txt
+                                 incremental: log-24.txt ... log-34.txt
+                                 (possible values="rename", "incremental"
+                                 default=`rename')
+      --rotate-first           Should rotate first before write  (default=off)
+
+Buffer options:
+  -c, --fifo-size=SIZE         Size of the FIFO buffer  (default=`32KB')
+
+Compress options:
+      --zstd-compress          Compress with zstd  (default=off)
+      --zstd-params=PARAMS     Parameters for zstd compression,
+                                 larger == more compression and memory (e.g.,
+                                 level=3,window-log=21,chain-log=16,hash-log=17)
 
 The SIZE parameter units are K, M, G (power of 1024). If the unit is not
 specified, the default is bytes.

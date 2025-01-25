@@ -117,16 +117,6 @@ static inline std::tuple<std::string, std::string> SplitByExtension(const std::s
   return std::make_tuple(filename.substr(0, ext_index), filename.substr(ext_index));
 }
 
-static inline std::string CalcFilename(const std::string &filename, std::size_t index) {
-  if (index == 0u) {
-    return filename;
-  }
-
-  std::string basename, ext;
-  std::tie(basename, ext) = SplitByExtension(filename);
-  return basename + "." + std::to_string(index) + ext;
-}
-
 // Rename the src file to target
 // return true on success, false otherwise.
 static inline bool RenameFile(const std::string &src_filename, const std::string &target_filename) {
@@ -138,27 +128,6 @@ static inline bool RenameFile(const std::string &src_filename, const std::string
   // Ref:
   // https://pubs.opengroup.org/onlinepubs/000095399/functions/rename.html
   return std::rename(src_filename.c_str(), target_filename.c_str()) == 0;
-}
-
-// Rotate files:
-// log.txt -> log.1.txt
-// log.1.txt -> log.2.txt
-// log.2.txt -> log.3.txt
-// log.3.txt -> delete
-static void inline RotateFiles(const std::string &filename, const size_t max_files) {
-  for (auto i = max_files - 1; i > 1; --i) {
-    std::string src = CalcFilename(filename, i - 1);
-    if (!ulog::file::path_exists(src)) {
-      continue;
-    }
-    std::string target = CalcFilename(filename, i);
-    RenameFile(src, target);
-  }
-
-  // "tail -f" may be interrupted when rename is executed, and "tail -F" can
-  // be used instead, but some "-F" implementations (busybox tail) cannot
-  // obtain all logs in real time.
-  RenameFile(filename, CalcFilename(filename, 1));
 }
 
 }  // namespace ulog::file

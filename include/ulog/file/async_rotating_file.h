@@ -14,7 +14,7 @@
 #include "ulog/error.h"
 #include "ulog/file/rotating_file.h"
 
-namespace ulog {
+namespace ulog::file {
 
 template <typename Queue>
 class AsyncRotatingFile {
@@ -28,11 +28,13 @@ class AsyncRotatingFile {
    * @param rotate_on_open Whether to rotate the file when opening
    * @param max_flush_period Maximum file flush period (some file systems and platforms only refresh once every 60s
    * by default, which is too slow)
+   * @param rotation_strategy Rotation strategy
    */
   AsyncRotatingFile(std::unique_ptr<WriterInterface> &&writer, const size_t fifo_size, const std::string &filename,
                     const std::size_t max_files, const bool rotate_on_open,
-                    const std::chrono::milliseconds max_flush_period)
-      : umq_(Queue::Create(fifo_size)), rotating_file_(std::move(writer), filename, max_files, rotate_on_open) {
+                    const std::chrono::milliseconds max_flush_period, const RotationStrategy rotation_strategy)
+      : umq_(Queue::Create(fifo_size)),
+        rotating_file_(std::move(writer), filename, max_files, rotate_on_open, rotation_strategy) {
     auto async_thread_function = [max_flush_period, this] {
       auto last_flush_time = std::chrono::steady_clock::now();
       bool need_wait_flush = false;  // Whether to wait for the next flush
@@ -108,4 +110,4 @@ class AsyncRotatingFile {
   std::atomic_bool should_exit_{false};
 };
 
-}  // namespace ulog
+}  // namespace ulog::file

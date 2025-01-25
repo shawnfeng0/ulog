@@ -2,25 +2,37 @@ package "logrotate"
 version "0.6.0"
 
 usage "logrotate -f PATH [OPTIONS]..."
-
 purpose "Loop logging of standard inputs to several files."
+description "Examples:\n\
+ your_program | logrotate --file-path=log.txt --file-size=1MB --max-files=8\n\
+ your_program | logrotate -f log.txt -s 1MB -n 8 --zstd-compress"
 
-option "file-path" f "File path to record log"
+section "File options"
+option  "file-path"         f   "File path to record log"
         string typestr="PATH" required
-option "file-size" s "Size of each file (e.g., 1MB, 500KB, 2GB)"
+option  "file-size"         s   "Size of each file"
         string typestr="SIZE" optional default="1MB"
-option "max-files" n "Maximum number of files"
+option  "max-files"         n   "Maximum number of files"
         int    typestr="NUM" optional default="8"
-option "fifo-size" c "Fifo size"
+option  "flush-interval"    i   "Time interval between flushing to disk"
+        string typestr="time" optional default="1s"
+option  "rotation-strategy" -   "File rotation strategy:\n\
+rename: log.1.txt -> log.2.txt\n\
+incremental: log-24.txt ... log-34.txt"
+        string typestr="STR" values="rename","incremental" default="rename" optional
+option  "rotate-first"      -   "Should rotate first before write"
+        flag off
+
+section "Buffer options"
+option  "fifo-size"         c   "Size of the FIFO buffer"
         string typestr="SIZE" optional default="32KB"
-option "flush-interval" i "The time interval between flushing to disk or writing the compression end mark and flushing to disk (e.g., 1, 3s, 500ms, 5min)"
-        string typestr="TIME" optional default="1s"
-option "zstd-compress" - "Compress with zstd"
+
+section "Compress options"
+option  "zstd-compress"     -   "Compress with zstd"
         flag off
-option "zstd-params" - "Parameters for zstd compression,\nlarger == more compression and memory (e.g., level=3,window-log=21,chain-log=16,hash-log=17)"
-        string typestr="params" optional dependon="zstd-compress"
-option "rotate-first" - "Should rotate first before write"
-        flag off
+option  "zstd-params"       -   "Parameters for zstd compression,\
+\nlarger == more compression and memory (e.g., level=3,window-log=21,chain-log=16,hash-log=17)"
+        string typestr="PARAMS" optional dependon="zstd-compress"
 
 text "\nThe SIZE parameter units are K, M, G (power of 1024). If the unit is not specified, the default is bytes."
 text "\nThe TIME parameter units are s, sec, ms, min, hour. If the unit is not specified, the default is seconds."

@@ -6,7 +6,6 @@
 
 #include "ulog/error.h"
 #include "ulog/file/async_rotating_file.h"
-#include "ulog/queue/fifo_power_of_two.h"
 #include "ulog/queue/mpsc_ring.h"
 #include "ulog/queue/spsc_ring.h"
 #include "ulog/ulog.h"
@@ -41,8 +40,8 @@ static void OutputFunc() {
 
 int main() {
   std::unique_ptr<ulog::WriterInterface> file_writer = std::make_unique<ulog::FileLimitWriter>(100 * 1024);
-  ulog::AsyncRotatingFile<ulog::mpsc::Mq> async_rotate(std::move(file_writer), 65536 * 2, "/tmp/ulog/test.txt", 5, true,
-                                                       std::chrono::seconds{1});
+  ulog::file::AsyncRotatingFile<ulog::mpsc::Mq> async_rotate(std::move(file_writer), 65536 * 2, "/tmp/ulog/test.txt", 5,
+                                                             true, std::chrono::seconds{1}, ulog::file::kRename);
 
   // Initial logger
   logger_set_user_data(ULOG_GLOBAL, &async_rotate);

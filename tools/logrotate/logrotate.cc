@@ -97,9 +97,13 @@ int main(const int argc, char *argv[]) {
     file_writer = std::make_unique<ulog::FileLimitWriter>(file_size);
   }
 
-  const ulog::AsyncRotatingFile<ulog::spsc::Mq<uint8_t>> async_rotate(std::move(file_writer), fifo_size, filepath,
-                                                                      args_info.max_files_arg,
-                                                                      args_info.rotate_first_flag, flush_interval);
+  const ulog::file::RotationStrategy rotation_strategy = std::string(args_info.rotation_strategy_arg) == "incremental"
+                                                             ? ulog::file::RotationStrategy::kIncrement
+                                                             : ulog::file::RotationStrategy::kRename;
+
+  const ulog::file::AsyncRotatingFile<ulog::spsc::Mq<uint8_t>> async_rotate(
+      std::move(file_writer), fifo_size, filepath, args_info.max_files_arg, args_info.rotate_first_flag, flush_interval,
+      rotation_strategy);
 
   cmdline_parser_free(&args_info);
 

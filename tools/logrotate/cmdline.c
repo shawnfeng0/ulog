@@ -31,19 +31,23 @@ const char *gengetopt_args_info_usage = "Usage: logrotate -f PATH [OPTIONS]...";
 
 const char *gengetopt_args_info_versiontext = "";
 
-const char *gengetopt_args_info_description = "";
+const char *gengetopt_args_info_description = "Examples:\n your_program | logrotate --file-path=log.txt --file-size=1MB --max-files=8\n your_program | logrotate -f log.txt -s 1MB -n 8 --zstd-compress";
 
 const char *gengetopt_args_info_help[] = {
-  "  -h, --help                 Print help and exit",
-  "  -V, --version              Print version and exit",
-  "  -f, --file-path=PATH       File path to record log",
-  "  -s, --file-size=SIZE       Size of each file (e.g., 1MB, 500KB, 2GB)\n                               (default=`1MB')",
-  "  -n, --max-files=NUM        Maximum number of files  (default=`8')",
-  "  -c, --fifo-size=SIZE       Fifo size  (default=`32KB')",
-  "  -i, --flush-interval=TIME  The time interval between flushing to disk or\n                               writing the compression end mark and flushing to\n                               disk (e.g., 1, 3s, 500ms, 5min)  (default=`1s')",
-  "      --zstd-compress        Compress with zstd  (default=off)",
-  "      --zstd-params=params   Parameters for zstd compression,\n                               larger == more compression and memory (e.g.,\n                               level=3,window-log=21,chain-log=16,hash-log=17)",
-  "      --rotate-first         Should rotate first before write  (default=off)",
+  "  -h, --help                   Print help and exit",
+  "  -V, --version                Print version and exit",
+  "\nFile options:",
+  "  -f, --file-path=PATH         File path to record log",
+  "  -s, --file-size=SIZE         Size of each file  (default=`1MB')",
+  "  -n, --max-files=NUM          Maximum number of files  (default=`8')",
+  "  -i, --flush-interval=time    Time interval between flushing to disk\n                                 (default=`1s')",
+  "      --rotation-strategy=STR  File rotation strategy:\n                                 rename: log.1.txt -> log.2.txt\n                                 incremental: log-24.txt ... log-34.txt\n                                 (possible values=\"rename\", \"incremental\"\n                                 default=`rename')",
+  "      --rotate-first           Should rotate first before write  (default=off)",
+  "\nBuffer options:",
+  "  -c, --fifo-size=SIZE         Size of the FIFO buffer  (default=`32KB')",
+  "\nCompress options:",
+  "      --zstd-compress          Compress with zstd  (default=off)",
+  "      --zstd-params=PARAMS     Parameters for zstd compression,\n                                 larger == more compression and memory (e.g.,\n                                 level=3,window-log=21,chain-log=16,hash-log=17)",
   "\nThe SIZE parameter units are K, M, G (power of 1024). If the unit is not\nspecified, the default is bytes.\nThe TIME parameter units are s, sec, ms, min, hour. If the unit is not\nspecified, the default is seconds.",
     0
 };
@@ -66,6 +70,8 @@ cmdline_parser_internal (int argc, char **argv, struct gengetopt_args_info *args
 static int
 cmdline_parser_required2 (struct gengetopt_args_info *args_info, const char *prog_name, const char *additional_error);
 
+const char *cmdline_parser_rotation_strategy_values[] = {"rename", "incremental", 0}; /*< Possible values for rotation-strategy. */
+
 static char *
 gengetopt_strdup (const char *s);
 
@@ -77,11 +83,12 @@ void clear_given (struct gengetopt_args_info *args_info)
   args_info->file_path_given = 0 ;
   args_info->file_size_given = 0 ;
   args_info->max_files_given = 0 ;
-  args_info->fifo_size_given = 0 ;
   args_info->flush_interval_given = 0 ;
+  args_info->rotation_strategy_given = 0 ;
+  args_info->rotate_first_given = 0 ;
+  args_info->fifo_size_given = 0 ;
   args_info->zstd_compress_given = 0 ;
   args_info->zstd_params_given = 0 ;
-  args_info->rotate_first_given = 0 ;
 }
 
 static
@@ -94,14 +101,16 @@ void clear_args (struct gengetopt_args_info *args_info)
   args_info->file_size_orig = NULL;
   args_info->max_files_arg = 8;
   args_info->max_files_orig = NULL;
-  args_info->fifo_size_arg = gengetopt_strdup ("32KB");
-  args_info->fifo_size_orig = NULL;
   args_info->flush_interval_arg = gengetopt_strdup ("1s");
   args_info->flush_interval_orig = NULL;
+  args_info->rotation_strategy_arg = gengetopt_strdup ("rename");
+  args_info->rotation_strategy_orig = NULL;
+  args_info->rotate_first_flag = 0;
+  args_info->fifo_size_arg = gengetopt_strdup ("32KB");
+  args_info->fifo_size_orig = NULL;
   args_info->zstd_compress_flag = 0;
   args_info->zstd_params_arg = NULL;
   args_info->zstd_params_orig = NULL;
-  args_info->rotate_first_flag = 0;
   
 }
 
@@ -112,14 +121,15 @@ void init_args_info(struct gengetopt_args_info *args_info)
 
   args_info->help_help = gengetopt_args_info_help[0] ;
   args_info->version_help = gengetopt_args_info_help[1] ;
-  args_info->file_path_help = gengetopt_args_info_help[2] ;
-  args_info->file_size_help = gengetopt_args_info_help[3] ;
-  args_info->max_files_help = gengetopt_args_info_help[4] ;
-  args_info->fifo_size_help = gengetopt_args_info_help[5] ;
+  args_info->file_path_help = gengetopt_args_info_help[3] ;
+  args_info->file_size_help = gengetopt_args_info_help[4] ;
+  args_info->max_files_help = gengetopt_args_info_help[5] ;
   args_info->flush_interval_help = gengetopt_args_info_help[6] ;
-  args_info->zstd_compress_help = gengetopt_args_info_help[7] ;
-  args_info->zstd_params_help = gengetopt_args_info_help[8] ;
-  args_info->rotate_first_help = gengetopt_args_info_help[9] ;
+  args_info->rotation_strategy_help = gengetopt_args_info_help[7] ;
+  args_info->rotate_first_help = gengetopt_args_info_help[8] ;
+  args_info->fifo_size_help = gengetopt_args_info_help[10] ;
+  args_info->zstd_compress_help = gengetopt_args_info_help[12] ;
+  args_info->zstd_params_help = gengetopt_args_info_help[13] ;
   
 }
 
@@ -214,10 +224,12 @@ cmdline_parser_release (struct gengetopt_args_info *args_info)
   free_string_field (&(args_info->file_size_arg));
   free_string_field (&(args_info->file_size_orig));
   free_string_field (&(args_info->max_files_orig));
-  free_string_field (&(args_info->fifo_size_arg));
-  free_string_field (&(args_info->fifo_size_orig));
   free_string_field (&(args_info->flush_interval_arg));
   free_string_field (&(args_info->flush_interval_orig));
+  free_string_field (&(args_info->rotation_strategy_arg));
+  free_string_field (&(args_info->rotation_strategy_orig));
+  free_string_field (&(args_info->fifo_size_arg));
+  free_string_field (&(args_info->fifo_size_orig));
   free_string_field (&(args_info->zstd_params_arg));
   free_string_field (&(args_info->zstd_params_orig));
   
@@ -226,13 +238,54 @@ cmdline_parser_release (struct gengetopt_args_info *args_info)
   clear_given (args_info);
 }
 
+/**
+ * @param val the value to check
+ * @param values the possible values
+ * @return the index of the matched value:
+ * -1 if no value matched,
+ * -2 if more than one value has matched
+ */
+static int
+check_possible_values(const char *val, const char *values[])
+{
+  int i, found, last;
+  size_t len;
+
+  if (!val)   /* otherwise strlen() crashes below */
+    return -1; /* -1 means no argument for the option */
+
+  found = last = 0;
+
+  for (i = 0, len = strlen(val); values[i]; ++i)
+    {
+      if (strncmp(val, values[i], len) == 0)
+        {
+          ++found;
+          last = i;
+          if (strlen(values[i]) == len)
+            return i; /* exact macth no need to check more */
+        }
+    }
+
+  if (found == 1) /* one match: OK */
+    return last;
+
+  return (found ? -2 : -1); /* return many values or none matched */
+}
+
 
 static void
 write_into_file(FILE *outfile, const char *opt, const char *arg, const char *values[])
 {
-  FIX_UNUSED (values);
+  int found = -1;
   if (arg) {
-    fprintf(outfile, "%s=\"%s\"\n", opt, arg);
+    if (values) {
+      found = check_possible_values(arg, values);      
+    }
+    if (found >= 0)
+      fprintf(outfile, "%s=\"%s\" # %s\n", opt, arg, values[found]);
+    else
+      fprintf(outfile, "%s=\"%s\"\n", opt, arg);
   } else {
     fprintf(outfile, "%s\n", opt);
   }
@@ -260,16 +313,18 @@ cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
     write_into_file(outfile, "file-size", args_info->file_size_orig, 0);
   if (args_info->max_files_given)
     write_into_file(outfile, "max-files", args_info->max_files_orig, 0);
-  if (args_info->fifo_size_given)
-    write_into_file(outfile, "fifo-size", args_info->fifo_size_orig, 0);
   if (args_info->flush_interval_given)
     write_into_file(outfile, "flush-interval", args_info->flush_interval_orig, 0);
+  if (args_info->rotation_strategy_given)
+    write_into_file(outfile, "rotation-strategy", args_info->rotation_strategy_orig, cmdline_parser_rotation_strategy_values);
+  if (args_info->rotate_first_given)
+    write_into_file(outfile, "rotate-first", 0, 0 );
+  if (args_info->fifo_size_given)
+    write_into_file(outfile, "fifo-size", args_info->fifo_size_orig, 0);
   if (args_info->zstd_compress_given)
     write_into_file(outfile, "zstd-compress", 0, 0 );
   if (args_info->zstd_params_given)
     write_into_file(outfile, "zstd-params", args_info->zstd_params_orig, 0);
-  if (args_info->rotate_first_given)
-    write_into_file(outfile, "rotate-first", 0, 0 );
   
 
   i = EXIT_SUCCESS;
@@ -457,7 +512,18 @@ int update_arg(void *field, char **orig_field,
       return 1; /* failure */
     }
 
-  FIX_UNUSED (default_value);
+  if (possible_values && (found = check_possible_values((value ? value : default_value), possible_values)) < 0)
+    {
+      if (short_opt != '-')
+        fprintf (stderr, "%s: %s argument, \"%s\", for option `--%s' (`-%c')%s\n", 
+          package_name, (found == -2) ? "ambiguous" : "invalid", value, long_opt, short_opt,
+          (additional_error ? additional_error : ""));
+      else
+        fprintf (stderr, "%s: %s argument, \"%s\", for option `--%s'%s\n", 
+          package_name, (found == -2) ? "ambiguous" : "invalid", value, long_opt,
+          (additional_error ? additional_error : ""));
+      return 1; /* failure */
+    }
     
   if (field_given && *field_given && ! override)
     return 0;
@@ -568,15 +634,16 @@ cmdline_parser_internal (
         { "file-path",	1, NULL, 'f' },
         { "file-size",	1, NULL, 's' },
         { "max-files",	1, NULL, 'n' },
-        { "fifo-size",	1, NULL, 'c' },
         { "flush-interval",	1, NULL, 'i' },
+        { "rotation-strategy",	1, NULL, 0 },
+        { "rotate-first",	0, NULL, 0 },
+        { "fifo-size",	1, NULL, 'c' },
         { "zstd-compress",	0, NULL, 0 },
         { "zstd-params",	1, NULL, 0 },
-        { "rotate-first",	0, NULL, 0 },
         { 0,  0, 0, 0 }
       };
 
-      c = getopt_long (argc, argv, "hVf:s:n:c:i:", long_options, &option_index);
+      c = getopt_long (argc, argv, "hVf:s:n:i:c:", long_options, &option_index);
 
       if (c == -1) break;	/* Exit from `while (1)' loop.  */
 
@@ -604,7 +671,7 @@ cmdline_parser_internal (
             goto failure;
         
           break;
-        case 's':	/* Size of each file (e.g., 1MB, 500KB, 2GB).  */
+        case 's':	/* Size of each file.  */
         
         
           if (update_arg( (void *)&(args_info->file_size_arg), 
@@ -628,19 +695,7 @@ cmdline_parser_internal (
             goto failure;
         
           break;
-        case 'c':	/* Fifo size.  */
-        
-        
-          if (update_arg( (void *)&(args_info->fifo_size_arg), 
-               &(args_info->fifo_size_orig), &(args_info->fifo_size_given),
-              &(local_args_info.fifo_size_given), optarg, 0, "32KB", ARG_STRING,
-              check_ambiguity, override, 0, 0,
-              "fifo-size", 'c',
-              additional_error))
-            goto failure;
-        
-          break;
-        case 'i':	/* The time interval between flushing to disk or writing the compression end mark and flushing to disk (e.g., 1, 3s, 500ms, 5min).  */
+        case 'i':	/* Time interval between flushing to disk.  */
         
         
           if (update_arg( (void *)&(args_info->flush_interval_arg), 
@@ -652,10 +707,50 @@ cmdline_parser_internal (
             goto failure;
         
           break;
+        case 'c':	/* Size of the FIFO buffer.  */
+        
+        
+          if (update_arg( (void *)&(args_info->fifo_size_arg), 
+               &(args_info->fifo_size_orig), &(args_info->fifo_size_given),
+              &(local_args_info.fifo_size_given), optarg, 0, "32KB", ARG_STRING,
+              check_ambiguity, override, 0, 0,
+              "fifo-size", 'c',
+              additional_error))
+            goto failure;
+        
+          break;
 
         case 0:	/* Long option with no short option */
+          /* File rotation strategy:
+          rename: log.1.txt -> log.2.txt
+          incremental: log-24.txt ... log-34.txt.  */
+          if (strcmp (long_options[option_index].name, "rotation-strategy") == 0)
+          {
+          
+          
+            if (update_arg( (void *)&(args_info->rotation_strategy_arg), 
+                 &(args_info->rotation_strategy_orig), &(args_info->rotation_strategy_given),
+                &(local_args_info.rotation_strategy_given), optarg, cmdline_parser_rotation_strategy_values, "rename", ARG_STRING,
+                check_ambiguity, override, 0, 0,
+                "rotation-strategy", '-',
+                additional_error))
+              goto failure;
+          
+          }
+          /* Should rotate first before write.  */
+          else if (strcmp (long_options[option_index].name, "rotate-first") == 0)
+          {
+          
+          
+            if (update_arg((void *)&(args_info->rotate_first_flag), 0, &(args_info->rotate_first_given),
+                &(local_args_info.rotate_first_given), optarg, 0, 0, ARG_FLAG,
+                check_ambiguity, override, 1, 0, "rotate-first", '-',
+                additional_error))
+              goto failure;
+          
+          }
           /* Compress with zstd.  */
-          if (strcmp (long_options[option_index].name, "zstd-compress") == 0)
+          else if (strcmp (long_options[option_index].name, "zstd-compress") == 0)
           {
           
           
@@ -677,18 +772,6 @@ cmdline_parser_internal (
                 &(local_args_info.zstd_params_given), optarg, 0, 0, ARG_STRING,
                 check_ambiguity, override, 0, 0,
                 "zstd-params", '-',
-                additional_error))
-              goto failure;
-          
-          }
-          /* Should rotate first before write.  */
-          else if (strcmp (long_options[option_index].name, "rotate-first") == 0)
-          {
-          
-          
-            if (update_arg((void *)&(args_info->rotate_first_flag), 0, &(args_info->rotate_first_given),
-                &(local_args_info.rotate_first_given), optarg, 0, 0, ARG_FLAG,
-                check_ambiguity, override, 1, 0, "rotate-first", '-',
                 additional_error))
               goto failure;
           
