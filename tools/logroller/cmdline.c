@@ -27,11 +27,11 @@
 
 const char *gengetopt_args_info_purpose = "Loop logging of standard inputs to several files.";
 
-const char *gengetopt_args_info_usage = "Usage: logrotate -f PATH [OPTIONS]...";
+const char *gengetopt_args_info_usage = "Usage: logroller -f PATH [OPTIONS]...";
 
 const char *gengetopt_args_info_versiontext = "";
 
-const char *gengetopt_args_info_description = "Examples:\n your_program | logrotate --file-path=log.txt --file-size=1MB --max-files=8\n your_program | logrotate -f log.txt -s 1MB -n 8 --zstd-compress";
+const char *gengetopt_args_info_description = "Examples:\n your_program | logroller --file-path=log.txt --file-size=1MB --max-files=8\n your_program | logroller -f log.txt -s 1MB -n 8 --zstd-compress";
 
 const char *gengetopt_args_info_help[] = {
   "  -h, --help                   Print help and exit",

@@ -1,1 +1,1 @@
-add_subdirectory(logrotate)
+add_subdirectory(logroller)

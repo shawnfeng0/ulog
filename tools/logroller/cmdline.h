@@ -21,12 +21,12 @@ extern "C" {
 
 #ifndef CMDLINE_PARSER_PACKAGE
 /** @brief the program name (used for printing errors) */
-#define CMDLINE_PARSER_PACKAGE "logrotate"
+#define CMDLINE_PARSER_PACKAGE "logroller"
 #endif
 
 #ifndef CMDLINE_PARSER_PACKAGE_NAME
 /** @brief the complete program name (used for help and version) */
-#define CMDLINE_PARSER_PACKAGE_NAME "logrotate"
+#define CMDLINE_PARSER_PACKAGE_NAME "logroller"
 #endif
 
 #ifndef CMDLINE_PARSER_VERSION

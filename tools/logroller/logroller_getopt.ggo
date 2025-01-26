@@ -1,11 +1,11 @@
-package "logrotate"
+package "logroller"
 version "0.6.0"
 
-usage "logrotate -f PATH [OPTIONS]..."
+usage "logroller -f PATH [OPTIONS]..."
 purpose "Loop logging of standard inputs to several files."
 description "Examples:\n\
- your_program | logrotate --file-path=log.txt --file-size=1MB --max-files=8\n\
- your_program | logrotate -f log.txt -s 1MB -n 8 --zstd-compress"
+ your_program | logroller --file-path=log.txt --file-size=1MB --max-files=8\n\
+ your_program | logroller -f log.txt -s 1MB -n 8 --zstd-compress"
 
 section "File options"
 option  "file-path"         f   "File path to record log"

@@ -123,14 +123,14 @@ sudo make install
 
 ## Extension tools
 
-### logrotate
+### logroller
 
-[logrotate](tools/logrotate) is a command-line tool for circularly writing the output of other programs to some files via a pipe ("|").
+[logroller](tools/logroller) is a command-line tool for circularly writing the output of other programs to some files via a pipe ("|").
 
 It is written using ulog's asynchronous fifo and extended headers for file loop writing.
 
 Usage:
 
 ```bash
-your_program | logrotate --file-path /tmp/example/log.txt --file-size=100000 --max-files=3
+your_program | logroller --file-path /tmp/example/log.txt --file-size=100000 --max-files=3
 ```
