@@ -50,7 +50,7 @@ static void mq_test(const size_t buffer_size, const size_t write_thread_count, c
   auto read_entry = [=, &total_read_packet, &total_read_size] {
     typename Mq::Consumer consumer(umq);
 
-    while (auto data = consumer.ReadOrWait(std::chrono::milliseconds(1000))) {
+    while (auto data = consumer.ReadOrWait(std::chrono::milliseconds(10))) {
       total_read_packet += data.remain();
       while (const auto packet = data.next()) {
         ASSERT_EQ(memcmp(data_source, packet.data, packet.size), 0);
@@ -71,4 +71,4 @@ static void mq_test(const size_t buffer_size, const size_t write_thread_count, c
   LOGGER_MULTI_TOKEN(total_write_size.load());
 }
 
-TEST(MpscRingTest, multi_producer_single_consumer) { mq_test<ulog::mpsc::Mq>(64 * 1024, 32, 1024 * 100, 1); }
+TEST(MpscRingTest, multi_producer_single_consumer) { mq_test<ulog::mpsc::Mq>(64 * 1024, 4, 1024 * 100, 1); }

@@ -1,6 +1,6 @@
 # ulog
 
-[![Build Status](https://travis-ci.org/shawnfeng0/ulog.svg?branch=master)](https://travis-ci.org/shawnfeng0/ulog)
+![Tests](https://github.com/ShawnFeng0/ulog/actions/workflows/tests.yml/badge.svg)
 
 A library written in C/C ++ for printing logs of lightweight embedded devices.
 
