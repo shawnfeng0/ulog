@@ -5,16 +5,16 @@
 #pragma once
 
 #include "file.h"
-#include "writer_interface.h"
+#include "file_writer_base.h"
 
 namespace ulog::file {
 
-class FileLimitWriter final : public WriterInterface {
+class FileWriter final : public FileWriterBase {
  public:
-  explicit FileLimitWriter(const size_t file_limit_size) : file_limit_size_(file_limit_size) {}
-  ~FileLimitWriter() override { FileLimitWriter::Close(); }
+  explicit FileWriter() : file_limit_size_(kNoLimit) {}
+  ~FileWriter() override { FileWriter::Close(); }
 
-  Status Open(const std::string &filename, const bool truncate) override {
+  Status Open(const std::string &filename, const bool truncate, size_t limit) override {
     if (file_ != nullptr) {
       return Status::Corruption("File already opened!", filename);
     }
@@ -30,6 +30,7 @@ class FileLimitWriter final : public WriterInterface {
     }
 
     file_write_size_ = truncate ? 0 : file::filesize(file_);
+    file_limit_size_ = limit;
     return Status::OK();
   }
 
@@ -72,7 +73,7 @@ class FileLimitWriter final : public WriterInterface {
 
  private:
   // config
-  const size_t file_limit_size_;
+  size_t file_limit_size_;
 
   std::FILE *file_{nullptr};
   size_t file_write_size_{0};

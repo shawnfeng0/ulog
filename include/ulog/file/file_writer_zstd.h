@@ -5,38 +5,37 @@
 #include <vector>
 
 #include "file.h"
-#include "writer_interface.h"
+#include "file_writer_base.h"
 
 namespace ulog::file {
 
-class ZstdLimitFile final : public WriterInterface {
+class FileWriterZstd final : public FileWriterBase {
  public:
-  explicit ZstdLimitFile(const size_t file_limit_size, const int zstd_level = 3, const int zstd_window_log = 14,
-                         const int zstd_chain_log = 14, const int zstd_hash_log = 15, const int zstd_search_log = 2,
-                         const int zstd_min_match = 4, const int zstd_target_length = 0, const int zstd_strategy = 2,
-                         const size_t zstd_max_frame_in = 8 << 20)
-      : config_file_limit_size_(file_limit_size), config_zstd_max_frame_in_(zstd_max_frame_in) {
+  explicit FileWriterZstd(const int level = 3, const int window_log = 14, const int chain_log = 14,
+                          const int hash_log = 15, const int search_log = 2, const int min_match = 4,
+                          const int target_length = 0, const int strategy = 2, const size_t max_frame_in = 8 << 20)
+      : config_file_limit_size_(kNoLimit), config_zstd_max_frame_in_(max_frame_in) {
     zstd_out_buffer_.resize(16 * 1024);
 
     zstd_cctx_ = ZSTD_createCCtx();
     assert(zstd_cctx_ != nullptr);
 
-    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_compressionLevel, zstd_level);
-    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_windowLog, zstd_window_log);
-    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_chainLog, zstd_chain_log);
-    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_hashLog, zstd_hash_log);
-    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_searchLog, zstd_search_log);
-    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_minMatch, zstd_min_match);
-    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_targetLength, zstd_target_length);
-    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_strategy, zstd_strategy);
+    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_compressionLevel, level);
+    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_windowLog, window_log);
+    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_chainLog, chain_log);
+    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_hashLog, hash_log);
+    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_searchLog, search_log);
+    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_minMatch, min_match);
+    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_targetLength, target_length);
+    ZSTD_CCtx_setParameter(zstd_cctx_, ZSTD_c_strategy, strategy);
   }
 
-  ~ZstdLimitFile() override {
-    ZstdLimitFile::Close();
+  ~FileWriterZstd() override {
+    FileWriterZstd::Close();
     ZSTD_freeCCtx(zstd_cctx_);
   }
 
-  Status Open(const std::string& filename, const bool truncate) override {
+  Status Open(const std::string& filename, const bool truncate, const size_t limit) override {
     if (!zstd_cctx_) {
       return Status::Corruption("Error creating ZSTD context");
     }
@@ -57,6 +56,7 @@ class ZstdLimitFile final : public WriterInterface {
 
     file_write_compress_size_ = truncate ? 0 : file::filesize(file_);
     zstd_frame_in_ = 0;
+    config_file_limit_size_ = limit;
     return Status::OK();
   }
 
@@ -137,7 +137,7 @@ class ZstdLimitFile final : public WriterInterface {
   }
 
   // config
-  const size_t config_file_limit_size_;
+  size_t config_file_limit_size_;
   const size_t config_zstd_max_frame_in_;
 
   FILE* file_ = nullptr;

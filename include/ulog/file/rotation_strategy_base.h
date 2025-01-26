@@ -4,10 +4,10 @@
 
 namespace ulog::file {
 
-class RotationStrategyInterface {
+class RotationStrategyBase {
  public:
-  RotationStrategyInterface() = default;
-  virtual ~RotationStrategyInterface() = default;
+  RotationStrategyBase() = default;
+  virtual ~RotationStrategyBase() = default;
 
   virtual Status Rotate() = 0;
   virtual std::string LatestFilename() = 0;

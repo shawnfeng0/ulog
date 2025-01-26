@@ -8,8 +8,9 @@
 #include <sstream>
 
 #include "cmdline.h"
-#include "ulog/file/async_rotating_file.h"
-#include "ulog/file/zstd_file_writer.h"
+#include "ulog/file/file_writer_zstd.h"
+#include "ulog/file/sink_async_wrapper.h"
+#include "ulog/file/sink_rotating_file.h"
 #include "ulog/queue/spsc_ring.h"
 
 #define ZSTD_DEFAULT_LEVEL 3
@@ -66,11 +67,13 @@ int main(const int argc, char *argv[]) {
   if (cmdline_parser(argc, argv, &args_info) != 0) exit(1);
 
   const auto fifo_size = std::max(to_bytes(args_info.fifo_size_arg), 16ULL * 1024);
-  const auto file_size = to_bytes(args_info.file_size_arg);
-  const auto flush_interval = to_chrono_time(args_info.flush_interval_arg);
+  const auto max_flush_period = to_chrono_time(args_info.flush_interval_arg);
+  const auto rotation_strategy = std::string(args_info.rotation_strategy_arg) == "incremental"
+                                     ? ulog::file::RotationStrategy::kIncrement
+                                     : ulog::file::RotationStrategy::kRename;
   std::string filename = args_info.file_path_arg;
 
-  std::unique_ptr<ulog::file::WriterInterface> file_writer;
+  std::unique_ptr<ulog::file::FileWriterBase> file_writer;
   // Zstd compression
   if (args_info.zstd_compress_flag) {
     // Append .zst extension if not present
@@ -81,8 +84,8 @@ int main(const int argc, char *argv[]) {
     // Parse zstd parameters
     if (args_info.zstd_params_given) {
       const std::map<std::string, std::string> result = ParseParametersMap(args_info.zstd_params_arg);
-      file_writer = std::make_unique<ulog::file::ZstdLimitFile>(
-          file_size, result.count("level") ? std::stoi(result.at("level")) : ZSTD_DEFAULT_LEVEL,
+      file_writer = std::make_unique<ulog::file::FileWriterZstd>(
+          result.count("level") ? std::stoi(result.at("level")) : ZSTD_DEFAULT_LEVEL,
           result.count("window-log") ? std::stoi(result.at("window-log")) : 0,
           result.count("chain-log") ? std::stoi(result.at("chain-log")) : 0,
           result.count("hash-log") ? std::stoi(result.at("hash-log")) : 0,
@@ -93,27 +96,19 @@ int main(const int argc, char *argv[]) {
 
       // No zstd parameters
     } else {
-      file_writer = std::make_unique<ulog::file::ZstdLimitFile>(file_size);
+      file_writer = std::make_unique<ulog::file::FileWriterZstd>();
     }
 
     // No compression
   } else {
-    file_writer = std::make_unique<ulog::file::FileLimitWriter>(file_size);
+    file_writer = std::make_unique<ulog::file::FileWriter>();
   }
 
-  const ulog::file::RotationStrategy rotation_strategy = std::string(args_info.rotation_strategy_arg) == "incremental"
-                                                             ? ulog::file::RotationStrategy::kIncrement
-                                                             : ulog::file::RotationStrategy::kRename;
-
-  ulog::file::AsyncRotatingFile<ulog::spsc::Mq<>>::Config config;
-  config.fifo_size = fifo_size;
-  config.filename = filename;
-  config.max_files = args_info.max_files_arg;
-  config.rotate_on_open = args_info.rotate_first_flag;
-  config.max_flush_period = flush_interval;
-  config.rotation_strategy = rotation_strategy;
-
-  const ulog::file::AsyncRotatingFile<ulog::spsc::Mq<>> async_rotate(std::move(file_writer), config);
+  std::unique_ptr<ulog::file::SinkBase> rotating_file = std::make_unique<ulog::file::SinkRotatingFile>(
+      std::move(file_writer), filename, to_bytes(args_info.file_size_arg), args_info.max_files_arg,
+      args_info.rotate_first_flag, rotation_strategy, nullptr);
+  const ulog::file::SinkAsyncWrapper<ulog::spsc::Mq<>> async_rotate(fifo_size, max_flush_period,
+                                                                     std::move(rotating_file));
 
   cmdline_parser_free(&args_info);
 
@@ -121,7 +116,7 @@ int main(const int argc, char *argv[]) {
   {
     const int flag = fcntl(STDIN_FILENO, F_GETFL);
     if (flag < 0) {
-      perror("fcntl");
+      ULOG_ERROR("fcntl failed");
       return -1;
     }
     fcntl(STDIN_FILENO, F_SETFL, flag | O_NONBLOCK);

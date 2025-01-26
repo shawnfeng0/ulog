@@ -5,9 +5,9 @@
 #include <vector>
 
 #include "ulog/error.h"
-#include "ulog/file/async_rotating_file.h"
+#include "ulog/file/sink_async_wrapper.h"
+#include "ulog/file/sink_rotating_file.h"
 #include "ulog/queue/mpsc_ring.h"
-#include "ulog/queue/spsc_ring.h"
 #include "ulog/ulog.h"
 
 static void OutputFunc() {
@@ -39,28 +39,23 @@ static void OutputFunc() {
 }
 
 int main() {
-  std::unique_ptr<ulog::file::WriterInterface> file_writer = std::make_unique<ulog::file::FileLimitWriter>(100 * 1024);
+  std::unique_ptr<ulog::file::FileWriterBase> file_writer = std::make_unique<ulog::file::FileWriter>();
+  std::unique_ptr<ulog::file::SinkBase> rotating_file = std::make_unique<ulog::file::SinkRotatingFile>(
+      std::move(file_writer), "/tmp/ulog/test.txt", 100 * 1024, 5, true, ulog::file::kRename, [] {
+        std::string file_head = "This is ulog lib file head.\n";
+        return std::vector(file_head.begin(), file_head.end());
+      });
 
-  ulog::file::AsyncRotatingFile<ulog::mpsc::Mq>::Config config;
-  config.fifo_size = 65536 * 2;
-  config.filename = "/tmp/ulog/test.txt";
-  config.max_files = 5;
-  config.rotate_on_open = true;
-  config.max_flush_period = std::chrono::seconds{1};
-  config.rotation_strategy = ulog::file::kRename;
-  config.cb_file_head = [] {
-    std::string file_head = "This is ulog lib file head.\n";
-    return std::vector(file_head.begin(), file_head.end());
-  };
-
-  ulog::file::AsyncRotatingFile<ulog::mpsc::Mq> async_rotate(std::move(file_writer), config);
+  ulog::file::SinkAsyncWrapper<ulog::mpsc::Mq> async_rotate(65536 * 2, std::chrono::seconds{1},
+                                                             std::move(rotating_file));
 
   // Initial logger
   logger_set_user_data(ULOG_GLOBAL, &async_rotate);
   logger_set_output_callback(ULOG_GLOBAL, [](void *user_data, const char *str) {
     printf("%s", str);
     auto &async = *static_cast<decltype(&async_rotate)>(user_data);
-    return static_cast<int>(async.InPacket(str, strlen(str)));
+    int len = strlen(str);
+    return async.SinkIt(str, len) ? len : 0;
   });
   logger_set_flush_callback(ULOG_GLOBAL, [](void *user_data) {
     auto &async = *static_cast<decltype(&async_rotate)>(user_data);

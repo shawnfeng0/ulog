@@ -5,12 +5,12 @@
 #include <string>
 #include <utility>
 
-#include "rotation_strategy_interface.h"
+#include "rotation_strategy_base.h"
 #include "ulog/status.h"
 
 namespace ulog::file {
 
-class RotationStrategyIncremental final : public RotationStrategyInterface {
+class RotationStrategyIncremental final : public RotationStrategyBase {
  public:
   RotationStrategyIncremental(std::string basename, std::string ext, const size_t max_files)
       : basename_(std::move(basename)), ext_(std::move(ext)), max_files_(max_files == 0 ? 1 : max_files) {

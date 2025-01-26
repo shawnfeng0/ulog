@@ -1,14 +1,13 @@
 #pragma once
 
 #include <string>
-#include <utility>
 
 #include "ulog/file/file.h"
-#include "ulog/file/rotation_strategy_interface.h"
+#include "ulog/file/rotation_strategy_base.h"
 
 namespace ulog::file {
 
-class RotationStrategyRename final : public RotationStrategyInterface {
+class RotationStrategyRename final : public RotationStrategyBase {
  public:
   RotationStrategyRename(std::string basename, std::string ext, const size_t max_files)
       : basename_(std::move(basename)), ext_(std::move(ext)), max_files_(max_files == 0 ? 1 : max_files) {}
