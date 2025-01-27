@@ -34,8 +34,19 @@ class SinkAsyncWrapper final : public SinkBase {
       typename Queue::Consumer reader(umq_->shared_from_this());
 
       while (!should_exit_) {
-        auto data_packet = need_wait_flush ? reader.ReadOrWait(max_flush_period, [&] { return should_exit_.load(); })
-                                           : reader.ReadOrWait([&] { return should_exit_.load(); });
+        bool flush_now = false;
+
+        auto data_packet = [&] {
+          if (should_flush_) {
+            should_flush_ = false;
+            flush_now = true;
+            return reader.Read();
+          }
+          return need_wait_flush
+                     ? reader.ReadOrWait(max_flush_period, [&] { return should_flush_.load() || should_exit_.load(); })
+                     : reader.ReadOrWait([&] { return should_flush_.load() || should_exit_.load(); });
+        }();
+
         while (const auto data = data_packet.next()) {
           auto status = SinkAll(data.data, data.size);
           if (!status) {
@@ -46,7 +57,7 @@ class SinkAsyncWrapper final : public SinkBase {
 
         // Flush
         const auto cur_time = std::chrono::steady_clock::now();
-        if (need_wait_flush && cur_time - last_flush_time >= max_flush_period) {
+        if (flush_now || (need_wait_flush && cur_time - last_flush_time >= max_flush_period)) {
           if (auto status = FlushAllSink(); !status) {
             ULOG_ERROR("Failed to flush file: %s", status.ToString().c_str());
             continue;
@@ -75,9 +86,10 @@ class SinkAsyncWrapper final : public SinkBase {
     if (async_thread_) async_thread_->join();
   }
 
-  [[nodiscard]] Status Flush() override {
+  Status Flush() override {
+    should_flush_.store(true);
     umq_->Flush();
-    return FlushAllSink();
+    return Status::OK();
   }
 
   typename Queue::Producer CreateProducer() const { return typename Queue::Producer(umq_->shared_from_this()); }
@@ -128,6 +140,7 @@ class SinkAsyncWrapper final : public SinkBase {
   std::unique_ptr<std::thread> async_thread_;
 
   std::atomic_bool should_exit_{false};
+  std::atomic_bool should_flush_{false};
 };
 
 }  // namespace ulog::file
