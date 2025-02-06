@@ -10,6 +10,7 @@
 #include "cmdline.h"
 #include "ulog/file/file_writer_zstd.h"
 #include "ulog/file/sink_async_wrapper.h"
+#include "ulog/file/sink_limit_size_file.h"
 #include "ulog/file/sink_rotating_file.h"
 #include "ulog/queue/spsc_ring.h"
 
@@ -108,7 +109,7 @@ int main(const int argc, char *argv[]) {
       std::move(file_writer), filename, to_bytes(args_info.file_size_arg), args_info.max_files_arg,
       args_info.rotate_first_flag, rotation_strategy, nullptr);
   const ulog::file::SinkAsyncWrapper<ulog::spsc::Mq<>> async_rotate(fifo_size, max_flush_period,
-                                                                     std::move(rotating_file));
+                                                                    std::move(rotating_file));
 
   cmdline_parser_free(&args_info);
 

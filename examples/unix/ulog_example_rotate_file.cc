@@ -6,6 +6,7 @@
 
 #include "ulog/error.h"
 #include "ulog/file/sink_async_wrapper.h"
+#include "ulog/file/sink_limit_size_file.h"
 #include "ulog/file/sink_rotating_file.h"
 #include "ulog/queue/mpsc_ring.h"
 #include "ulog/ulog.h"
@@ -46,8 +47,10 @@ int main() {
         return std::vector(file_head.begin(), file_head.end());
       });
 
+  std::unique_ptr<ulog::file::SinkBase> limit_size_file = std::make_unique<ulog::file::SinkLimitSizeFile>(
+      std::make_unique<ulog::file::FileWriter>(), "/tmp/ulog/test.txt", 10 * 1024);
   ulog::file::SinkAsyncWrapper<ulog::mpsc::Mq> async_rotate(65536 * 2, std::chrono::seconds{1},
-                                                             std::move(rotating_file));
+                                                            std::move(rotating_file), std::move(limit_size_file));
 
   // Initial logger
   logger_set_user_data(ULOG_GLOBAL, &async_rotate);

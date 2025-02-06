@@ -22,12 +22,18 @@ class SinkAsyncWrapper final : public SinkBase {
   /**
    * Build a logger that asynchronously outputs data to a file
    * @param fifo_size Asynchronous first-in first-out buffer size
-   * @param max_flush_period  Maximum file flush period (some file systems and platforms only refresh once every 60s by default, which is too slow)
+   * @param max_flush_period  Maximum file flush period (some file systems and platforms only refresh once every 60s by
+   * default, which is too slow)
    * @param next_sink Next sinker
+   * @param args More sinker
    */
-  SinkAsyncWrapper(size_t fifo_size, std::chrono::milliseconds max_flush_period, std::unique_ptr<SinkBase> next_sink)
+  template <typename... Args>
+  SinkAsyncWrapper(size_t fifo_size, std::chrono::milliseconds max_flush_period, std::unique_ptr<SinkBase> &&next_sink,
+                   Args &&...args)
       : umq_(Queue::Create(fifo_size)) {
     sinks_.emplace_back(std::move(next_sink));
+    (sinks_.emplace_back(std::forward<Args>(args)), ...);
+
     auto async_thread_function = [max_flush_period, this] {
       auto last_flush_time = std::chrono::steady_clock::now();
       bool need_wait_flush = false;  // Whether to wait for the next flush
@@ -94,7 +100,7 @@ class SinkAsyncWrapper final : public SinkBase {
 
   typename Queue::Producer CreateProducer() const { return typename Queue::Producer(umq_->shared_from_this()); }
 
-  Status SinkIt(const void *data, const size_t len, [[maybe_unused]] std::chrono::milliseconds timeout) override {
+  Status SinkIt(const void *data, const size_t len, std::chrono::milliseconds timeout) override {
     typename Queue::Producer writer(umq_->shared_from_this());
     if (auto *buffer = writer.ReserveOrWaitFor(len, timeout)) {
       memcpy(buffer, data, len);
@@ -115,12 +121,18 @@ class SinkAsyncWrapper final : public SinkBase {
   }
 
  private:
-  [[nodiscard]] Status SinkAll(const void *data, const size_t len) const {
+  [[nodiscard]] Status SinkAll(const void *data, const size_t len) {
     Status result = Status::OK();
-    for (auto &sink : sinks_) {
-      if (const auto status = sink->SinkIt(data, len); !status) {
+    for (auto sink = sinks_.begin(); sink != sinks_.end();) {
+      if (const auto status = (*sink)->SinkIt(data, len); !status) {
+        if (status.IsFull()) {
+          sink = sinks_.erase(sink);
+          continue;
+        }
         result = status;
       }
+
+      ++sink;
     }
     return result;
   }
