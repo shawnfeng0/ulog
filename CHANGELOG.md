@@ -7,19 +7,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.6.0...HEAD
+
+## [0.6.0] - 2025-02-08
+
+[0.6.0]: https://github.com/ShawnFeng0/ulog/compare/v0.5.0...v0.6.0
 
 ### Added
 
 * Add lock-free and wait-free spsc (single producer-single consumer) and mpsc (multiple producers-single consumer) queue
   libraries based on bip-buffer algorithm
-* logrotate: Supports zstd real-time compression
-* logrotate: Support incremental file rotation strategy
+* logroller: Supports zstd real-time compression
+* logroller: Support incremental file rotation strategy
+* async_file: Add file header callback function
 
 ### Changed
 
-* logrotate: SIZE and TIME parameters support string formats such as kb/mb and s/min/hour
-* logrotate: Improve performance, using lock-free spsc queue implementation
+* logrotate -> logroller: To avoid naming conflicts with logrotate, change the name to logroller
+* logroller: SIZE and TIME parameters support string formats such as kb/mb and s/min/hour
+* logroller: Improve performance, using lock-free spsc queue implementation
 
 ## [0.5.0] - 2024-11-20
 
