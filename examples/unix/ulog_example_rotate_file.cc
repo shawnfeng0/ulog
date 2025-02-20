@@ -47,8 +47,9 @@ int main() {
         return std::vector(file_head.begin(), file_head.end());
       });
 
+  const auto [basename, ext] = ulog::file::SplitByExtension("/tmp/ulog/test.txt");
   std::unique_ptr<ulog::file::SinkBase> limit_size_file = std::make_unique<ulog::file::SinkLimitSizeFile>(
-      std::make_unique<ulog::file::FileWriter>(), "/tmp/ulog/test.txt", 10 * 1024);
+      std::make_unique<ulog::file::FileWriter>(), basename + "-head" + ext, 10 * 1024);
   ulog::file::SinkAsyncWrapper<ulog::mpsc::Mq> async_rotate(65536 * 2, std::chrono::seconds{1},
                                                             std::move(rotating_file), std::move(limit_size_file));
 

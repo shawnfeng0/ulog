@@ -28,8 +28,7 @@ class SinkLimitSizeFile final : public SinkBase {
       : file_size_(file_size),
         writer_(std::move(writer)),
         filename_(std::move(filename)) {
-    auto [basename, ext] = SplitByExtension(filename_);
-    writer_->Open(basename + "-head" + ext, true, file_size_);
+    writer_->Open(filename_, true, file_size_);
   }
 
   Status SinkIt(const void *data, const size_t len, [[maybe_unused]] std::chrono::milliseconds timeout) override {
