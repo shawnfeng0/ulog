@@ -53,6 +53,7 @@ int main() {
                                                             std::move(rotating_file), std::move(limit_size_file));
 
   // Initial logger
+  logger_format_enable(ULOG_GLOBAL, ULOG_F_NUMBER);
   logger_set_user_data(ULOG_GLOBAL, &async_rotate);
   logger_set_output_callback(ULOG_GLOBAL, [](void *user_data, const char *str) {
     printf("%s", str);
