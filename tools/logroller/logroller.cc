@@ -1,5 +1,6 @@
 #include <fcntl.h>
 #include <poll.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -62,10 +63,25 @@ static std::map<std::string, std::string> ParseParametersMap(const std::string &
   return params;
 }
 
+// Ref: android logcat
+// Lower priority and set to batch scheduling
+static void SetupSchedulingPolicy() {
+  constexpr int PRIORITY_BACKGROUND = 10;
+  constexpr sched_param param = {};
+  if (sched_setscheduler(0, SCHED_BATCH, &param) < 0) {
+    ULOG_ERROR("failed to set to batch scheduler\n");
+  }
+  if (setpriority(PRIO_PROCESS, 0, PRIORITY_BACKGROUND) < 0) {
+    ULOG_ERROR("failed set to priority\n");
+  }
+}
+
 int main(const int argc, char *argv[]) {
   gengetopt_args_info args_info{};
 
   if (cmdline_parser(argc, argv, &args_info) != 0) exit(1);
+
+  SetupSchedulingPolicy();
 
   const auto fifo_size = std::max(to_bytes(args_info.fifo_size_arg), 16ULL * 1024);
   const auto max_flush_period = to_chrono_time(args_info.flush_interval_arg);
