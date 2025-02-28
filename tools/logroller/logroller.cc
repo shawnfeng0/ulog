@@ -66,11 +66,15 @@ static std::map<std::string, std::string> ParseParametersMap(const std::string &
 // Ref: android logcat
 // Lower priority and set to batch scheduling
 static void SetupSchedulingPolicy() {
-  constexpr int PRIORITY_BACKGROUND = 10;
+#if defined(__linux__)
   constexpr sched_param param = {};
   if (sched_setscheduler(0, SCHED_BATCH, &param) < 0) {
     ULOG_ERROR("failed to set to batch scheduler\n");
   }
+#endif
+
+  constexpr int PRIORITY_BACKGROUND = 10;
+
   if (setpriority(PRIO_PROCESS, 0, PRIORITY_BACKGROUND) < 0) {
     ULOG_ERROR("failed set to priority\n");
   }
