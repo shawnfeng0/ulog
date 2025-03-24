@@ -2,20 +2,24 @@
 #include <zstd.h>
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "file.h"
 #include "file_writer_base.h"
+#include "file_writer_buffered_io.h"
 
 namespace ulog::file {
 
 class FileWriterZstd final : public FileWriterBase {
  public:
-  explicit FileWriterZstd(const int level = 3, const int window_log = 14, const int chain_log = 14,
-                          const int hash_log = 15, const int search_log = 2, const int min_match = 4,
-                          const int target_length = 0, const int strategy = 2, const size_t max_frame_in = 8 << 20)
-      : config_file_limit_size_(kNoLimit), config_zstd_max_frame_in_(max_frame_in) {
+  explicit FileWriterZstd(std::unique_ptr<FileWriterBase>&& file_writer, const int level = 3, const int window_log = 14,
+                          const int chain_log = 14, const int hash_log = 15, const int search_log = 2,
+                          const int min_match = 4, const int target_length = 0, const int strategy = 2,
+                          const size_t max_frame_in = 8 << 20)
+      : config_file_limit_size_(kNoLimit), config_zstd_max_frame_in_(max_frame_in), file_(std::move(file_writer)) {
     zstd_out_buffer_.resize(16 * 1024);
+    out_buffer_ = {zstd_out_buffer_.data(), zstd_out_buffer_.size(), 0};
 
     zstd_cctx_ = ZSTD_createCCtx();
     assert(zstd_cctx_ != nullptr);
@@ -40,32 +44,22 @@ class FileWriterZstd final : public FileWriterBase {
       return Status::Corruption("Error creating ZSTD context");
     }
 
-    if (file_ != nullptr) {
-      return Status::Corruption("File already opened!", filename);
-    }
-
     // create containing folder if not exists already.
-    if (!file::create_dir(file::dir_name(filename))) {
+    if (!create_dir(dir_name(filename))) {
       return Status::Corruption("Error creating directory", filename);
     }
 
-    file_ = fopen(filename.c_str(), truncate ? "wb" : "ab");
-    if (!file_) {
-      return Status::IOError("Error opening file", filename);
+    if (const auto status = file_->Open(filename, truncate, limit); !status) {
+      return status;
     }
 
-    file_write_compress_size_ = truncate ? 0 : file::filesize(file_);
     zstd_frame_in_ = 0;
     config_file_limit_size_ = limit;
     return Status::OK();
   }
 
   Status Write(const void* data, const size_t length) override {
-    if (file_ == nullptr) {
-      return Status::Corruption("Not opened");
-    }
-
-    if (file_write_compress_size_ + ZSTD_compressBound(length) + zstd_header_size() > config_file_limit_size_) {
+    if (file_->TellP() + ZSTD_compressBound(length) + zstd_header_size() > config_file_limit_size_) {
       return Status::Full();
     }
 
@@ -79,33 +73,26 @@ class FileWriterZstd final : public FileWriterBase {
   }
 
   Status Flush() override {
-    if (!file_) {
-      return Status::Corruption("Not opened");
-    }
-
     if (zstd_frame_in_ > 0) {
-      auto status = WriteCompressData(nullptr, 0, ZSTD_e_end);
-      if (!status) return status;
+      if (const auto status = WriteCompressData(nullptr, 0, ZSTD_e_end); !status) {
+        return status;
+      }
 
       zstd_frame_in_ = 0;
     }
 
-    std::fflush(file_);
+    file_->Flush();
     return Status::OK();
   }
 
   Status Close() override {
-    if (!file_) {
-      return Status::Corruption("Not opened");
-    }
+    auto f_result = Flush();
+    auto c_result = file_->Close();
 
-    Status result = Flush();
-
-    fclose(file_);
-    file_ = nullptr;
-
-    return result;
+    return std::move(f_result.ok() ? c_result : f_result);
   }
+
+  size_t TellP() override { return file_->TellP(); }
 
  private:
   static size_t zstd_header_size() {
@@ -120,17 +107,18 @@ class FileWriterZstd final : public FileWriterBase {
     size_t remaining = 0;
     ZSTD_inBuffer in_buffer = {data, length, 0};
     do {
-      ZSTD_outBuffer out_buffer{zstd_out_buffer_.data(), zstd_out_buffer_.size(), 0};
-      remaining = ZSTD_compressStream2(zstd_cctx_, &out_buffer, &in_buffer, mode);
+      remaining = ZSTD_compressStream2(zstd_cctx_, &out_buffer_, &in_buffer, mode);
       if (ZSTD_isError(remaining)) {
         return Status::Corruption(ZSTD_getErrorName(remaining));
       }
 
-      if (std::fwrite(out_buffer.dst, 1, out_buffer.pos, file_) != out_buffer.pos) {
-        return Status::IOError("Error writing to file");
+      if (mode == ZSTD_e_end || out_buffer_.size == out_buffer_.pos) {
+        if (const auto status = file_->Write(out_buffer_.dst, out_buffer_.pos); !status) {
+          return Status::IOError("Error writing to file");
+        }
+        out_buffer_.pos = 0;
       }
 
-      file_write_compress_size_ += out_buffer.pos;
     } while (remaining != 0);
 
     return Status::OK();
@@ -140,12 +128,11 @@ class FileWriterZstd final : public FileWriterBase {
   size_t config_file_limit_size_;
   const size_t config_zstd_max_frame_in_;
 
-  FILE* file_ = nullptr;
-  size_t file_write_compress_size_{0};
-
+  std::unique_ptr<FileWriterBase> file_;
   ZSTD_CCtx* zstd_cctx_ = nullptr;
   size_t zstd_frame_in_{0};
   std::vector<uint8_t> zstd_out_buffer_;
+  ZSTD_outBuffer out_buffer_{};
 };
 
 }  // namespace ulog::file

@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "file_writer.h"
+#include "file_writer_buffered_io.h"
 #include "rotation_strategy_incremental.h"
 #include "rotation_strategy_rename.h"
 #include "sink_base.h"
@@ -52,7 +52,9 @@ class SinkRotatingFile final : public SinkBase {
       rotator_->Rotate();
     }
 
-    writer_->Open(rotator_->LatestFilename(), rotate_on_open, file_size_);
+    if (const auto status = writer_->Open(rotator_->LatestFilename(), rotate_on_open, file_size_); !status) {
+      ULOG_ERROR("Failed to open file: %s", status.ToString().c_str());
+    }
 
     if (cb_file_head_) {
       const auto head_data = cb_file_head_();

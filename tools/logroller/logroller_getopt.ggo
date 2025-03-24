@@ -1,5 +1,5 @@
 package "logroller"
-version "0.6.0"
+version "0.6.1"
 
 usage "logroller -f PATH [OPTIONS]..."
 purpose "Loop logging of standard inputs to several files."

@@ -9,6 +9,8 @@
 #include <sstream>
 
 #include "cmdline.h"
+#include "ulog/file/file_writer_buffered_io.h"
+#include "ulog/file/file_writer_unbuffered_io.h"
 #include "ulog/file/file_writer_zstd.h"
 #include "ulog/file/sink_async_wrapper.h"
 #include "ulog/file/sink_limit_size_file.h"
@@ -106,6 +108,7 @@ int main(const int argc, char *argv[]) {
     if (args_info.zstd_params_given) {
       const std::map<std::string, std::string> result = ParseParametersMap(args_info.zstd_params_arg);
       file_writer = std::make_unique<ulog::file::FileWriterZstd>(
+          std::make_unique<ulog::file::FileWriterUnbufferedIo>(),
           result.count("level") ? std::stoi(result.at("level")) : ZSTD_DEFAULT_LEVEL,
           result.count("window-log") ? std::stoi(result.at("window-log")) : 0,
           result.count("chain-log") ? std::stoi(result.at("chain-log")) : 0,
@@ -117,12 +120,13 @@ int main(const int argc, char *argv[]) {
 
       // No zstd parameters
     } else {
-      file_writer = std::make_unique<ulog::file::FileWriterZstd>();
+      file_writer =
+          std::make_unique<ulog::file::FileWriterZstd>(std::make_unique<ulog::file::FileWriterUnbufferedIo>());
     }
 
     // No compression
   } else {
-    file_writer = std::make_unique<ulog::file::FileWriter>();
+    file_writer = std::make_unique<ulog::file::FileWriterBufferedIo>();
   }
 
   std::unique_ptr<ulog::file::SinkBase> rotating_file = std::make_unique<ulog::file::SinkRotatingFile>(
