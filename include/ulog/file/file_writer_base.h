@@ -53,5 +53,11 @@ class FileWriterBase {
    * @return Status::Full() if the file is full
    */
   virtual Status Write(const void* data, std::size_t len) = 0;
+
+  /**
+   * Get the current file write position(filesize).
+   * @return The current file write position.
+   */
+  virtual size_t TellP() = 0;
 };
 }  // namespace ulog::file

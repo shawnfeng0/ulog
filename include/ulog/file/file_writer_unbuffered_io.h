@@ -1,41 +1,43 @@
 //
-// Created by fs on 2020-05-25.
+// Created by shawn on 25-3-13.
 //
 
 #pragma once
+
+#include <unistd.h>
 
 #include "file.h"
 #include "file_writer_base.h"
 
 namespace ulog::file {
 
-class FileWriter final : public FileWriterBase {
- public:
-  explicit FileWriter() : file_limit_size_(kNoLimit) {}
-  ~FileWriter() override { FileWriter::Close(); }
+class FileWriterUnbufferedIo final : public FileWriterBase {
+public:
+  explicit FileWriterUnbufferedIo() : file_limit_size_(kNoLimit) {}
+  ~FileWriterUnbufferedIo() override { FileWriterUnbufferedIo::Close(); }
 
-  Status Open(const std::string &filename, const bool truncate, size_t limit) override {
-    if (file_ != nullptr) {
+  Status Open(const std::string &filename, const bool truncate, const size_t limit) override {
+    if (fd_ != -1) {
       return Status::Corruption("File already opened!", filename);
     }
 
     // create containing folder if not exists already.
-    if (!file::create_dir(file::dir_name(filename))) {
+    if (!create_dir(file::dir_name(filename))) {
       return Status::Corruption("Error creating directory", filename);
     }
 
-    file_ = fopen(filename.c_str(), truncate ? "wb" : "ab");
-    if (!file_) {
+    fd_ = open(filename.c_str(), O_WRONLY | O_CREAT | (truncate ? O_TRUNC : O_APPEND), 0644);
+    if (fd_ == -1) {
       return Status::IOError("Error opening file", filename);
     }
 
-    file_write_size_ = truncate ? 0 : file::filesize(file_);
+    file_write_size_ = lseek(fd_, 0, SEEK_END);
     file_limit_size_ = limit;
     return Status::OK();
   }
 
   Status Write(const void *data, const size_t length) override {
-    if (!file_) {
+    if (fd_ == -1) {
       return Status::Corruption("Not opened");
     }
 
@@ -43,7 +45,8 @@ class FileWriter final : public FileWriterBase {
       return Status::Full();
     }
 
-    if (std::fwrite(data, 1, length, file_) != length) {
+    ssize_t written = write(fd_, data, length);
+    if (written == -1 || static_cast<size_t>(written) != length) {
       return Status::IOError("Error writing to file");
     }
 
@@ -52,30 +55,36 @@ class FileWriter final : public FileWriterBase {
   }
 
   Status Flush() override {
-    if (!file_) {
+    if (fd_ == -1) {
       return Status::Corruption("Not opened");
     }
 
-    fflush(file_);
+    if (fsync(fd_) == -1) {
+      return Status::IOError("Error flushing file");
+    }
     return Status::OK();
   }
 
   Status Close() override {
-    if (!file_) {
+    if (fd_ == -1) {
       return Status::Corruption("Not opened");
     }
 
-    fclose(file_);
-    file_ = nullptr;
+    if (close(fd_) == -1) {
+      return Status::IOError("Error closing file");
+    }
+    fd_ = -1;
 
     return Status::OK();
   }
 
- private:
+  size_t TellP() override { return file_write_size_; }
+
+private:
   // config
   size_t file_limit_size_;
 
-  std::FILE *file_{nullptr};
+  int fd_{-1};
   size_t file_write_size_{0};
 };
 }  // namespace ulog::file

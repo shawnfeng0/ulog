@@ -9,7 +9,7 @@
 #include <vector>
 #include <memory>
 
-#include "file_writer.h"
+#include "file_writer_buffered_io.h"
 #include "rotation_strategy_incremental.h"
 #include "rotation_strategy_rename.h"
 #include "sink_base.h"
