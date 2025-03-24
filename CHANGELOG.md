@@ -7,7 +7,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.6.1...HEAD
+
+## [0.6.1] - 2025-03-25
+
+[0.6.1]: https://github.com/ShawnFeng0/ulog/compare/v0.6.0...v0.6.1
+
+### Added
+
+* logroller: Add native unbuffered write interface, enabled by default when logroller is compressed
+
+### Changed
+
+* file: limit_size_file no longer automatically adds the "-head" suffix, but is user-defined
+* logroller: Set up SCHED_BATCH scheduling strategy as a background task
+
+### Fixed
+
+* fix: log sequence number does not support multithreading
 
 ## [0.6.0] - 2025-02-08
 
