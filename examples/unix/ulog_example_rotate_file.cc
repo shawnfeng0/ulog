@@ -40,7 +40,7 @@ static void OutputFunc() {
 }
 
 int main() {
-  std::unique_ptr<ulog::file::FileWriterBase> file_writer = std::make_unique<ulog::file::FileWriterBufferIo>();
+  std::unique_ptr<ulog::file::FileWriterBase> file_writer = std::make_unique<ulog::file::FileWriterBufferedIo>();
   std::unique_ptr<ulog::file::SinkBase> rotating_file = std::make_unique<ulog::file::SinkRotatingFile>(
       std::move(file_writer), "/tmp/ulog/test.txt", 100 * 1024, 5, true, ulog::file::kRename, [] {
         std::string file_head = "This is ulog lib file head.\n";
@@ -49,7 +49,7 @@ int main() {
 
   const auto [basename, ext] = ulog::file::SplitByExtension("/tmp/ulog/test.txt");
   std::unique_ptr<ulog::file::SinkBase> limit_size_file = std::make_unique<ulog::file::SinkLimitSizeFile>(
-      std::make_unique<ulog::file::FileWriterBufferIo>(), basename + "-head" + ext, 10 * 1024);
+      std::make_unique<ulog::file::FileWriterBufferedIo>(), basename + "-head" + ext, 10 * 1024);
   ulog::file::SinkAsyncWrapper<ulog::mpsc::Mq> async_rotate(65536 * 2, std::chrono::seconds{1},
                                                             std::move(rotating_file), std::move(limit_size_file));
 
