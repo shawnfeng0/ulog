@@ -75,7 +75,7 @@ class Mq : public std::enable_shared_from_this<Mq<T>> {
    * @param wait_time The maximum waiting time
    */
   void Flush(const std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000)) {
-    prod_notifier_.notify_when_blocking();
+    prod_notifier_.notify_all();
     const auto prod_head = in_.load();
     cons_notifier_.wait_for(wait_time, [&]() { return queue::IsPassed(prod_head, out_.load()); });
   }
@@ -84,8 +84,8 @@ class Mq : public std::enable_shared_from_this<Mq<T>> {
    * Notify all waiting threads, so that they can check the status of the queue
    */
   void Notify() {
-    prod_notifier_.notify_when_blocking();
-    cons_notifier_.notify_when_blocking();
+    prod_notifier_.notify_all();
+    cons_notifier_.notify_all();
   }
 
  private:
@@ -193,7 +193,7 @@ class Producer {
       ring_->in_.store(new_pos, std::memory_order_release);
     }
 
-    ring_->prod_notifier_.notify_when_blocking();
+    ring_->prod_notifier_.notify_all();
   }
 
  private:
@@ -262,7 +262,7 @@ class Consumer {
 
   void Release(const DataPacket<T> &data) {
     ring_->out_.store(data.end_index_, std::memory_order_release);
-    ring_->cons_notifier_.notify_when_blocking();
+    ring_->cons_notifier_.notify_all();
   }
 
  private:
