@@ -1,15 +1,11 @@
 #pragma once
 
-#include <unistd.h>
-
 #include <atomic>
 #include <cassert>
 #include <complex>
-#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <memory>
-#include <string>
 #include <thread>
 
 #include "lite_notifier.h"
@@ -162,7 +158,7 @@ class Mq : public std::enable_shared_from_this<Mq> {
    * @param wait_time The maximum waiting time
    */
   void Flush(const std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000)) {
-    prod_notifier_.notify_when_blocking();
+    prod_notifier_.notify_all();
     const auto prod_head = prod_head_.load();
     cons_notifier_.wait_for(wait_time, [&]() { return queue::IsPassed(prod_head, cons_head_.load()); });
   }
@@ -171,8 +167,8 @@ class Mq : public std::enable_shared_from_this<Mq> {
    * Notify all waiting threads, so that they can check the status of the queue
    */
   void Notify() {
-    prod_notifier_.notify_when_blocking();
-    cons_notifier_.notify_when_blocking();
+    prod_notifier_.notify_all();
+    cons_notifier_.notify_all();
   }
 
  private:
@@ -299,7 +295,7 @@ class Producer {
     // 1. If you wait for prod_tail to update to the current position, there will be a lot of performance loss
     // 2. If you don't wait for prod_tail, just do a check and mark? It doesn't work either. Because it is a wait-free
     // process, in a highly competitive scenario, the queue may have been updated once, and the data is unreliable.
-    ring_->prod_notifier_.notify_when_blocking();
+    ring_->prod_notifier_.notify_all();
   }
 
   /**
@@ -432,7 +428,7 @@ class Consumer {
     }
 
     ring_->cons_head_.store(cons_head_next, std::memory_order_release);
-    ring_->cons_notifier_.notify_when_blocking();
+    ring_->cons_notifier_.notify_all();
   }
 
  private:
