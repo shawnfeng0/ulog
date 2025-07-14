@@ -59,7 +59,7 @@ class FileWriterZstd final : public FileWriterBase {
   }
 
   Status Write(const void* data, const size_t length) override {
-    if (file_->TellP() + ZSTD_compressBound(length) + zstd_header_size() > config_file_limit_size_) {
+    if (file_->TellP() + ZSTD_compressBound(zstd_frame_in_ + length) + zstd_header_size() > config_file_limit_size_) {
       return Status::Full();
     }
 
@@ -114,7 +114,7 @@ class FileWriterZstd final : public FileWriterBase {
 
       if (mode == ZSTD_e_end || out_buffer_.size == out_buffer_.pos) {
         if (const auto status = file_->Write(out_buffer_.dst, out_buffer_.pos); !status) {
-          return Status::IOError("Error writing to file");
+          return status;
         }
         out_buffer_.pos = 0;
       }
