@@ -7,7 +7,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/ShawnFeng0/ulog/compare/v0.6.2...HEAD
+
+## [0.6.2] - 2025-04-15
+
+[0.6.2]: https://github.com/ShawnFeng0/ulog/compare/v0.6.1...v0.6.2
+
+### Fixed
+
+* fix: file size check for zstd compression
 
 ## [0.6.1] - 2025-03-25
 
