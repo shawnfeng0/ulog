@@ -20,16 +20,22 @@ jobs:
             arch: x64
             cmake_args: ""
             artifact_name: ulog-linux-x64
+            build_examples: "ON"
+            build_tools: "ON"
           - name: linux-arm64
             os: ubuntu-latest
             arch: arm64
             cmake_args: "-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=aarch64 -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++"
             artifact_name: ulog-linux-arm64
+            build_examples: "OFF"
+            build_tools: "OFF"
           - name: linux-arm32
             os: ubuntu-latest
             arch: arm32
             cmake_args: "-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=arm -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++"
             artifact_name: ulog-linux-arm32
+            build_examples: "OFF"
+            build_tools: "OFF"
 
     steps:
       - name: Checkout code
@@ -51,8 +57,8 @@ jobs:
         run: |
           cmake -B ${{github.workspace}}/build \
             -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-            -DULOG_BUILD_EXAMPLES=ON \
-            -DULOG_BUILD_TOOLS=ON \
+            -DULOG_BUILD_EXAMPLES=${{ matrix.platform.build_examples }} \
+            -DULOG_BUILD_TOOLS=${{ matrix.platform.build_tools }} \
             -DULOG_BUILD_TESTS=OFF \
             ${{ matrix.platform.cmake_args }}
 

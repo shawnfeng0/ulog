@@ -540,3 +540,4 @@ MigrationBackup/
 
 # vscode cmake build
 build
+build-*
