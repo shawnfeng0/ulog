@@ -7,8 +7,8 @@ This repository includes an automated workflow that builds cross-platform packag
 The workflow automatically builds packages for the following architectures:
 
 - **linux-x64**: Native x86_64 Linux build (includes examples and tools)
-- **linux-arm64**: ARM64/AArch64 Linux build (cross-compiled, library only)
-- **linux-arm32**: ARM32 Linux build (cross-compiled, library only)
+- **linux-arm64**: ARM64/AArch64 Linux build (cross-compiled, includes tools)
+- **linux-arm32**: ARM32 Linux build (cross-compiled, includes tools)
 
 ## How to Trigger a Release
 
@@ -28,11 +28,11 @@ The workflow automatically builds packages for the following architectures:
 Each package contains:
 - `lib/libulog.a` - Static library for the target architecture
 - `include/ulog/` - Header files for development
+- `tools/` - Tools like logroller for all platforms
 - `README.txt` - Platform-specific usage instructions
 
 For the x64 build only:
 - `examples/` - Example programs
-- `tools/` - Additional tools like logroller
 
 ## Usage
 
@@ -49,9 +49,9 @@ gcc -I./include your_program.c -L./lib -lulog -o your_program
 ## Cross-Compilation Notes
 
 - ARM builds are cross-compiled on Ubuntu using standard cross-compilation toolchains
-- ARM packages contain only the core library to avoid linker compatibility issues
+- ARM packages now include the logroller tool for all platforms
 - For ARM targets, you may need appropriate runtime libraries on the target system
-- Examples and tools are only included in the x64 build to ensure compatibility
+- Examples are only included in the x64 build to avoid potential compatibility issues
 
 ## Workflow Details
 
@@ -69,5 +69,6 @@ If you encounter issues with the packages:
 1. **ARM libraries not working**: Ensure you have the correct runtime libraries installed on your target system
 2. **Linking errors**: Make sure you're using the correct architecture package for your target
 3. **Missing examples**: Examples are only available in the x64 package - use those for reference
+4. **Tools not working on ARM**: Ensure you have the necessary shared libraries (like libzstd) on your ARM target system
 
 For issues with the workflow itself, check the Actions tab in the GitHub repository.

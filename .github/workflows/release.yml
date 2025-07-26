@@ -28,14 +28,14 @@ jobs:
             cmake_args: "-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=aarch64 -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++"
             artifact_name: ulog-linux-arm64
             build_examples: "OFF"
-            build_tools: "OFF"
+            build_tools: "ON"
           - name: linux-arm32
             os: ubuntu-latest
             arch: arm32
             cmake_args: "-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=arm -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++"
             artifact_name: ulog-linux-arm32
             build_examples: "OFF"
-            build_tools: "OFF"
+            build_tools: "ON"
 
     steps:
       - name: Checkout code
