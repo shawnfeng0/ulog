@@ -42,6 +42,8 @@ endif ()
 
 if (ULOG_BUILD_TOOLS)
     add_subdirectory(tools)
+    install(TARGETS logroller
+            RUNTIME DESTINATION bin)
 endif ()
 
 # install

@@ -1,9 +1,9 @@
-name: Cross-Platform Release Build
+name: Release Build
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v?[0-9]+.[0-9]+.[0-9]+*'
 
 env:
   BUILD_TYPE: Release
@@ -15,52 +15,27 @@ jobs:
     strategy:
       matrix:
         platform:
-          - name: linux-x64
+          - name: linux-x86_64
             os: ubuntu-latest
-            arch: x64
-            cmake_args: ""
-            artifact_name: ulog-linux-x64
-            build_examples: "ON"
-            build_tools: "ON"
-          - name: linux-arm64
-            os: ubuntu-latest
-            arch: arm64
-            cmake_args: "-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=aarch64 -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++"
-            artifact_name: ulog-linux-arm64
-            build_examples: "OFF"
-            build_tools: "ON"
-          - name: linux-arm32
-            os: ubuntu-latest
-            arch: arm32
-            cmake_args: "-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=arm -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++"
-            artifact_name: ulog-linux-arm32
-            build_examples: "OFF"
-            build_tools: "ON"
+            arch: x86_64
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install cross-compilation toolchains (ARM64)
-        if: matrix.platform.arch == 'arm64'
+      - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-
-      - name: Install cross-compilation toolchains (ARM32)
-        if: matrix.platform.arch == 'arm32'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+          sudo apt-get install -y clang libzstd-dev
 
       - name: Configure CMake
         run: |
           cmake -B ${{github.workspace}}/build \
             -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-            -DULOG_BUILD_EXAMPLES=${{ matrix.platform.build_examples }} \
-            -DULOG_BUILD_TOOLS=${{ matrix.platform.build_tools }} \
-            -DULOG_BUILD_TESTS=OFF \
-            ${{ matrix.platform.cmake_args }}
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DULOG_BUILD_TOOLS=ON \
+            -DULOG_BUILD_EXAMPLES=OFF \
+            -DULOG_BUILD_TESTS=OFF
 
       - name: Build
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} -j$(nproc)
@@ -70,58 +45,21 @@ jobs:
           mkdir -p ${{github.workspace}}/package
           cmake --install ${{github.workspace}}/build --prefix ${{github.workspace}}/package
 
-      - name: Copy binaries and examples
+      - name: Copy binaries
         run: |
-          # Copy main library
-          cp ${{github.workspace}}/build/libulog.a ${{github.workspace}}/package/
-          
-          # Copy examples if they exist
-          if [ -f "${{github.workspace}}/build/examples/ulog_example_asyn" ]; then
-            mkdir -p ${{github.workspace}}/package/examples
-            cp ${{github.workspace}}/build/examples/ulog_example_* ${{github.workspace}}/package/examples/ || true
-          fi
-          
-          # Copy tools if they exist
-          if [ -f "${{github.workspace}}/build/tools/logroller/logroller" ]; then
-            mkdir -p ${{github.workspace}}/package/tools
-            cp ${{github.workspace}}/build/tools/logroller/logroller ${{github.workspace}}/package/tools/
-          fi
-
-      - name: Create README for package
-        run: |
-          cat > ${{github.workspace}}/package/README.txt << EOF
-          ulog Library Package
-          ===================
-          Platform: ${{ matrix.platform.name }}
-          Architecture: ${{ matrix.platform.arch }}
-          Build Type: ${{env.BUILD_TYPE}}
-          Git Tag: ${{ github.ref_name }}
-          
-          Contents:
-          - lib/libulog.a          - Main ulog static library
-          - include/ulog/          - Header files
-          - examples/              - Example programs (if built)
-          - tools/                 - Tools like logroller (if built)
-          
-          Usage:
-          Include the header files in your project and link against libulog.a
-          
-          Example compilation:
-          gcc -I./include your_program.c -L. -lulog -o your_program
-          
-          For more information, visit: https://github.com/ShawnFeng0/ulog
-          EOF
+          # No need to copy binaries, install step already handles this
 
       - name: Create package archive
         run: |
+          repo_name="${{ github.event.repository.name }}"
           cd ${{github.workspace}}/package
-          tar -czf ../${{ matrix.platform.artifact_name }}-${{ github.ref_name }}.tar.gz *
+          tar -czf ../${repo_name}-${{ matrix.platform.name }}-${{ github.ref_name }}.tar.gz *
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform.artifact_name }}-${{ github.ref_name }}
-          path: ${{github.workspace}}/${{ matrix.platform.artifact_name }}-${{ github.ref_name }}.tar.gz
+          name: ${{ github.event.repository.name }}-${{ matrix.platform.name }}-${{ github.ref_name }}
+          path: ${{github.workspace}}/${{ github.event.repository.name }}-${{ matrix.platform.name }}-${{ github.ref_name }}.tar.gz
           retention-days: 30
 
   release:
@@ -144,43 +82,21 @@ jobs:
       - name: Display structure of downloaded files
         run: ls -la ./artifacts/
 
-      - name: Create release body
+      - name: Create release body from changelog
+        shell: bash
         run: |
-          cat > release_body.md << 'EOF'
-          ## Cross-Platform Release for ${{ github.ref_name }}
-          
-          This release includes pre-built binaries for multiple architectures:
-          
-          ### Platforms:
-          - **linux-x64**: Native x86_64 Linux build
-          - **linux-arm64**: ARM64/AArch64 Linux build (cross-compiled)
-          - **linux-arm32**: ARM32 Linux build (cross-compiled)
-          
-          ### Contents:
-          Each package contains:
-          - Static library (`libulog.a`)
-          - Header files for development
-          - Example programs
-          - Tools (logroller)
-          - Documentation
-          
-          ### Usage:
-          1. Download the appropriate package for your target platform
-          2. Extract the archive
-          3. Include the headers and link against the static library
-          4. See README.txt in each package for detailed instructions
-          
-          **Note**: ARM builds are cross-compiled and may require appropriate runtime libraries on target systems.
-          EOF
+          tag="${{ github.ref_name }}"
+          tag_no_v="${tag#v}"
+          tag_escaped=$(echo "$tag_no_v" | sed 's/\./\\./g')
+          awk "/## \\[(v)?$tag_escaped\]/ {flag=1; next} /^## \\[/ {flag=0} flag" CHANGELOG.md | sed '/^$/d' > release_body.md
+          repo_url="https://github.com/${{ github.repository }}"
+          echo -e "\nFor more release notes, see [CHANGELOG.md]($repo_url/blob/${{ github.ref_name }}/CHANGELOG.md)" >> release_body.md
 
       - name: Create Release and Upload Assets
         run: |
-          # Create release
           gh release create ${{ github.ref_name }} \
             --title "Release ${{ github.ref_name }}" \
             --notes-file release_body.md
-          
-          # Upload all artifacts
           for artifact_dir in ./artifacts/*/; do
             artifact_file=$(find "$artifact_dir" -name "*.tar.gz" | head -1)
             if [ -f "$artifact_file" ]; then
