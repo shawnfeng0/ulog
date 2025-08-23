@@ -1,4 +1,4 @@
-add_subdirectory(benchmarks)
+add_subdirectory(mpsc_benchmarks)
 
 # ulog build test
 add_executable(ulog_test ulog_test.c)
