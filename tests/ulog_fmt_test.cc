@@ -1,47 +1,128 @@
 #include "ulog/ulog_fmt.h"
 
-#include <stdio.h>
-#include <time.h>
+#include <gtest/gtest.h>
+#include <cstring>
+#include <string>
 
-static int put_str(void *user_data, const char *str) {
-  (void)user_data;  // unused
-#if defined(WIN32) || defined(__unix__) || defined(__APPLE__)
-  return printf("%s", str);
-#else
-  return 0;
-#endif
+// Captures all output written to a Logger instance
+class OutputCapture {
+ public:
+  explicit OutputCapture(ulog::Logger& logger) {
+    logger.set_output_callback(Callback, this);
+  }
+  const std::string& str() const { return buf_; }
+  void clear() { buf_.clear(); }
+
+ private:
+  std::string buf_;
+  static int Callback(void* self, const char* s) {
+    static_cast<OutputCapture*>(self)->buf_ += s;
+    return static_cast<int>(strlen(s));
+  }
+};
+
+// ---------------------------------------------------------------------------
+// All log levels produce output
+// ---------------------------------------------------------------------------
+TEST(UlogFmt, AllLevels) {
+  ulog::Logger logger;
+  OutputCapture cap(logger);
+
+  logger.trace("trace {}", 1);
+  logger.debug("debug {}", 2);
+  logger.info("info {}", 3);
+  logger.warn("warn {}", 4);
+  logger.error("error {}", 5);
+  logger.fatal("fatal {}", 6);
+
+  EXPECT_NE(cap.str().find("trace 1"), std::string::npos);
+  EXPECT_NE(cap.str().find("debug 2"), std::string::npos);
+  EXPECT_NE(cap.str().find("info 3"), std::string::npos);
+  EXPECT_NE(cap.str().find("warn 4"), std::string::npos);
+  EXPECT_NE(cap.str().find("error 5"), std::string::npos);
+  EXPECT_NE(cap.str().find("fatal 6"), std::string::npos);
 }
 
-int main() {
-  struct ulog_s *local_logger = logger_create();
-  logger_set_output_callback(local_logger, put_str);
-  logger_set_output_callback(ULOG_GLOBAL, put_str);
+// ---------------------------------------------------------------------------
+// Level filtering works
+// ---------------------------------------------------------------------------
+TEST(UlogFmt, LevelFilter) {
+  ulog::Logger logger;
+  OutputCapture cap(logger);
 
-  double pi = 3.14159265;
+  logger.set_level(ulog::level::warn);
+  logger.trace("filtered trace");
+  logger.debug("filtered debug");
+  logger.info("filtered info");
+  logger.warn("visible warn");
+  logger.error("visible error");
 
-  // Global logger – fmt-style format strings
-  LOGGER_FMT_TRACE("PI = {:.3f}", pi);
-  LOGGER_FMT_DEBUG("PI = {:.3f}", pi);
-  LOGGER_FMT_INFO("PI = {:.3f}", pi);
-  LOGGER_FMT_WARN("PI = {:.3f}", pi);
-  LOGGER_FMT_ERROR("PI = {:.3f}", pi);
-  LOGGER_FMT_FATAL("PI = {:.3f}", pi);
-  LOGGER_FMT_RAW("PI = {:.3f}\r\n", pi);
+  EXPECT_EQ(cap.str().find("filtered"), std::string::npos);
+  EXPECT_NE(cap.str().find("visible warn"), std::string::npos);
+  EXPECT_NE(cap.str().find("visible error"), std::string::npos);
+}
 
-  // Local logger
-  LOGGER_FMT_LOCAL_TRACE(local_logger, "PI = {:.3f}", pi);
-  LOGGER_FMT_LOCAL_DEBUG(local_logger, "PI = {:.3f}", pi);
-  LOGGER_FMT_LOCAL_INFO(local_logger, "PI = {:.3f}", pi);
-  LOGGER_FMT_LOCAL_WARN(local_logger, "PI = {:.3f}", pi);
-  LOGGER_FMT_LOCAL_ERROR(local_logger, "PI = {:.3f}", pi);
-  LOGGER_FMT_LOCAL_FATAL(local_logger, "PI = {:.3f}", pi);
-  LOGGER_FMT_LOCAL_RAW(local_logger, "PI = {:.3f}\r\n", pi);
+// ---------------------------------------------------------------------------
+// Source location is automatically captured (filename appears in output)
+// ---------------------------------------------------------------------------
+TEST(UlogFmt, SourceLocation) {
+  ulog::Logger logger;
+  OutputCapture cap(logger);
 
-  // Various format specifiers
-  LOGGER_FMT_INFO("int={} str={} hex={:#x}", 42, "hello", 255);
-  LOGGER_FMT_INFO("width {:>10}", "right");
-  LOGGER_FMT_INFO("no args");
+  logger.info("location test");
 
-  logger_destroy(&local_logger);
-  return 0;
+  // The captured output should contain this file's name
+  EXPECT_NE(cap.str().find("ulog_fmt_test"), std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// Various format specifiers
+// ---------------------------------------------------------------------------
+TEST(UlogFmt, FormatSpecifiers) {
+  ulog::Logger logger;
+  OutputCapture cap(logger);
+
+  logger.info("int={} float={:.2f} str={} hex={:#x}", 42, 3.14, "hi", 255);
+
+  EXPECT_NE(cap.str().find("int=42"), std::string::npos);
+  EXPECT_NE(cap.str().find("float=3.14"), std::string::npos);
+  EXPECT_NE(cap.str().find("str=hi"), std::string::npos);
+  EXPECT_NE(cap.str().find("hex=0xff"), std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// raw() produces output without a header
+// ---------------------------------------------------------------------------
+TEST(UlogFmt, RawOutput) {
+  ulog::Logger logger;
+  OutputCapture cap(logger);
+  // Disable all format flags so a normal log would emit nothing but the msg
+  logger.disable_format(ulog::kFormatTime | ulog::kFormatPid |
+                        ulog::kFormatLevel | ulog::kFormatFileLine |
+                        ulog::kFormatFunction | ulog::kFormatColor);
+  cap.clear();
+
+  logger.raw(ulog::level::info, "raw {}", 7);
+
+  EXPECT_NE(cap.str().find("raw 7"), std::string::npos);
+  // raw() should not include a trailing newline from the header logic
+  EXPECT_EQ(cap.str().find('\n'), std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// Free functions compile and forward to the default logger
+// ---------------------------------------------------------------------------
+TEST(UlogFmt, FreeFunctions) {
+  // Set a no-op output so the global logger doesn't write to stdout
+  ulog::get_default_logger().set_output_callback(
+      [](void*, const char*) -> int { return 0; });
+
+  // These must compile and not crash
+  ulog::trace("trace free {}", 1);
+  ulog::debug("debug free {}", 2);
+  ulog::info("info free {}", 3);
+  ulog::warn("warn free {}", 4);
+  ulog::error("error free {}", 5);
+  ulog::fatal("fatal free {}", 6);
+  ulog::raw(ulog::level::info, "raw free {}", 7);
 }
