@@ -12,3 +12,8 @@ add_test(test_cpp_compile ulog_test_cpp)
 add_executable(ulog_unit_test file_test.cc mpsc_ring_test.cc spsc_ring_test.cc power_of_2_test.cc)
 target_link_libraries(ulog_unit_test GTest::gtest_main ulog)
 add_test(ulog_unit_test ulog_unit_test)
+
+# C++ fmt frontend test
+add_executable(ulog_fmt_test ulog_fmt_test.cc)
+target_link_libraries(ulog_fmt_test ulog_fmt)
+add_test(test_fmt_compile ulog_fmt_test)

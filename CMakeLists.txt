@@ -13,6 +13,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(ULOG_BUILD_EXAMPLES "Build examples" OFF)
 option(ULOG_BUILD_TESTS "Build tests" OFF)
 option(ULOG_BUILD_TOOLS "Build tools" ON)
+option(ULOG_BUILD_FMT "Build C++ fmt frontend (ulog_fmt target)" ON)
 
 # Generate git version info
 include(cmake/git_version.cmake)
@@ -28,6 +29,14 @@ target_include_directories(ulog PUBLIC include)
 
 if (ULOG_BUILD_EXAMPLES OR ULOG_BUILD_TOOLS)
     include(cmake/zstd.cmake)
+endif ()
+
+if (ULOG_BUILD_FMT OR ULOG_BUILD_TESTS)
+    include(cmake/fmt.cmake)
+    # ulog_fmt: header-only C++ interface that wraps ulog with {fmt} format strings
+    add_library(ulog_fmt INTERFACE)
+    target_link_libraries(ulog_fmt INTERFACE ulog ulog_fmt_dep)
+    target_include_directories(ulog_fmt INTERFACE include)
 endif ()
 
 if (ULOG_BUILD_EXAMPLES)
