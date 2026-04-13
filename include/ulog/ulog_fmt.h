@@ -6,6 +6,11 @@
 // Source location (file, line, function) is captured automatically at each
 // call site without requiring any macros.
 //
+// The format backend is selected at build time (cmake/fmt.cmake):
+//   1. C++20 std::format  (ULOG_FMT_USE_STD=1, no extra dependency)
+//   2. System {fmt} library
+//   3. Downloaded {fmt} 11.1.4 (FMT_HEADER_ONLY, no exported link symbols)
+//
 // Usage:
 //   ulog::info("Hello {}", name);
 //   ulog::get_default_logger().set_output_callback(my_cb);
@@ -26,8 +31,17 @@
 #include <string>
 #include <type_traits>
 
-// {fmt} library – either bundled (header-only) or system installation
-#include <fmt/format.h>
+// Select the format backend:
+//   ULOG_FMT_USE_STD=1  → C++20 std::format (set by cmake/fmt.cmake priority 1)
+//   otherwise           → {fmt} library      (system or downloaded, priority 2/3)
+#if defined(ULOG_FMT_USE_STD) || \
+    (defined(__cpp_lib_format) && __cpp_lib_format >= 202106L)
+#  include <format>
+#  define ULOG_FMT_USE_STD_ 1
+#else
+#  include <fmt/format.h>
+#  define ULOG_FMT_USE_STD_ 0
+#endif
 
 // Platform includes for PID / TID
 #include <unistd.h>
@@ -88,13 +102,44 @@ struct identity {
 template <typename T>
 using non_deducible = typename identity<T>::type;
 
-// Wraps a fmt format string and captures the caller's source location via
+// Unified format_string type alias – resolves to the appropriate type from
+// whichever backend is active (std::format or {fmt}).
+#if ULOG_FMT_USE_STD_
+template <typename... Args>
+using format_string = std::format_string<Args...>;
+#else
+template <typename... Args>
+using format_string = fmt::format_string<Args...>;
+#endif
+
+// Unified format call – dispatches to std::format or fmt::format.
+template <typename... Args>
+inline std::string do_format(format_string<Args...> fmt_str, Args&&... args) {
+#if ULOG_FMT_USE_STD_
+  return std::format(fmt_str, std::forward<Args>(args)...);
+#else
+  return fmt::format(fmt_str, std::forward<Args>(args)...);
+#endif
+}
+
+// With std::format (C++20), std::format_string has a consteval constructor
+// that requires the format string argument to be a constant expression.
+// Function parameters are never constant expressions, so the loc_fmt_str
+// constructor must itself be consteval to propagate that requirement.
+// With {fmt} the check is constexpr-friendly, so no keyword is needed.
+#if ULOG_FMT_USE_STD_
+#  define ULOG_FMT_STRLIT_CTOR consteval
+#else
+#  define ULOG_FMT_STRLIT_CTOR
+#endif
+
+// Wraps a format string and captures the caller's source location via
 // __builtin_FILE / __builtin_LINE / __builtin_FUNCTION default parameters.
 // These builtins are evaluated at the point where loc_fmt_str is constructed
 // (i.e. the actual call site), giving correct file/line/func without macros.
 template <typename... Args>
 struct loc_fmt_str {
-  fmt::format_string<Args...> fmt;
+  format_string<Args...> fmt;
   const char* file;
   int line;
   const char* func;
@@ -106,16 +151,20 @@ struct loc_fmt_str {
   constexpr loc_fmt_str(loc_fmt_str&&) = default;
 
   // The primary constructor: builds from a string literal (or any type
-  // implicitly convertible to fmt::format_string) and captures location.
+  // implicitly convertible to format_string) and captures location.
+  // ULOG_FMT_STRLIT_CTOR expands to `consteval` on the std::format path so
+  // that std::format_string's consteval constructor can treat the string
+  // literal argument as a constant expression.
   // enable_if ensures this is not selected when S is the same loc_fmt_str
   // specialisation (copy/move ctors above take priority).
   template <typename S,
             typename = std::enable_if_t<
                 !std::is_same<std::decay_t<S>, loc_fmt_str>::value>>
-  constexpr loc_fmt_str(S&& s,
-                        const char* f  = __builtin_FILE(),
-                        int l          = __builtin_LINE(),
-                        const char* fn = __builtin_FUNCTION())
+  ULOG_FMT_STRLIT_CTOR
+  loc_fmt_str(S&& s,
+              const char* f  = __builtin_FILE(),
+              int l          = __builtin_LINE(),
+              const char* fn = __builtin_FUNCTION())
       : fmt(std::forward<S>(s)), file(f), line(l), func(fn) {}
 };
 
@@ -208,57 +257,57 @@ class Logger {
 
   template <typename... Args>
   void trace(
-      detail::non_deducible<detail::loc_fmt_str<std::decay_t<Args>...>> lf,
+      detail::non_deducible<detail::loc_fmt_str<Args...>> lf,
       Args&&... args) {
     log_(level::trace, lf.file, lf.line, lf.func,
-         fmt::format(lf.fmt, std::forward<Args>(args)...));
+         detail::do_format(lf.fmt, std::forward<Args>(args)...));
   }
 
   template <typename... Args>
   void debug(
-      detail::non_deducible<detail::loc_fmt_str<std::decay_t<Args>...>> lf,
+      detail::non_deducible<detail::loc_fmt_str<Args...>> lf,
       Args&&... args) {
     log_(level::debug, lf.file, lf.line, lf.func,
-         fmt::format(lf.fmt, std::forward<Args>(args)...));
+         detail::do_format(lf.fmt, std::forward<Args>(args)...));
   }
 
   template <typename... Args>
   void info(
-      detail::non_deducible<detail::loc_fmt_str<std::decay_t<Args>...>> lf,
+      detail::non_deducible<detail::loc_fmt_str<Args...>> lf,
       Args&&... args) {
     log_(level::info, lf.file, lf.line, lf.func,
-         fmt::format(lf.fmt, std::forward<Args>(args)...));
+         detail::do_format(lf.fmt, std::forward<Args>(args)...));
   }
 
   template <typename... Args>
   void warn(
-      detail::non_deducible<detail::loc_fmt_str<std::decay_t<Args>...>> lf,
+      detail::non_deducible<detail::loc_fmt_str<Args...>> lf,
       Args&&... args) {
     log_(level::warn, lf.file, lf.line, lf.func,
-         fmt::format(lf.fmt, std::forward<Args>(args)...));
+         detail::do_format(lf.fmt, std::forward<Args>(args)...));
   }
 
   template <typename... Args>
   void error(
-      detail::non_deducible<detail::loc_fmt_str<std::decay_t<Args>...>> lf,
+      detail::non_deducible<detail::loc_fmt_str<Args...>> lf,
       Args&&... args) {
     log_(level::error, lf.file, lf.line, lf.func,
-         fmt::format(lf.fmt, std::forward<Args>(args)...));
+         detail::do_format(lf.fmt, std::forward<Args>(args)...));
   }
 
   template <typename... Args>
   void fatal(
-      detail::non_deducible<detail::loc_fmt_str<std::decay_t<Args>...>> lf,
+      detail::non_deducible<detail::loc_fmt_str<Args...>> lf,
       Args&&... args) {
     log_(level::fatal, lf.file, lf.line, lf.func,
-         fmt::format(lf.fmt, std::forward<Args>(args)...));
+         detail::do_format(lf.fmt, std::forward<Args>(args)...));
   }
 
   // raw: outputs the formatted message without any log header
   template <typename... Args>
-  void raw(level lvl, fmt::format_string<Args...> fmt_str, Args&&... args) {
+  void raw(level lvl, detail::format_string<Args...> fmt_str, Args&&... args) {
     if (!is_enabled(lvl)) return;
-    auto msg = fmt::format(fmt_str, std::forward<Args>(args)...);
+    auto msg = detail::do_format(fmt_str, std::forward<Args>(args)...);
     write_(msg.c_str());
   }
 
@@ -303,7 +352,7 @@ class Logger {
     if (check_format(kFormatNumber)) {
       const uint32_t n =
           log_num_.fetch_add(1, std::memory_order_relaxed);
-      out += fmt::format("#{:06} ", n);
+      out += detail::do_format("#{:06} ", n);
     }
 
     // Timestamp
@@ -312,14 +361,14 @@ class Logger {
       const time_t   s  = static_cast<time_t>(us / 1000000);
       const int      ms = static_cast<int>((us % 1000000) / 1000);
       struct tm      lt = *localtime(&s);  // NOLINT: same approach as C core
-      out += fmt::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:03} ",
-                         lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday,
-                         lt.tm_hour, lt.tm_min, lt.tm_sec, ms);
+      out += detail::do_format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:03} ",
+                               lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday,
+                               lt.tm_hour, lt.tm_min, lt.tm_sec, ms);
     }
 
     // PID-TID
     if (check_format(kFormatPid))
-      out += fmt::format("{}-{} ", detail::get_pid(), detail::get_tid());
+      out += detail::do_format("{}-{} ", detail::get_pid(), detail::get_tid());
 
     // Level mark
     if (check_format(kFormatLevel)) out += lv.mark;
@@ -334,7 +383,7 @@ class Logger {
     if (check_format(kFormatFileLine | kFormatFunction)) {
       out += '(';
       if (check_format(kFormatFileLine))
-        out += fmt::format("{}:{}", detail::basename(file), line);
+        out += detail::do_format("{}:{}", detail::basename(file), line);
       if (check_format(kFormatFunction)) {
         if (check_format(kFormatFileLine)) out += ' ';
         out += func;
@@ -372,52 +421,55 @@ inline Logger& get_default_logger() {
 
 template <typename... Args>
 inline void trace(
-    detail::non_deducible<detail::loc_fmt_str<std::decay_t<Args>...>> lf,
+    detail::non_deducible<detail::loc_fmt_str<Args...>> lf,
     Args&&... args) {
   get_default_logger().trace(lf, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 inline void debug(
-    detail::non_deducible<detail::loc_fmt_str<std::decay_t<Args>...>> lf,
+    detail::non_deducible<detail::loc_fmt_str<Args...>> lf,
     Args&&... args) {
   get_default_logger().debug(lf, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 inline void info(
-    detail::non_deducible<detail::loc_fmt_str<std::decay_t<Args>...>> lf,
+    detail::non_deducible<detail::loc_fmt_str<Args...>> lf,
     Args&&... args) {
   get_default_logger().info(lf, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 inline void warn(
-    detail::non_deducible<detail::loc_fmt_str<std::decay_t<Args>...>> lf,
+    detail::non_deducible<detail::loc_fmt_str<Args...>> lf,
     Args&&... args) {
   get_default_logger().warn(lf, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 inline void error(
-    detail::non_deducible<detail::loc_fmt_str<std::decay_t<Args>...>> lf,
+    detail::non_deducible<detail::loc_fmt_str<Args...>> lf,
     Args&&... args) {
   get_default_logger().error(lf, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 inline void fatal(
-    detail::non_deducible<detail::loc_fmt_str<std::decay_t<Args>...>> lf,
+    detail::non_deducible<detail::loc_fmt_str<Args...>> lf,
     Args&&... args) {
   get_default_logger().fatal(lf, std::forward<Args>(args)...);
 }
 
 template <typename... Args>
-inline void raw(level lvl, fmt::format_string<Args...> fmt_str,
+inline void raw(level lvl, detail::format_string<Args...> fmt_str,
                 Args&&... args) {
   get_default_logger().raw(lvl, fmt_str, std::forward<Args>(args)...);
 }
 
 }  // namespace ulog
+
+#undef ULOG_FMT_USE_STD_
+#undef ULOG_FMT_STRLIT_CTOR
 
 #endif  // __cplusplus
