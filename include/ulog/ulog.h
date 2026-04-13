@@ -224,4 +224,10 @@ bool logger_check_format(struct ulog_s *logger, int32_t format);
 #define LOGGER_HEX_DUMP(data, length, width) \
   LOGGER_LOCAL_HEX_DUMP(ULOG_GLOBAL, data, length, width)
 
+// In C++ translation units, automatically pull in the C++ frontend when the
+// ulog_fmt CMake target is linked (which defines ULOG_FMT_AVAILABLE).
+#if defined(__cplusplus) && defined(ULOG_FMT_AVAILABLE)
+#include "ulog/ulog_fmt.h"
+#endif
+
 #endif  //__ULOG_H__

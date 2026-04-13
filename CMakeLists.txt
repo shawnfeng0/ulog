@@ -34,7 +34,9 @@ endif ()
 include(cmake/fmt.cmake)
 add_library(ulog_fmt INTERFACE)
 target_include_directories(ulog_fmt INTERFACE include)
-target_link_libraries(ulog_fmt INTERFACE ulog_fmt_dep)
+target_link_libraries(ulog_fmt INTERFACE ulog ulog_fmt_dep)
+# Signals ulog.h to auto-include the C++ frontend in C++ translation units
+target_compile_definitions(ulog_fmt INTERFACE ULOG_FMT_AVAILABLE=1)
 
 if (ULOG_BUILD_EXAMPLES)
     add_subdirectory(examples)

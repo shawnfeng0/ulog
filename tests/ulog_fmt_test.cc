@@ -1,5 +1,9 @@
 #include "ulog/ulog_fmt.h"
 
+// Also verify that ulog.h auto-includes the C++ frontend when ULOG_FMT_AVAILABLE
+// is defined (which it is when linking the ulog_fmt CMake target).
+#include "ulog/ulog.h"
+
 #include <gtest/gtest.h>
 #include <cstring>
 #include <string>
@@ -107,6 +111,18 @@ TEST(UlogFmt, RawOutput) {
   EXPECT_NE(cap.str().find("raw 7"), std::string::npos);
   // raw() should not include a trailing newline from the header logic
   EXPECT_EQ(cap.str().find('\n'), std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// Auto-include via ulog.h: ulog::info() etc. are available after including
+// just ulog.h when the ulog_fmt CMake target is linked.
+// ---------------------------------------------------------------------------
+TEST(UlogFmt, AutoIncludeViaUlogH) {
+  // The ulog:: namespace is available — this would fail to compile if
+  // ulog.h did not pull in ulog_fmt.h.
+  ulog::get_default_logger().set_output_callback(
+      [](void*, const char*) -> int { return 0; });
+  ulog::info("auto-include check {}", 42);
 }
 
 // ---------------------------------------------------------------------------
