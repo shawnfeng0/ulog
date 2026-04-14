@@ -1,7 +1,3 @@
-#include "ulog/ulog_fmt.h"
-
-// Also verify that ulog.h auto-includes the C++ frontend when ULOG_FMT_AVAILABLE
-// is defined (which it is when linking the ulog_fmt CMake target).
 #include "ulog/ulog.h"
 
 #include <gtest/gtest.h>
@@ -114,12 +110,12 @@ TEST(UlogFmt, RawOutput) {
 }
 
 // ---------------------------------------------------------------------------
-// Auto-include via ulog.h: ulog::info() etc. are available after including
-// just ulog.h when the ulog_fmt CMake target is linked.
+// ulog.h is the single entry point: in C++ it includes ulog_fmt.h, giving
+// ulog::Logger and free functions without any extra includes.
 // ---------------------------------------------------------------------------
 TEST(UlogFmt, AutoIncludeViaUlogH) {
-  // The ulog:: namespace is available — this would fail to compile if
-  // ulog.h did not pull in ulog_fmt.h.
+  // The ulog:: namespace is available from just #include "ulog/ulog.h" —
+  // this test would fail to compile if the dispatcher were not working.
   ulog::get_default_logger().set_output_callback(
       [](void*, const char*) -> int { return 0; });
   ulog::info("auto-include check {}", 42);

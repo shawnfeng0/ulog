@@ -1,4 +1,4 @@
-#include "ulog/ulog.h"
+#include "ulog/ulog_c.h"
 
 #include <stdio.h>
 #include <time.h>

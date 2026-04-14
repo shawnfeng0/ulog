@@ -10,7 +10,7 @@
 
 #include "ulog/queue/fifo_power_of_two.h"
 #include "ulog/queue/mpsc_ring.h"
-#include "ulog/ulog.h"
+#include "ulog/ulog_c.h"
 
 // Returns ANSI color string for ratio value
 #include <string>
