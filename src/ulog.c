@@ -1,4 +1,4 @@
-#include "ulog/ulog_c.h"
+#include "ulog/ulog.h"
 
 #include <ctype.h>
 #include <stdarg.h>

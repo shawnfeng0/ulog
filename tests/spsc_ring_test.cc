@@ -9,7 +9,7 @@
 #include <thread>
 
 #include "ulog/queue/spsc_ring.h"
-#include "ulog/ulog_c.h"
+#include "ulog/ulog.h"
 
 template <typename T>
 static void spsc(const uint32_t buffer_size, const uint64_t limit) {

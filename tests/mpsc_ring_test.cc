@@ -5,7 +5,7 @@
 #include "ulog/queue/mpsc_ring.h"
 
 #include <gtest/gtest.h>
-#include <ulog/ulog_c.h>
+#include <ulog/ulog.h>
 
 #include <algorithm>
 #include <random>

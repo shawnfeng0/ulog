@@ -4,7 +4,7 @@
 #include <ctime>
 
 #include "ulog/queue/fifo_power_of_two.h"
-#include "ulog/ulog_c.h"
+#include "ulog/ulog.h"
 
 void *ulog_asyn_thread(void *arg) {
   auto &fifo = *(ulog::FifoPowerOfTwo *)(arg);

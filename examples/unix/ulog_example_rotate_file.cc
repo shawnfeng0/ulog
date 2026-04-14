@@ -9,7 +9,7 @@
 #include "ulog/file/sink_limit_size_file.h"
 #include "ulog/file/sink_rotating_file.h"
 #include "ulog/queue/mpsc_ring.h"
-#include "ulog/ulog_c.h"
+#include "ulog/ulog.h"
 
 static void OutputFunc() {
   int i = 10;
