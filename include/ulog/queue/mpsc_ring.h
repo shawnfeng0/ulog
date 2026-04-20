@@ -436,7 +436,7 @@ class Consumer {
     HeaderPtr pk;
     size_t count = 0;
     for (pk = data; pk.get() < data + size;) {
-      if (pk->valid(std::memory_order_relaxed) == 0) break;
+      if (!pk->valid(std::memory_order_acquire)) break;
 
       count++;
       pk = pk.next();

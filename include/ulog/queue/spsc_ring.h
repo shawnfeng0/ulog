@@ -143,7 +143,7 @@ class Producer {
    * @return data pointer if successful, otherwise nullptr
    */
   T *Reserve(const size_t size) {
-    const auto out = ring_->out_.load(std::memory_order_relaxed);
+    const auto out = ring_->out_.load(std::memory_order_acquire);
     const auto in = ring_->in_.load(std::memory_order_relaxed);
 
     const auto unused = ring_->size() - (in - out);
