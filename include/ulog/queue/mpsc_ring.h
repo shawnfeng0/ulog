@@ -2,14 +2,14 @@
 
 #include <atomic>
 #include <cassert>
-#include <complex>
+#include <initializer_list>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <thread>
 
+#include "intrusive_struct.h"
 #include "lite_notifier.h"
-#include "memory_logger.h"
 #include "power_of_two.h"
 
 // The basic principle of circular queue implementation:
@@ -50,7 +50,7 @@ struct Header {
   bool discarded(const std::memory_order m) const { return data_size.load(m) & kFlagMask; }
   bool valid(const std::memory_order m) const { return data_size.load(m) != 0; }
 
-  std::atomic_uint32_t reverse_size;
+  std::atomic_uint32_t reserved_size;
 
  private:
   std::atomic_uint32_t data_size{0};
@@ -70,7 +70,7 @@ union HeaderPtr {
   explicit operator bool() const noexcept { return ptr_ != nullptr; }
   auto operator->() const -> Header * { return header; }
   auto get() const -> uint8_t * { return this->ptr_; }
-  HeaderPtr next() const { return HeaderPtr(ptr_ + (sizeof(Header) + align8(header->reverse_size))); }
+  HeaderPtr next() const { return HeaderPtr(ptr_ + (sizeof(Header) + align8(header->reserved_size))); }
 
  private:
   Header *header;
@@ -274,7 +274,7 @@ class Producer {
       return nullptr;
     } while (true);
 
-    pending_packet_->reverse_size.store(size, std::memory_order_relaxed);
+    pending_packet_->reserved_size.store(size, std::memory_order_relaxed);
     return &pending_packet_->data[0];
   }
 
@@ -283,12 +283,12 @@ class Producer {
    */
   void Commit(const uint8_t *data, const size_t real_size) {
     const HeaderPtr pending_packet_(intrusive::owner_of(data, &Header::data));
-    assert(real_size <= pending_packet_->reverse_size);
+    assert(real_size <= pending_packet_->reserved_size);
 
     if (real_size) {
       pending_packet_->set_size(real_size, std::memory_order_release);
     } else {
-      pending_packet_->mark_discarded(std::memory_order_relaxed);
+      pending_packet_->mark_discarded(std::memory_order_release);
     }
 
     // prod_tail cannot be modified here:
@@ -448,8 +448,8 @@ class Consumer {
 
     return PacketGroup(HeaderPtr(data), count, pk.get() - data);
   }
-  size_t cons_head_next = 0;
-  size_t cons_head = 0;
+  uint32_t cons_head_next = 0;
+  uint32_t cons_head = 0;
   std::shared_ptr<Mq> ring_;
 };
 }  // namespace mpsc
