@@ -1,8 +1,4 @@
-//
-// Created by shawnfeng on 23-3-31.
-//
-
-#include "ulog/queue/mpsc_ring.h"
+#include "ulog/queue/mpmc_ring.h"
 
 #include <gtest/gtest.h>
 
@@ -13,11 +9,11 @@
 #include <thread>
 #include <vector>
 
-using Mq = ulog::mpsc::Mq;
+using Mq = ulog::mpmc::Mq;
 
 // ── Single-threaded basic tests ─────────────────────────────────────────
 
-TEST(MpscRingTest, basic) {
+TEST(MpmcRingTest, basic) {
   const auto umq = Mq::Create(1024);
   Mq::Producer producer(umq);
   Mq::Consumer consumer(umq);
@@ -36,7 +32,7 @@ TEST(MpscRingTest, basic) {
   consumer.Release(rd);
 }
 
-TEST(MpscRingTest, multiple_writes_reads) {
+TEST(MpmcRingTest, multiple_writes_reads) {
   const auto umq = Mq::Create(1024);
   Mq::Producer producer(umq);
   Mq::Consumer consumer(umq);
@@ -57,7 +53,7 @@ TEST(MpscRingTest, multiple_writes_reads) {
   }
 }
 
-TEST(MpscRingTest, empty_queue) {
+TEST(MpmcRingTest, empty_queue) {
   const auto umq = Mq::Create(1024);
   Mq::Consumer consumer(umq);
 
@@ -66,7 +62,7 @@ TEST(MpscRingTest, empty_queue) {
   ASSERT_EQ(rd.remain(), 0u);
 }
 
-TEST(MpscRingTest, queue_full) {
+TEST(MpmcRingTest, queue_full) {
   const auto umq = Mq::Create(32);
   Mq::Producer producer(umq);
 
@@ -81,7 +77,7 @@ TEST(MpscRingTest, queue_full) {
   ASSERT_EQ(producer.Reserve(8), nullptr);
 }
 
-TEST(MpscRingTest, fill_drain_cycle) {
+TEST(MpmcRingTest, fill_drain_cycle) {
   const auto umq = Mq::Create(256);
   Mq::Producer producer(umq);
   Mq::Consumer consumer(umq);
@@ -112,7 +108,7 @@ TEST(MpscRingTest, fill_drain_cycle) {
   }
 }
 
-TEST(MpscRingTest, varying_packet_sizes) {
+TEST(MpmcRingTest, varying_packet_sizes) {
   const auto umq = Mq::Create(4096);
   Mq::Producer producer(umq);
   Mq::Consumer consumer(umq);
@@ -141,7 +137,7 @@ TEST(MpscRingTest, varying_packet_sizes) {
   ASSERT_EQ(idx, sizes.size());
 }
 
-TEST(MpscRingTest, discard_packet) {
+TEST(MpmcRingTest, discard_packet) {
   const auto umq = Mq::Create(4096);
   Mq::Producer producer(umq);
   Mq::Consumer consumer(umq);
@@ -176,7 +172,7 @@ TEST(MpscRingTest, discard_packet) {
 
 // ── Blocking / timeout tests ────────────────────────────────────────────
 
-TEST(MpscRingTest, read_or_wait_timeout) {
+TEST(MpmcRingTest, read_or_wait_timeout) {
   const auto umq = Mq::Create(1024);
   Mq::Consumer consumer(umq);
 
@@ -188,7 +184,7 @@ TEST(MpscRingTest, read_or_wait_timeout) {
   ASSERT_GE(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count(), 40);
 }
 
-TEST(MpscRingTest, reserve_or_wait_unblocks) {
+TEST(MpmcRingTest, reserve_or_wait_unblocks) {
   const auto umq = Mq::Create(64);
   Mq::Producer producer(umq);
   Mq::Consumer consumer(umq);
@@ -216,8 +212,8 @@ TEST(MpscRingTest, reserve_or_wait_unblocks) {
 
 // ── Multi-threaded stress tests ─────────────────────────────────────────
 
-static void mpsc_stress_test(size_t buffer_size, size_t write_thread_count,
-                             size_t publish_count_per_thread) {
+static void mpmc_stress_test(size_t buffer_size, size_t write_thread_count,
+                             size_t publish_count_per_thread, size_t read_thread_count) {
   const auto umq = Mq::Create(buffer_size);
   uint8_t data_source[256];
   for (size_t i = 0; i < sizeof(data_source); i++) data_source[i] = i;
@@ -258,18 +254,24 @@ static void mpsc_stress_test(size_t buffer_size, size_t write_thread_count,
     }
   };
 
-  std::vector<std::thread> writers;
+  std::vector<std::thread> writers, readers;
+  for (size_t i = 0; i < read_thread_count; ++i) readers.emplace_back(read_entry);
   for (size_t i = 0; i < write_thread_count; ++i) writers.emplace_back(write_entry);
-  std::thread reader(read_entry);
 
   for (auto &t : writers) t.join();
   umq->Notify();
-  reader.join();
+  for (auto &t : readers) t.join();
 
   ASSERT_EQ(total_read_packets.load(), total_write_packets.load());
   ASSERT_EQ(total_read_size.load(), total_write_size.load());
 }
 
-TEST(MpscRingTest, spsc) { mpsc_stress_test(32 * 1024, 1, 1024 * 100); }
-TEST(MpscRingTest, mpsc_4_producers) { mpsc_stress_test(64 * 1024, 4, 1024 * 100); }
-TEST(MpscRingTest, mpsc_heavy_contention) { mpsc_stress_test(16 * 1024, 16, 10000); }
+TEST(MpmcRingTest, spsc) { mpmc_stress_test(4096, 1, 5000, 1); }
+TEST(MpmcRingTest, mpsc_2_producers) { mpmc_stress_test(8192, 2, 5000, 1); }
+TEST(MpmcRingTest, mpsc_4_producers) { mpmc_stress_test(16384, 4, 5000, 1); }
+TEST(MpmcRingTest, spmc_2_consumers) { mpmc_stress_test(8192, 1, 5000, 2); }
+TEST(MpmcRingTest, spmc_4_consumers) { mpmc_stress_test(16384, 1, 5000, 4); }
+TEST(MpmcRingTest, mpmc_2x2) { mpmc_stress_test(8192, 2, 5000, 2); }
+TEST(MpmcRingTest, mpmc_4x4) { mpmc_stress_test(16384, 4, 2000, 4); }
+TEST(MpmcRingTest, mpmc_heavy_contention) { mpmc_stress_test(4096, 8, 1000, 4); }
+TEST(MpmcRingTest, small_buffer_mpmc) { mpmc_stress_test(128, 2, 2000, 2); }
