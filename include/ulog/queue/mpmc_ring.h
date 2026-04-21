@@ -135,7 +135,7 @@ class Mq : public std::enable_shared_from_this<Mq> {
   };
 
  public:
-  explicit Mq(size_t num_elements, Private) : cons_head_(0), prod_head_(0), prod_last_(0) {
+  explicit Mq(size_t num_elements, Private) : cons_head_(0), cons_tail_(0), prod_head_(0), prod_last_(0) {
     if (num_elements < 2) num_elements = 2;
 
     // round up to the next power of 2, since our 'let the indices wrap'
@@ -160,7 +160,7 @@ class Mq : public std::enable_shared_from_this<Mq> {
   void Flush(const std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000)) {
     prod_notifier_.notify_all();
     const auto prod_head = prod_head_.load();
-    cons_notifier_.wait_for(wait_time, [&]() { return queue::IsPassed(prod_head, cons_head_.load()); });
+    cons_notifier_.wait_for(wait_time, [&]() { return queue::IsPassed(prod_head, cons_tail_.load()); });
   }
 
   /**
@@ -182,7 +182,12 @@ class Mq : public std::enable_shared_from_this<Mq> {
   size_t mask_;
 
   [[maybe_unused]] uint8_t pad0[64]{};  // Using cache line filling technology can improve performance by 15%
+  // cons_head_: claim pointer, advanced by consumers in Read() via CAS to serialize claims.
   std::atomic<uint32_t> cons_head_;
+  // cons_tail_: free pointer, advanced by consumers in Release() AFTER memset, strictly in
+  // claim order. Producers use this for free-space calculation so they are synchronized-with
+  // the consumer's memset (release/acquire pair).
+  std::atomic<uint32_t> cons_tail_;
 
   [[maybe_unused]] uint8_t pad1[64]{};
   std::atomic<uint32_t> prod_head_;
@@ -227,11 +232,13 @@ class Producer {
 
     auto packet_head_ = ring_->prod_head_.load(std::memory_order_relaxed);
     do {
-      const auto cons_head = ring_->cons_head_.load(std::memory_order_acquire);
+      // cons_tail_ is advanced by consumers only AFTER they memset the released region,
+      // so using it (with acquire) guarantees any region before cons_tail_ has been zeroed.
+      const auto cons_tail = ring_->cons_tail_.load(std::memory_order_acquire);
       packet_next_ = packet_head_ + packet_size;
 
       // Not enough space
-      if (packet_next_ - cons_head > ring_->size()) {
+      if (packet_next_ - cons_tail > ring_->size()) {
         return nullptr;
       }
 
@@ -243,10 +250,7 @@ class Producer {
       // 0--_____________________________0--_____________________________
       //    ^in                          ^new
       if (relate_pos >= packet_size || relate_pos == 0) {
-        // MPMC: verify region is cleared by consumer before claiming
-        if (!queue::IsAllZero(&ring_->data_[packet_head_ & ring_->mask()], packet_size)) {
-          return nullptr;
-        }
+        // After being fully read out, it will be marked as all 0 by the reader
         if (!ring_->prod_head_.compare_exchange_weak(packet_head_, packet_next_, std::memory_order_relaxed)) {
           continue;
         }
@@ -260,11 +264,7 @@ class Producer {
         break;
       }
 
-      if ((cons_head & ring_->mask()) >= packet_size) {
-        // MPMC: verify region is cleared by consumer before claiming
-        if (!queue::IsAllZero(&ring_->data_[0], packet_size)) {
-          return nullptr;
-        }
+      if ((cons_tail & ring_->mask()) >= packet_size) {
         // new_pos is in the next block
         // 0__________------------------___0__________------------------___
         //            ^out              ^in
@@ -311,7 +311,7 @@ class Producer {
    */
   void Flush(const std::chrono::milliseconds wait_time = std::chrono::milliseconds(1000)) const {
     ring_->cons_notifier_.wait_for(wait_time,
-                                   [&]() { return queue::IsPassed(packet_next_, ring_->cons_head_.load()); });
+                                   [&]() { return queue::IsPassed(packet_next_, ring_->cons_tail_.load()); });
   }
 
  private:
@@ -374,6 +374,7 @@ class Consumer {
 
         cons_head_next_ = cons_head_ + group.raw_size();
         // MPMC: CAS to claim read region exclusively
+        cons_head_prev_ = cons_head_;
         if (!ring_->cons_head_.compare_exchange_weak(cons_head_, cons_head_next_, std::memory_order_relaxed)) {
           continue;
         }
@@ -405,6 +406,7 @@ class Consumer {
         } else {
           cons_head_next_ = ring_->next_buffer(cons_head_) + group.raw_size();
         }
+        cons_head_prev_ = cons_head_;
         if (!ring_->cons_head_.compare_exchange_weak(cons_head_, cons_head_next_, std::memory_order_relaxed)) {
           continue;
         }
@@ -422,6 +424,7 @@ class Consumer {
         // Read the next group only if the current group has been committed
         const auto group1 = CheckRealSize(&ring_->data_[0], cur_prod_head);
         cons_head_next_ = ring_->next_buffer(cons_head_) + group1.raw_size();
+        cons_head_prev_ = cons_head_;
         if (!ring_->cons_head_.compare_exchange_weak(cons_head_, cons_head_next_, std::memory_order_relaxed)) {
           continue;
         }
@@ -430,6 +433,7 @@ class Consumer {
       }
 
       cons_head_next_ = cons_head_ + group0.raw_size();
+      cons_head_prev_ = cons_head_;
       if (!ring_->cons_head_.compare_exchange_weak(cons_head_, cons_head_next_, std::memory_order_relaxed)) {
         continue;
       }
@@ -448,7 +452,14 @@ class Consumer {
       std::memset(group.raw_ptr(), 0, group.raw_size());
     }
 
-    // MPMC: cons_head_ already advanced in Read() via CAS, only memset and notify here
+    // MPMC: advance cons_tail_ strictly in claim order. We must wait until all earlier
+    // consumers have finished their Release (cons_tail_ reaches our claim start) before
+    // publishing our advance. The release store pairs with the producer's acquire load
+    // of cons_tail_ in Reserve, guaranteeing memset is visible before reuse.
+    while (ring_->cons_tail_.load(std::memory_order_relaxed) != cons_head_prev_) {
+      std::this_thread::yield();
+    }
+    ring_->cons_tail_.store(cons_head_next_, std::memory_order_release);
     ring_->cons_notifier_.notify_all();
   }
 
@@ -470,6 +481,7 @@ class Consumer {
     return PacketGroup(HeaderPtr(data), count, pk.get() - data);
   }
   uint32_t cons_head_next_ = 0;
+  uint32_t cons_head_prev_ = 0;
   uint32_t cons_head_ = 0;
   std::shared_ptr<Mq> ring_;
 };
