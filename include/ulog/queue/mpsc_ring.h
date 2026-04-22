@@ -424,7 +424,15 @@ class Consumer {
     for (auto &group : {data.group0_, data.group1_}) {
       if (!group.raw_size()) continue;
 
-      std::memset(group.raw_ptr(), 0, group.raw_size());
+      HeaderPtr pk(group.raw_ptr());
+      const uint8_t *end = group.raw_ptr() + group.raw_size();
+      while (pk.get() < end) {
+        auto next_pk = pk.next();
+        std::memset(pk->data, 0, align8(pk->reserved_size));
+        pk->reserved_size.store(0, std::memory_order_relaxed);
+        pk->set_size(0, std::memory_order_release);
+        pk = next_pk;
+      }
     }
 
     ring_->cons_head_.store(cons_head_next, std::memory_order_release);

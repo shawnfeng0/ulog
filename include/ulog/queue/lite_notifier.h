@@ -15,45 +15,41 @@ namespace ulog {
  */
 class LiteNotifier {
  public:
-  LiteNotifier() : waiters_(0) {}
-
   template <typename Predicate>
   void wait(Predicate pred) {
-    if (pred()) return;
-
-    std::unique_lock<std::mutex> lock(mutex_);
-    waiters_.fetch_add(1, std::memory_order_release);
-    cv_.wait(lock, pred);
-    waiters_.fetch_sub(1, std::memory_order_release);
+    WaitImpl(pred, [&](std::unique_lock<std::mutex>& lk) { cv_.wait(lk, pred); });
   }
 
   template <typename Rep, typename Period, typename Predicate>
   bool wait_for(const std::chrono::duration<Rep, Period>& timeout, Predicate pred) {
-    if (pred()) return true;
-
-    std::unique_lock<std::mutex> lock(mutex_);
-    waiters_.fetch_add(1, std::memory_order_release);
-    const bool result = cv_.wait_for(lock, timeout, pred);
-    waiters_.fetch_sub(1, std::memory_order_release);
-    return result;
+    bool ok = true;
+    WaitImpl(pred, [&](std::unique_lock<std::mutex>& lk) { ok = cv_.wait_for(lk, timeout, pred); });
+    return ok;
   }
 
   void notify_all() {
-    if (waiters_.load(std::memory_order_acquire) > 0) {
+    // Pair with the seq_cst fence in WaitImpl(): ensures the caller's state
+    // store happens-before this waiters_ load, avoiding missed wakeup
+    // (Dekker-style StoreLoad race between state/waiters_).
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    if (waiters_.load(std::memory_order_relaxed) > 0) {
       std::lock_guard<std::mutex> lock(mutex_);
       cv_.notify_all();
     }
   }
 
-  void notify_one() {
-    if (waiters_.load(std::memory_order_acquire) > 0) {
-      std::lock_guard<std::mutex> lock(mutex_);
-      cv_.notify_one();
-    }
+ private:
+  template <typename Predicate, typename Waiter>
+  void WaitImpl(Predicate pred, Waiter waiter) {
+    if (pred()) return;
+    std::unique_lock<std::mutex> lock(mutex_);
+    waiters_.fetch_add(1, std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    waiter(lock);
+    waiters_.fetch_sub(1, std::memory_order_relaxed);
   }
 
- private:
-  std::atomic<int> waiters_;
+  std::atomic<int> waiters_{0};
   std::mutex mutex_;
   std::condition_variable cv_;
 };
